@@ -1,10 +1,10 @@
 @php
     $footerColumns = [
         'Explore' => [
-            ['label' => 'Destinations', 'href' => '#destinations'],
-            ['label' => 'Tourism Directory', 'href' => '#directory'],
-            ['label' => 'Reviews', 'href' => '#reviews'],
-            ['label' => 'Near You', 'href' => '#near-you'],
+            ['label' => 'Destinations', 'href' => url('/').'#destinations'],
+            ['label' => 'Explore Listings', 'href' => route('explore')],
+            ['label' => 'Reviews', 'href' => url('/').'#reviews'],
+            ['label' => 'Near Me', 'href' => url('/').'#near-you'],
         ],
         'Information' => [
             ['label' => 'About iTOUR', 'href' => '#about'],
@@ -22,19 +22,18 @@
     <div class="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
         <div class="grid gap-10 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
             <div>
-                <div class="flex items-center gap-2">
-                    <span class="flex h-9 w-9 items-center justify-center rounded-md bg-primary-700 text-sand-0">
-                        <i class="ti ti-map-2 text-lg" aria-hidden="true"></i>
-                    </span>
-                    <span class="font-display text-lg font-extrabold tracking-tight text-primary-900">iTOUR</span>
-                </div>
+                <x-logo class="text-2xl" />
                 <p class="mt-3 max-w-xs text-sm leading-relaxed text-sand-600">
                     Integrated Tourism Information and Monitoring System — the official digital platform of the Provincial Tourism Office of Davao Oriental.
                 </p>
+                <a href="#" class="mt-5 inline-flex items-center gap-2 rounded-sm bg-accent-500 px-4 py-2.5 text-sm font-semibold text-sand-0 shadow-sm transition-colors hover:bg-accent-600">
+                    <i class="ti ti-message-2" aria-hidden="true"></i>
+                    Give Feedback
+                </a>
             </div>
 
             @foreach ($footerColumns as $heading => $links)
-                <div>
+                <div @if ($heading === 'Emergency') id="footer-emergency" @endif>
                     <h3 class="text-xs font-bold tracking-widest text-sand-500 uppercase">{{ $heading }}</h3>
                     <ul class="mt-4 flex flex-col gap-2.5 text-sm text-sand-700">
                         @foreach ($links as $link)

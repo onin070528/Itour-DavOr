@@ -16,7 +16,7 @@
 
     <div class="flex items-center gap-1" aria-label="{{ $review['rating'] }} out of 5 stars">
         @for ($i = 1; $i <= 5; $i++)
-            <i class="ti ti-star-filled text-sm {{ $i <= $review['rating'] ? 'text-accent-500' : 'text-sand-200' }}" aria-hidden="true"></i>
+            <i class="ti ti-star text-sm {{ $i <= $review['rating'] ? 'text-accent-500' : 'text-sand-200' }}" aria-hidden="true"></i>
         @endfor
     </div>
 

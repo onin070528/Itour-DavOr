@@ -34,10 +34,10 @@
             data-map-container
             class="relative h-80 overflow-hidden rounded-lg border border-sand-200 bg-gradient-to-br from-sand-200 to-primary-100 shadow-sm sm:h-96"
         >
-            <i class="ti ti-map-pin-filled absolute top-[38%] left-[42%] text-3xl text-primary-700 drop-shadow" aria-hidden="true"></i>
-            <i class="ti ti-map-pin-filled absolute top-[55%] left-[60%] text-4xl text-accent-600 drop-shadow" aria-hidden="true"></i>
-            <i class="ti ti-map-pin-filled absolute top-[28%] left-[65%] text-2xl text-primary-700 drop-shadow" aria-hidden="true"></i>
-            <i class="ti ti-map-pin-filled absolute top-[68%] left-[30%] text-2xl text-primary-700 drop-shadow" aria-hidden="true"></i>
+            <i class="ti ti-map-pin absolute top-[38%] left-[42%] text-3xl text-primary-700 drop-shadow" aria-hidden="true"></i>
+            <i class="ti ti-map-pin absolute top-[55%] left-[60%] text-4xl text-accent-600 drop-shadow" aria-hidden="true"></i>
+            <i class="ti ti-map-pin absolute top-[28%] left-[65%] text-2xl text-primary-700 drop-shadow" aria-hidden="true"></i>
+            <i class="ti ti-map-pin absolute top-[68%] left-[30%] text-2xl text-primary-700 drop-shadow" aria-hidden="true"></i>
 
             <span class="absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-sm bg-sand-0 px-2.5 py-1.5 text-xs font-semibold text-sand-700 shadow-sm">
                 <i class="ti ti-map-2" aria-hidden="true"></i>

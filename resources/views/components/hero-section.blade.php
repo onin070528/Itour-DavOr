@@ -1,5 +1,10 @@
-<section class="relative overflow-hidden bg-gradient-to-br from-primary-900 to-primary-700">
-    <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_25%_20%,rgba(255,255,255,0.14),transparent_55%)]"></div>
+<section class="relative overflow-hidden">
+    <img
+        src="{{ asset('storage/itour-images/hero-dahican-sunrise.jpg') }}"
+        alt="Aerial view of Dahican Beach's coastline at sunrise, Davao Oriental"
+        class="absolute inset-0 h-full w-full object-cover"
+    >
+    <div class="absolute inset-0 bg-gradient-to-r from-primary-900/90 via-primary-900/55 to-primary-900/10"></div>
 
     <div class="relative mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
         <span class="inline-flex items-center gap-2 rounded-sm bg-white/10 px-3 py-1.5 text-xs font-semibold text-sand-0 ring-1 ring-inset ring-white/20">
@@ -15,7 +20,7 @@
         </p>
 
         <div class="mt-8 flex flex-col gap-3 sm:flex-row">
-            <a href="#destinations" class="inline-flex items-center justify-center gap-2 rounded-sm bg-accent-500 px-6 py-3 text-sm font-semibold text-sand-0 shadow-md transition-colors hover:bg-accent-600">
+            <a href="{{ route('explore') }}" class="inline-flex items-center justify-center gap-2 rounded-sm bg-accent-500 px-6 py-3 text-sm font-semibold text-sand-0 shadow-md transition-colors hover:bg-accent-600">
                 <i class="ti ti-compass" aria-hidden="true"></i>
                 Explore Destinations
             </a>
@@ -25,7 +30,7 @@
             </a>
         </div>
 
-        <form action="#destinations" class="mt-10 flex max-w-xl items-center gap-2 rounded-md bg-sand-0 p-2 shadow-md">
+        <form action="{{ route('explore') }}" method="GET" class="mt-10 flex max-w-xl items-center gap-2 rounded-md bg-sand-0 p-2 shadow-md">
             <i class="ti ti-search ml-2 text-sand-500" aria-hidden="true"></i>
             <label for="hero-search" class="sr-only">Search a destination, accommodation, restaurant, or service</label>
             <input
@@ -39,5 +44,20 @@
                 Search
             </button>
         </form>
+
+        <div class="mt-4 flex max-w-xl flex-wrap gap-2">
+            @foreach ([
+                ['icon' => 'ti-map-pin', 'label' => 'Destinations', 'href' => route('explore', ['category' => 'destinations'])],
+                ['icon' => 'ti-bed', 'label' => 'Accommodation', 'href' => route('explore', ['category' => 'accommodation'])],
+                ['icon' => 'ti-tools-kitchen-2', 'label' => 'Restaurants', 'href' => route('explore', ['category' => 'restaurants'])],
+                ['icon' => 'ti-bus', 'label' => 'Transportation', 'href' => route('explore', ['category' => 'transportation'])],
+                ['icon' => 'ti-first-aid-kit', 'label' => 'Emergency', 'href' => '#footer-emergency'],
+            ] as $pill)
+                <a href="{{ $pill['href'] }}" class="inline-flex items-center gap-1.5 rounded-sm border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-sand-0 backdrop-blur transition-colors hover:bg-white/20">
+                    <i class="ti {{ $pill['icon'] }}" aria-hidden="true"></i>
+                    {{ $pill['label'] }}
+                </a>
+            @endforeach
+        </div>
     </div>
 </section>

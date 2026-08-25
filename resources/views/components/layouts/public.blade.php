@@ -9,7 +9,7 @@
         <meta name="description" content="iTOUR is the official tourism information platform of the Provincial Tourism Office of Davao Oriental — explore destinations, accommodations, restaurants, and tourism establishments across the province.">
 
         @fonts
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/2.47.0/iconfont/tabler-icons.min.css">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/3.46.0/tabler-icons.min.css">
 
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
