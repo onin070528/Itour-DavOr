@@ -1,2 +1,5 @@
 *
 !.gitignore
+
+!itour-images/
+!itour-images/**
