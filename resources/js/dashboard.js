@@ -15,6 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initTrendCharts();
     initConfirmActions();
     initToastTriggers();
+    initReportGenerator();
 });
 
 function initSidebarSubmenus() {
@@ -224,10 +225,17 @@ function initEditTriggers() {
 
 /**
  * Confirmation dialog for destructive/state-changing actions (archive,
- * enable/disable): `[data-confirm-trigger]` with `data-confirm-title`,
- * `data-confirm-message`, `data-confirm-label`, and `data-confirm-tone`
- * ("danger" | "success") opens `#confirm-modal`, and confirming shows a
- * success toast — there is no backend behind this yet.
+ * enable/disable, verify, remove): `[data-confirm-trigger]` with
+ * `data-confirm-title`, `data-confirm-message`, `data-confirm-label`, and
+ * `data-confirm-tone` ("danger" | "success") opens `#confirm-modal`.
+ * Confirming shows a success toast and, if the trigger also carries
+ * `data-confirm-remove-target="<selector>"`, removes the trigger's closest
+ * matching ancestor from the DOM (used for e.g. "remove this photo").
+ * There is no backend behind this yet.
+ *
+ * Delegated on `document` (rather than bound per-trigger) so it also works
+ * for triggers added dynamically after page load, e.g. a newly uploaded
+ * image card's Remove button.
  */
 function initConfirmActions() {
     const modal = document.getElementById('confirm-modal');
@@ -237,24 +245,30 @@ function initConfirmActions() {
     const messageEl = modal.querySelector('[data-confirm-message]');
     const confirmButton = modal.querySelector('[data-confirm-button]');
 
-    document.querySelectorAll('[data-confirm-trigger]').forEach((trigger) => {
-        trigger.addEventListener('click', () => {
-            titleEl.textContent = trigger.dataset.confirmTitle ?? 'Are you sure?';
-            messageEl.textContent = trigger.dataset.confirmMessage ?? 'This action cannot be undone.';
-            confirmButton.textContent = trigger.dataset.confirmLabel ?? 'Confirm';
-            confirmButton.dataset.confirmTone = trigger.dataset.confirmTone ?? 'danger';
-            confirmButton.classList.toggle('bg-danger', confirmButton.dataset.confirmTone === 'danger');
-            confirmButton.classList.toggle('bg-primary-700', confirmButton.dataset.confirmTone !== 'danger');
+    document.addEventListener('click', (e) => {
+        const trigger = e.target.closest('[data-confirm-trigger]');
+        if (!trigger) return;
 
-            confirmButton.onclick = () => {
-                modal.classList.add('hidden');
-                document.body.classList.remove('overflow-hidden');
-                showToast(trigger.dataset.confirmSuccess ?? 'Done.', 'success');
-            };
+        titleEl.textContent = trigger.dataset.confirmTitle ?? 'Are you sure?';
+        messageEl.textContent = trigger.dataset.confirmMessage ?? 'This action cannot be undone.';
+        confirmButton.textContent = trigger.dataset.confirmLabel ?? 'Confirm';
+        confirmButton.dataset.confirmTone = trigger.dataset.confirmTone ?? 'danger';
+        confirmButton.classList.toggle('bg-danger', confirmButton.dataset.confirmTone === 'danger');
+        confirmButton.classList.toggle('bg-primary-700', confirmButton.dataset.confirmTone !== 'danger');
 
-            modal.classList.remove('hidden');
-            document.body.classList.add('overflow-hidden');
-        });
+        confirmButton.onclick = () => {
+            modal.classList.add('hidden');
+            document.body.classList.remove('overflow-hidden');
+            showToast(trigger.dataset.confirmSuccess ?? 'Done.', 'success');
+
+            const removeTarget = trigger.dataset.confirmRemoveTarget;
+            if (removeTarget) {
+                trigger.closest(removeTarget)?.remove();
+            }
+        };
+
+        modal.classList.remove('hidden');
+        document.body.classList.add('overflow-hidden');
     });
 }
 
@@ -385,4 +399,233 @@ function drawLineChart(svg, values, padding = 8) {
         <path d="${linePath}" fill="none" stroke="var(--color-primary-700)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path>
         ${points.map(([x, y]) => `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.5" fill="var(--color-primary-700)"></circle>`).join('')}
     `;
+}
+
+/**
+ * Reports page: Report Generator → Preview → Recent Reports, shared by all
+ * three roles via <x-dashboard.report-workspace> + <x-dashboard.report-history-table>.
+ * There is no report-generation backend yet, so "generating" a report just
+ * reveals the matching pre-rendered preview panel (built server-side from
+ * real mock data — see each role's MockData::reportPreviewData()) after a
+ * short simulated delay. Every preview panel already exists in the DOM;
+ * this function only ever toggles visibility and fills in a few header
+ * fields, it never builds report content from raw strings.
+ */
+function initReportGenerator() {
+    const typeSelect = document.getElementById('report-type-select');
+    const form = document.getElementById('report-generator-form');
+    if (!typeSelect || !form) return;
+
+    const fromInput = document.getElementById('report-from');
+    const toInput = document.getElementById('report-to');
+    const descriptionEl = document.getElementById('report-type-description');
+    const filtersSection = document.getElementById('report-filters-section');
+    const errorEl = document.getElementById('report-generator-error');
+    const generateButton = document.getElementById('report-generate-button');
+    const generateIcon = generateButton?.querySelector('[data-generate-icon]');
+    const generateLabel = generateButton?.querySelector('[data-generate-label]');
+    const successBanner = document.getElementById('report-success-banner');
+    const previewSection = document.getElementById('report-preview');
+    const historyBody = document.getElementById('report-history-body');
+    const historyTable = document.querySelector('[data-report-history-table]');
+    const historyEmpty = document.querySelector('[data-report-history-empty]');
+    const currentUserName = document.querySelector('[data-preview-generated-by]')?.textContent ?? '';
+
+    function updateFiltersForSelectedType() {
+        const selected = typeSelect.selectedOptions[0];
+        const activeFilters = (selected?.dataset.filters ?? '').split(',').filter(Boolean);
+
+        document.querySelectorAll('[data-report-filter]').forEach((el) => {
+            el.classList.toggle('hidden', !activeFilters.includes(el.dataset.reportFilter));
+        });
+
+        filtersSection?.classList.toggle('hidden', activeFilters.length === 0);
+
+        if (descriptionEl) {
+            descriptionEl.textContent = selected?.dataset.description ?? '';
+        }
+    }
+
+    typeSelect.addEventListener('change', updateFiltersForSelectedType);
+    updateFiltersForSelectedType();
+
+    function showError(message) {
+        if (!errorEl) return;
+        errorEl.textContent = message;
+        errorEl.classList.remove('hidden');
+    }
+
+    function clearError() {
+        errorEl?.classList.add('hidden');
+    }
+
+    function formatInputDate(value) {
+        if (!value) return '';
+        const [y, m, d] = value.split('-').map(Number);
+
+        return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    function setLoading(isLoading) {
+        if (!generateButton) return;
+        generateButton.disabled = isLoading;
+        generateIcon?.classList.toggle('ti-file-report', !isLoading);
+        generateIcon?.classList.toggle('ti-loader-2', isLoading);
+        generateIcon?.classList.toggle('animate-spin', isLoading);
+        if (generateLabel) {
+            generateLabel.textContent = isLoading ? 'Generating report…' : 'Generate Report';
+        }
+    }
+
+    /**
+     * Reveals the pre-rendered panel for `typeKey` and fills in the
+     * letterhead fields. Returns false if that type has no panel (nothing
+     * to show), so callers can bail out cleanly.
+     */
+    function renderPreview(typeKey, periodLabel, generatedAtLabel, generatedByLabel) {
+        const panels = document.querySelectorAll('[data-preview-panel]');
+        let matched = false;
+        panels.forEach((panel) => {
+            const isMatch = panel.dataset.previewPanel === typeKey;
+            panel.classList.toggle('hidden', !isMatch);
+            matched = matched || isMatch;
+        });
+        if (!matched || !previewSection) return false;
+
+        const typeOption = typeSelect.querySelector(`option[value="${typeKey}"]`);
+        const titleEl = document.querySelector('[data-preview-title]');
+        const periodEl = document.querySelector('[data-preview-period]');
+        const generatedDateEl = document.querySelector('[data-preview-generated-date]');
+        const generatedByEl = document.querySelector('[data-preview-generated-by]');
+
+        if (titleEl) titleEl.textContent = typeOption?.textContent ?? '';
+        if (periodEl) periodEl.textContent = periodLabel;
+        if (generatedDateEl) generatedDateEl.textContent = generatedAtLabel;
+        if (generatedByEl) generatedByEl.textContent = generatedByLabel;
+
+        // The trend chart's SVG path can't be pre-rendered server-side (it's
+        // drawn, not looped), so the one visible panel's chart is drawn here
+        // by reusing the existing drawLineChart() — same function the
+        // dashboard's own trend charts already use, just called once instead
+        // of wired to period-toggle buttons.
+        const visiblePanel = document.querySelector('[data-preview-panel]:not(.hidden)');
+        const trendSvg = visiblePanel?.querySelector('[data-trend-chart-static]');
+        if (trendSvg) {
+            const values = JSON.parse(trendSvg.dataset.values || '[]');
+            drawLineChart(trendSvg, values);
+        }
+
+        previewSection.classList.remove('hidden');
+
+        return true;
+    }
+
+    function addToRecentReports(typeLabel, typeKey, periodLabel) {
+        if (!historyBody) return;
+
+        historyTable?.classList.remove('hidden');
+        historyEmpty?.classList.add('hidden');
+
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td class="py-2.5 pr-2 font-medium text-sand-900"></td>
+            <td class="py-2.5 pr-2 text-sand-600"></td>
+            <td class="py-2.5 pr-2 text-sand-600"></td>
+            <td class="py-2.5 pr-2 text-sand-600"></td>
+            <td class="py-2.5 pr-2 text-right">
+                <div class="inline-flex items-center gap-1.5">
+                    <button type="button" data-view-report class="rounded-sm border border-sand-300 px-3 py-1.5 text-xs font-semibold text-sand-800 hover:border-primary-300">View</button>
+                    <button type="button" data-toast-trigger data-toast-message="" class="rounded-sm border border-sand-300 px-3 py-1.5 text-xs font-semibold text-sand-800 hover:border-primary-300">Download</button>
+                </div>
+            </td>
+        `;
+
+        const reportName = `${typeLabel} — ${periodLabel}`;
+        const today = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+        row.children[0].textContent = reportName;
+        row.children[1].textContent = periodLabel;
+        row.children[2].textContent = today;
+        row.children[3].textContent = currentUserName;
+
+        const viewButton = row.querySelector('[data-view-report]');
+        viewButton.dataset.typeKey = typeKey;
+        viewButton.dataset.range = periodLabel;
+        viewButton.dataset.generatedAt = today;
+        viewButton.dataset.generatedBy = currentUserName;
+
+        row.querySelector('[data-toast-trigger]').dataset.toastMessage = `Downloading ${reportName}...`;
+
+        historyBody.prepend(row);
+    }
+
+    generateButton?.addEventListener('click', () => {
+        clearError();
+
+        if (!form.reportValidity()) {
+            return;
+        }
+
+        if (fromInput.value && toInput.value && fromInput.value > toInput.value) {
+            showError('Unable to generate the report. Please check the selected date range and try again.');
+
+            return;
+        }
+
+        const typeKey = typeSelect.value;
+        const typeLabel = typeSelect.selectedOptions[0]?.textContent ?? '';
+        const periodLabel = `${formatInputDate(fromInput.value)} – ${formatInputDate(toInput.value)}`;
+        const today = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+        setLoading(true);
+        successBanner?.classList.add('hidden');
+
+        window.setTimeout(() => {
+            setLoading(false);
+
+            const rendered = renderPreview(typeKey, periodLabel, today, currentUserName);
+            if (!rendered) {
+                showError('Unable to generate the report. Please check the selected filters and reporting period.');
+
+                return;
+            }
+
+            successBanner?.classList.remove('hidden');
+            addToRecentReports(typeLabel, typeKey, periodLabel);
+        }, 700);
+    });
+
+    document.addEventListener('click', (e) => {
+        const viewTrigger = e.target.closest('[data-view-report]');
+        if (viewTrigger) {
+            renderPreview(
+                viewTrigger.dataset.typeKey,
+                viewTrigger.dataset.range,
+                viewTrigger.dataset.generatedAt,
+                viewTrigger.dataset.generatedBy
+            );
+            document.getElementById('report-preview')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+            return;
+        }
+
+        const scrollTrigger = e.target.closest('[data-preview-scroll]');
+        if (scrollTrigger) {
+            document.getElementById('report-preview')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+            return;
+        }
+
+        const downloadTrigger = e.target.closest('[data-report-download]');
+        if (downloadTrigger) {
+            const kind = downloadTrigger.dataset.reportDownload === 'pdf' ? 'PDF downloaded.' : 'Excel file exported.';
+            showToast(kind, 'success');
+
+            return;
+        }
+
+        if (e.target.closest('#report-print-button')) {
+            window.print();
+        }
+    });
 }

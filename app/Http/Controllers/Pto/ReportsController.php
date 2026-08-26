@@ -17,7 +17,12 @@ class ReportsController extends PtoController
         return $this->renderPto($request, 'pto.reports', 'reports', 'Reports', [
             'reportTypes' => PtoMockData::reportTypes(),
             'history' => PtoMockData::reportHistory(),
+            'previewData' => PtoMockData::reportPreviewData(),
             'municipalities' => TourismCatalog::municipalities(),
+            'filterOptions' => [
+                'destination' => collect(PtoMockData::destinationPerformance())->pluck('destination')->all(),
+                'category' => collect(PtoMockData::establishmentDirectory())->pluck('category')->unique()->sort()->values()->all(),
+            ],
         ]);
     }
 }

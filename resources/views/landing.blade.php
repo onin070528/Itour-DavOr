@@ -31,7 +31,7 @@
             @foreach ($municipalities as $municipality)
                 <a
                     href="{{ route('explore', ['municipality' => $municipality['name']]) }}"
-                    class="inline-flex items-center gap-1.5 rounded-sm border border-sand-300 bg-sand-0 px-3.5 py-2 text-sm font-medium text-sand-700 transition-colors hover:border-primary-300 hover:text-primary-700"
+                    class="inline-flex items-center gap-1.5 rounded-full border border-sand-300 bg-sand-0 px-3.5 py-2 text-sm font-medium text-sand-700 transition-colors hover:border-primary-300 hover:text-primary-700"
                 >
                     <i class="ti ti-map-pin" aria-hidden="true"></i>
                     {{ $municipality['name'] }}

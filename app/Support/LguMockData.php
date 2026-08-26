@@ -2,6 +2,9 @@
 
 namespace App\Support;
 
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
+
 /**
  * Municipality-scoped view over PtoMockData and TourismCatalog.
  *
@@ -189,30 +192,152 @@ class LguMockData
     /**
      * The five municipality-level report types the LGU can generate.
      *
-     * @return array<int, array{key: string, label: string, description: string, icon: string}>
+     * @return array<int, array{key: string, label: string, description: string, icon: string, filters: array<int, string>}>
      */
     public static function reportTypes(): array
     {
         return [
-            ['key' => 'arrivals', 'label' => 'Tourist Arrival Report', 'description' => 'Arrivals by date, establishment, and visitor classification for your municipality.', 'icon' => 'ti-users'],
-            ['key' => 'statistics', 'label' => 'Municipal Tourism Statistics Report', 'description' => 'Visitation trends and establishment comparison within your municipality.', 'icon' => 'ti-chart-line'],
-            ['key' => 'destinations', 'label' => 'Destination Performance Report', 'description' => 'Ranked visits and trend for destinations in your municipality.', 'icon' => 'ti-map-pin'],
-            ['key' => 'feedback', 'label' => 'Tourist Feedback Report', 'description' => 'Feedback entries with sentiment and polarity for your municipality.', 'icon' => 'ti-message-2'],
-            ['key' => 'experience', 'label' => 'Tourist Experience Analytics Report', 'description' => 'Sentiment breakdown and trends for your municipality.', 'icon' => 'ti-heart-handshake'],
+            ['key' => 'arrivals', 'label' => 'Tourist Arrival Report', 'description' => 'Arrivals by date, establishment, and visitor classification for your municipality.', 'icon' => 'ti-users', 'filters' => ['classification', 'gender']],
+            ['key' => 'statistics', 'label' => 'Municipal Tourism Statistics Report', 'description' => 'Visitation trends and establishment comparison within your municipality.', 'icon' => 'ti-chart-line', 'filters' => []],
+            ['key' => 'destinations', 'label' => 'Destination Performance Report', 'description' => 'Ranked visits and trend for destinations in your municipality.', 'icon' => 'ti-map-pin', 'filters' => ['destination']],
+            ['key' => 'feedback', 'label' => 'Tourist Feedback Report', 'description' => 'Feedback entries with sentiment and polarity for your municipality.', 'icon' => 'ti-message-2', 'filters' => ['sentiment']],
+            ['key' => 'experience', 'label' => 'Tourist Experience Analytics Report', 'description' => 'Sentiment breakdown and trends for your municipality.', 'icon' => 'ti-heart-handshake', 'filters' => []],
         ];
     }
 
     /**
      * Previously generated reports for this municipality.
      *
-     * @return array<int, array{name: string, type: string, range: string, generatedAt: string, status: string}>
+     * @return array<int, array{name: string, typeKey: string, type: string, range: string, generatedAt: string, generatedBy: string}>
      */
     public static function reportHistory(string $municipality): array
     {
         return [
-            ['name' => "Tourist Arrival Report — {$municipality}, July 2026", 'type' => 'Tourist Arrival Report', 'range' => 'Jul 1 – Jul 31, 2026', 'generatedAt' => '2026-08-02', 'status' => 'Ready'],
-            ['name' => "Municipal Tourism Statistics Report — {$municipality}, Q2 2026", 'type' => 'Municipal Tourism Statistics Report', 'range' => 'Apr 1 – Jun 30, 2026', 'generatedAt' => '2026-07-05', 'status' => 'Ready'],
-            ['name' => "Tourist Feedback Report — {$municipality}, July 2026", 'type' => 'Tourist Feedback Report', 'range' => 'Jul 1 – Jul 31, 2026', 'generatedAt' => '2026-08-01', 'status' => 'Ready'],
+            ['name' => "Tourist Arrival Report — {$municipality}, July 2026", 'typeKey' => 'arrivals', 'type' => 'Tourist Arrival Report', 'range' => 'Jul 1 – Jul 31, 2026', 'generatedAt' => '2026-08-02', 'generatedBy' => 'Arnel Dizon'],
+            ['name' => "Municipal Tourism Statistics Report — {$municipality}, Q2 2026", 'typeKey' => 'statistics', 'type' => 'Municipal Tourism Statistics Report', 'range' => 'Apr 1 – Jun 30, 2026', 'generatedAt' => '2026-07-05', 'generatedBy' => 'Arnel Dizon'],
+            ['name' => "Tourist Feedback Report — {$municipality}, July 2026", 'typeKey' => 'feedback', 'type' => 'Tourist Feedback Report', 'range' => 'Jul 1 – Jul 31, 2026', 'generatedAt' => '2026-08-01', 'generatedBy' => 'Arnel Dizon'],
+        ];
+    }
+
+    /**
+     * Pre-shaped content for each report type's preview panel, keyed by
+     * report-type key. Drives the Reports page's report preview: summary
+     * stat cards, an optional chart, an optional breakdown table, and an
+     * optional detailed-records table.
+     *
+     * @return array<string, array{summary: array<int, array{label: string, value: string}>, chart: array<string, mixed>|null, breakdown: array{label: string, columns: array<int, string>, rows: array<int, array<int, string>>}|null, columns: array<int, string>, rows: array<int, array<int, string>>, filterable: bool, empty: bool}>
+     */
+    public static function reportPreviewData(string $municipality): array
+    {
+        $arrivals = self::arrivals($municipality);
+        $destinations = self::destinationPerformance($municipality);
+        $feedback = self::feedback($municipality);
+        $sentiment = self::sentimentBreakdown($municipality);
+        $sentimentTotal = array_sum($sentiment);
+
+        $arrivalsTotal = collect($arrivals)->sum('visitors');
+        $foreignTotal = collect($arrivals)->where('classification', 'Foreign')->sum('visitors');
+        $classificationTotals = collect($arrivals)->groupBy('classification')
+            ->map(fn ($rows) => $rows->sum('visitors'));
+
+        // Arrivals are recorded per establishment, not per destination, so the
+        // arrivals-report breakdown groups by establishment (self-consistent
+        // with the arrivals total above); the statistics-report breakdown
+        // uses destination performance instead, a separate real metric.
+        $establishmentBreakdown = collect($arrivals)->groupBy('establishment')
+            ->map(fn ($rows, $establishment) => [$establishment, number_format($rows->sum('visitors')), (string) $rows->count()])
+            ->sortByDesc(fn ($row) => (int) str_replace(',', '', $row[1]))
+            ->values()->all();
+
+        $destinationBreakdown = collect($destinations)
+            ->map(fn ($row) => [$row['destination'], number_format($row['visits']), ucfirst($row['trend'])])
+            ->all();
+
+        return [
+            'arrivals' => [
+                'summary' => [
+                    ['label' => 'Total Arrivals', 'value' => number_format($arrivalsTotal)],
+                    ['label' => 'Domestic Visitors', 'value' => number_format($arrivalsTotal - $foreignTotal)],
+                    ['label' => 'Foreign Visitors', 'value' => number_format($foreignTotal)],
+                ],
+                'chart' => [
+                    'type' => 'bar',
+                    'title' => 'Visitor Classification Distribution',
+                    'items' => $classificationTotals->map(fn ($value, $label) => ['label' => $label, 'value' => $value])->values()->all(),
+                ],
+                'breakdown' => ['label' => 'Establishment', 'columns' => ['Establishment', 'Arrivals', 'Records'], 'rows' => $establishmentBreakdown],
+                'columns' => ['Date', 'Establishment', 'Classification', 'Gender', 'Visitors'],
+                'rows' => collect($arrivals)->map(fn ($row) => [
+                    Carbon::parse($row['date'])->format('M j, Y'),
+                    $row['establishment'], $row['classification'], $row['gender'], number_format($row['visitors']),
+                ])->all(),
+                'filterable' => true,
+                'empty' => $arrivalsTotal === 0,
+            ],
+            'statistics' => [
+                'summary' => [
+                    ['label' => 'Total Arrivals', 'value' => number_format($arrivalsTotal)],
+                    ['label' => 'Destinations Tracked', 'value' => (string) count($destinations)],
+                ],
+                'chart' => [
+                    'type' => 'trend',
+                    'title' => 'Visitor Trend',
+                    'labels' => collect(self::arrivalTrend($municipality)['month'])->pluck('label')->all(),
+                    'values' => collect(self::arrivalTrend($municipality)['month'])->pluck('value')->all(),
+                ],
+                'breakdown' => ['label' => 'Destination', 'columns' => ['Destination', 'Visits', 'Trend'], 'rows' => $destinationBreakdown],
+                'columns' => [],
+                'rows' => [],
+                'filterable' => false,
+                'empty' => false,
+            ],
+            'destinations' => [
+                'summary' => [
+                    ['label' => 'Destinations Tracked', 'value' => (string) count($destinations)],
+                    ['label' => 'Top Destination', 'value' => $destinations[0]['destination'] ?? '—'],
+                ],
+                'chart' => [
+                    'type' => 'bar',
+                    'title' => 'Visits per Destination',
+                    'items' => collect($destinations)->map(fn ($row) => ['label' => $row['destination'], 'value' => $row['visits']])->all(),
+                ],
+                'breakdown' => null,
+                'columns' => ['#', 'Destination', 'Visits', 'Trend'],
+                'rows' => collect($destinations)->map(fn ($row) => [
+                    (string) $row['rank'], $row['destination'], number_format($row['visits']), ucfirst($row['trend']),
+                ])->all(),
+                'filterable' => false,
+                'empty' => count($destinations) === 0,
+            ],
+            'feedback' => [
+                'summary' => [
+                    ['label' => 'Feedback Entries', 'value' => (string) count($feedback)],
+                    ['label' => 'Positive', 'value' => (string) collect($feedback)->where('sentiment', 'Positive')->count()],
+                    ['label' => 'Negative', 'value' => (string) collect($feedback)->where('sentiment', 'Negative')->count()],
+                ],
+                'chart' => ['type' => 'donut', 'positive' => $sentiment['positive'], 'neutral' => $sentiment['neutral'], 'negative' => $sentiment['negative']],
+                'breakdown' => null,
+                'columns' => ['Date', 'Subject', 'Sentiment', 'Feedback'],
+                'rows' => collect($feedback)->map(fn ($row) => [
+                    Carbon::parse($row['date'])->format('M j, Y'),
+                    $row['subject'], $row['sentiment'], Str::limit($row['text'], 70),
+                ])->all(),
+                'filterable' => true,
+                'empty' => count($feedback) === 0,
+            ],
+            'experience' => [
+                'summary' => [
+                    ['label' => 'Feedback Analyzed', 'value' => number_format($sentimentTotal)],
+                    ['label' => 'Positive Share', 'value' => $sentimentTotal ? round(($sentiment['positive'] / $sentimentTotal) * 100).'%' : '—'],
+                    ['label' => 'Negative Entries', 'value' => number_format($sentiment['negative'])],
+                ],
+                'chart' => ['type' => 'donut', 'positive' => $sentiment['positive'], 'neutral' => $sentiment['neutral'], 'negative' => $sentiment['negative']],
+                'breakdown' => null,
+                'columns' => [],
+                'rows' => [],
+                'filterable' => false,
+                'empty' => $sentimentTotal === 0,
+            ],
         ];
     }
 

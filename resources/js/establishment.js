@@ -99,6 +99,10 @@ function initImageGallery() {
     const gallery = document.getElementById('image-gallery');
     if (!gallery) return;
 
+    // Removal itself is handled by the shared confirm-dialog flow in
+    // dashboard.js (via `data-confirm-trigger` + `data-confirm-remove-target`
+    // on the Remove button) so it goes through the same confirmation step as
+    // every other destructive action in the app.
     gallery.addEventListener('click', (e) => {
         const setPrimary = e.target.closest('[data-set-primary]');
         if (setPrimary) {
@@ -107,11 +111,6 @@ function initImageGallery() {
                 card.querySelector('[data-primary-badge]')?.classList.toggle('hidden', !isTarget);
                 card.querySelector('[data-set-primary]')?.classList.toggle('hidden', isTarget);
             });
-        }
-
-        const remove = e.target.closest('[data-remove-image]');
-        if (remove) {
-            remove.closest('[data-image-card]')?.remove();
         }
     });
 
@@ -128,7 +127,17 @@ function initImageGallery() {
             <img src="${url}" alt="${file.name}" class="h-32 w-full object-cover">
             <div class="absolute inset-0 flex items-end justify-between bg-gradient-to-t from-sand-900/60 via-transparent to-transparent p-2 opacity-0 transition-opacity group-hover:opacity-100">
                 <button type="button" data-set-primary class="rounded-sm bg-sand-0/90 px-2 py-1 text-[11px] font-semibold text-sand-800">Set as Featured</button>
-                <button type="button" data-remove-image class="rounded-sm bg-danger px-2 py-1 text-[11px] font-semibold text-white">Remove</button>
+                <button
+                    type="button"
+                    data-confirm-trigger
+                    data-confirm-title="Remove this photo?"
+                    data-confirm-message="This photo will be removed from your establishment's gallery."
+                    data-confirm-label="Remove"
+                    data-confirm-tone="danger"
+                    data-confirm-success="Photo removed."
+                    data-confirm-remove-target="[data-image-card]"
+                    class="rounded-sm bg-danger px-2 py-1 text-[11px] font-semibold text-sand-0"
+                >Remove</button>
             </div>
         `;
         gallery.querySelector('[data-image-grid]')?.appendChild(card);

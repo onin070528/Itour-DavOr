@@ -13,7 +13,7 @@
         description="Tourism destinations ranked by tourist visitation, province-wide."
     />
 
-    <div data-filterable-table class="mt-6">
+    <div data-filterable-table data-page-size="10" class="mt-6">
         <div class="flex flex-col gap-3 rounded-md border border-sand-200 bg-sand-0 p-4 sm:flex-row sm:items-center">
             <div class="flex flex-1 items-center gap-2 rounded-sm border border-sand-300 bg-sand-50 px-3 py-2.5">
                 <i class="ti ti-search text-sand-500" aria-hidden="true"></i>
@@ -52,6 +52,8 @@
                 </tbody>
             </table>
         </div>
+
+        <div data-pagination class="mt-4 flex items-center justify-center gap-1"></div>
 
         <x-dashboard.empty-state
             data-empty-state

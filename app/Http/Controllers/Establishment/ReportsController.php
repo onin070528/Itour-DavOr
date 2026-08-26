@@ -18,6 +18,8 @@ class ReportsController extends EstablishmentController
         return $this->renderEstablishment($request, 'establishment.reports', 'reports', 'Reports', [
             'reportTypes' => EstablishmentMockData::reportTypes(),
             'history' => EstablishmentMockData::reportHistory($name),
+            'previewData' => EstablishmentMockData::reportPreviewData($name),
+            'filterOptions' => [],
         ]);
     }
 }

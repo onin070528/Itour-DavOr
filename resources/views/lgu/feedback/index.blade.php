@@ -39,9 +39,14 @@
                     <option value="{{ $s }}">{{ $s }}</option>
                 @endforeach
             </select>
+            <button type="button" data-filter-reset class="rounded-sm border border-sand-300 px-3 py-2.5 text-sm font-semibold text-sand-700 hover:border-primary-300">
+                Reset
+            </button>
         </div>
 
         @if (count($feedback))
+            <p class="mt-3 text-xs text-sand-500"><span data-result-count>{{ count($feedback) }}</span> of {{ count($feedback) }} entries</p>
+
             <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 @foreach ($feedback as $entry)
                     <div

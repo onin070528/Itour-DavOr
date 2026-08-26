@@ -38,7 +38,12 @@
                 <option value="Pending Review">Pending Review</option>
                 <option value="Inactive">Inactive</option>
             </select>
+            <button type="button" data-filter-reset class="rounded-sm border border-sand-300 px-3 py-2.5 text-sm font-semibold text-sand-700 hover:border-primary-300">
+                Reset
+            </button>
         </div>
+
+        <p class="mt-3 text-xs text-sand-500"><span data-result-count>{{ count($listings) }}</span> of {{ count($listings) }} establishments</p>
 
         <div class="mt-3 overflow-x-auto rounded-md border border-sand-200 bg-sand-0 shadow-sm">
             <table class="w-full min-w-[760px] border-collapse text-sm">

@@ -22,12 +22,12 @@
 
                 <form class="mt-6 flex flex-col gap-4">
                     <div>
-                        <label class="mb-1 block text-xs font-semibold text-sand-700">Full Name</label>
-                        <input type="text" value="{{ $user->name }}" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                        <label class="mb-1 block text-xs font-semibold text-sand-700">Full Name <span class="text-danger" aria-hidden="true">*</span></label>
+                        <input type="text" value="{{ $user->name }}" required class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
                     </div>
                     <div>
-                        <label class="mb-1 block text-xs font-semibold text-sand-700">Email</label>
-                        <input type="email" value="{{ $user->email }}" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                        <label class="mb-1 block text-xs font-semibold text-sand-700">Email <span class="text-danger" aria-hidden="true">*</span></label>
+                        <input type="email" value="{{ $user->email }}" required class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
                     </div>
                     <div>
                         <button type="button" data-toast-trigger data-toast-message="Profile changes saved." class="rounded-sm bg-primary-700 px-4 py-2 text-sm font-semibold text-sand-0 hover:bg-primary-900">
@@ -83,20 +83,20 @@
     <x-dashboard.modal id="change-password-modal" title="Change Password" max-width="max-w-sm">
         <form class="flex flex-col gap-4">
             <div>
-                <label class="mb-1 block text-xs font-semibold text-sand-700">Current Password</label>
-                <input type="password" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                <label class="mb-1 block text-xs font-semibold text-sand-700">Current Password <span class="text-danger" aria-hidden="true">*</span></label>
+                <input type="password" required class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
             </div>
             <div>
-                <label class="mb-1 block text-xs font-semibold text-sand-700">New Password</label>
-                <input type="password" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                <label class="mb-1 block text-xs font-semibold text-sand-700">New Password <span class="text-danger" aria-hidden="true">*</span></label>
+                <input type="password" required class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
             </div>
             <div>
-                <label class="mb-1 block text-xs font-semibold text-sand-700">Confirm New Password</label>
-                <input type="password" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                <label class="mb-1 block text-xs font-semibold text-sand-700">Confirm New Password <span class="text-danger" aria-hidden="true">*</span></label>
+                <input type="password" required class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
             </div>
         </form>
         <x-slot:footer>
-            <button type="button" data-modal-close class="rounded-sm border border-sand-300 px-4 py-2 text-sm font-semibold text-sand-700 hover:border-sand-400">Cancel</button>
+            <button type="button" data-modal-close class="rounded-sm border border-sand-300 bg-sand-0 px-4 py-2.5 text-sm font-semibold text-sand-800 hover:border-primary-300">Cancel</button>
             <button type="button" data-modal-close data-toast-message="Password updated." class="rounded-sm bg-primary-700 px-4 py-2 text-sm font-semibold text-sand-0 hover:bg-primary-900">
                 Update Password
             </button>

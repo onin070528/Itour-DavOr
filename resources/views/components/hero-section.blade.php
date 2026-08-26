@@ -53,7 +53,7 @@
                 ['icon' => 'ti-bus', 'label' => 'Transportation', 'href' => route('explore', ['category' => 'transportation'])],
                 ['icon' => 'ti-first-aid-kit', 'label' => 'Emergency', 'href' => '#footer-emergency'],
             ] as $pill)
-                <a href="{{ $pill['href'] }}" class="inline-flex items-center gap-1.5 rounded-sm border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-sand-0 backdrop-blur transition-colors hover:bg-white/20">
+                <a href="{{ $pill['href'] }}" class="inline-flex items-center gap-1.5 rounded-full border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-sand-0 backdrop-blur transition-colors hover:bg-white/20">
                     <i class="ti {{ $pill['icon'] }}" aria-hidden="true"></i>
                     {{ $pill['label'] }}
                 </a>

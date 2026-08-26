@@ -19,6 +19,10 @@ class ReportsController extends LguController
             'municipality' => $municipality,
             'reportTypes' => LguMockData::reportTypes(),
             'history' => LguMockData::reportHistory($municipality),
+            'previewData' => LguMockData::reportPreviewData($municipality),
+            'filterOptions' => [
+                'destination' => collect(LguMockData::destinationPerformance($municipality))->pluck('destination')->all(),
+            ],
         ]);
     }
 }

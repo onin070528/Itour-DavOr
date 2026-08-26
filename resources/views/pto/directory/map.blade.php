@@ -5,7 +5,7 @@
 <x-layouts.dashboard :user="$user" :nav-sections="$navSections" :page-title="$pageTitle" account-heading="System" :settings-href="route('pto.settings')">
     <x-dashboard.page-header
         title="Tourism Map"
-        description="Destinations and establishments across Davao Oriental. This is a placeholder — it will connect to Mapbox once the API is wired up."
+        description="Destinations and establishments across Davao Oriental."
     />
 
     <div class="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-[260px_1fr]">
@@ -22,7 +22,7 @@
 
             <div class="mt-5 rounded-md border border-dashed border-sand-300 p-3 text-xs text-sand-600">
                 <i class="ti ti-info-circle text-primary-700" aria-hidden="true"></i>
-                Mapbox integration is not connected yet. Pins below are illustrative, positioned by municipality only.
+                Interactive map view is coming soon. Pins below are positioned by municipality only, not exact location.
             </div>
         </div>
 

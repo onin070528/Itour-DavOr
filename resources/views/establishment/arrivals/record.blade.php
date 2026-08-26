@@ -74,7 +74,7 @@
                 <div data-review-summary class="mt-4"></div>
 
                 <div class="mt-5 flex justify-between border-t border-sand-200 pt-5">
-                    <button type="button" data-step-back class="rounded-sm border border-sand-300 px-5 py-2.5 text-sm font-semibold text-sand-700 hover:border-sand-400">
+                    <button type="button" data-step-back class="rounded-sm border border-sand-300 px-5 py-2.5 text-sm font-semibold text-sand-800 hover:border-primary-300">
                         <i class="ti ti-arrow-left" aria-hidden="true"></i>
                         Back
                     </button>

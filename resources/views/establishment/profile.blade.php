@@ -19,7 +19,7 @@
                     <h2 class="font-display text-base font-bold text-sand-900">Images</h2>
                     <p class="text-xs text-sand-500">Your featured photo is shown first on your public listing.</p>
                 </div>
-                <label class="inline-flex cursor-pointer items-center gap-2 rounded-sm border border-sand-300 px-3.5 py-2 text-sm font-semibold text-sand-800 hover:border-primary-300">
+                <label class="inline-flex cursor-pointer items-center gap-2 rounded-sm border border-sand-300 bg-sand-0 px-4 py-2.5 text-sm font-semibold text-sand-800 hover:border-primary-300">
                     <i class="ti ti-photo-plus" aria-hidden="true"></i>
                     Add Image
                     <input id="image-upload-input" type="file" accept="image/*" class="hidden">
@@ -33,7 +33,17 @@
                         <span data-primary-badge @class(['absolute top-2 left-2 rounded-sm bg-primary-700 px-2 py-0.5 text-[10px] font-semibold text-sand-0', 'hidden' => ! $image['primary']])>Featured</span>
                         <div class="absolute inset-0 flex items-end justify-between bg-gradient-to-t from-sand-900/60 via-transparent to-transparent p-2 opacity-0 transition-opacity group-hover:opacity-100">
                             <button type="button" data-set-primary @class(['rounded-sm bg-sand-0/90 px-2 py-1 text-[11px] font-semibold text-sand-800', 'hidden' => $image['primary']])>Set as Featured</button>
-                            <button type="button" data-remove-image class="rounded-sm bg-danger px-2 py-1 text-[11px] font-semibold text-white">Remove</button>
+                            <button
+                                type="button"
+                                data-confirm-trigger
+                                data-confirm-title="Remove this photo?"
+                                data-confirm-message="This photo will be removed from your establishment's gallery."
+                                data-confirm-label="Remove"
+                                data-confirm-tone="danger"
+                                data-confirm-success="Photo removed."
+                                data-confirm-remove-target="[data-image-card]"
+                                class="rounded-sm bg-danger px-2 py-1 text-[11px] font-semibold text-sand-0"
+                            >Remove</button>
                         </div>
                     </div>
                 @endforeach
@@ -46,13 +56,13 @@
 
             <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div data-field class="sm:col-span-2">
-                    <label class="mb-1 block text-xs font-semibold text-sand-700">Establishment Name</label>
-                    <input name="name" type="text" value="{{ $profile['name'] }}" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                    <label class="mb-1 block text-xs font-semibold text-sand-700">Establishment Name <span class="text-danger" aria-hidden="true">*</span></label>
+                    <input name="name" type="text" value="{{ $profile['name'] }}" required class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
                 </div>
 
                 <div data-field>
-                    <label class="mb-1 block text-xs font-semibold text-sand-700">Category</label>
-                    <select name="category" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                    <label class="mb-1 block text-xs font-semibold text-sand-700">Category <span class="text-danger" aria-hidden="true">*</span></label>
+                    <select name="category" required class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
                         @foreach ($categories as $c)
                             @if ($c['slug'] !== 'destinations')
                                 <option value="{{ $c['slug'] }}" @selected($c['slug'] === $profile['category'])>{{ $c['label'] }}</option>
@@ -68,8 +78,8 @@
                 </div>
 
                 <div data-field class="sm:col-span-2">
-                    <label class="mb-1 block text-xs font-semibold text-sand-700">Address / Barangay</label>
-                    <input name="address" type="text" value="{{ $profile['barangay'] }}" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                    <label class="mb-1 block text-xs font-semibold text-sand-700">Address / Barangay <span class="text-danger" aria-hidden="true">*</span></label>
+                    <input name="address" type="text" value="{{ $profile['barangay'] }}" required class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
                 </div>
 
                 <div data-field class="sm:col-span-2">
@@ -78,13 +88,13 @@
                 </div>
 
                 <div data-field>
-                    <label class="mb-1 block text-xs font-semibold text-sand-700">Contact Number</label>
-                    <input name="phone" type="text" value="{{ $profile['contactPhone'] }}" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                    <label class="mb-1 block text-xs font-semibold text-sand-700">Contact Number <span class="text-danger" aria-hidden="true">*</span></label>
+                    <input name="phone" type="text" value="{{ $profile['contactPhone'] }}" required class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
                 </div>
 
                 <div data-field>
-                    <label class="mb-1 block text-xs font-semibold text-sand-700">Operating Hours</label>
-                    <input name="hours" type="text" value="{{ $profile['hours'] }}" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                    <label class="mb-1 block text-xs font-semibold text-sand-700">Operating Hours <span class="text-danger" aria-hidden="true">*</span></label>
+                    <input name="hours" type="text" value="{{ $profile['hours'] }}" required class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
                 </div>
 
                 <div data-field>

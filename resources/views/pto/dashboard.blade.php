@@ -12,7 +12,7 @@
         <x-slot:actions>
             <a href="{{ route('pto.reports') }}" class="inline-flex items-center gap-2 rounded-sm border border-sand-300 bg-sand-0 px-4 py-2.5 text-sm font-semibold text-sand-800 hover:border-primary-300">
                 <i class="ti ti-file-report" aria-hidden="true"></i>
-                Open Reports
+                Generate Report
             </a>
             <a href="{{ route('pto.feedback.analytics') }}" class="inline-flex items-center gap-2 rounded-sm bg-accent-500 px-4 py-2.5 text-sm font-semibold text-sand-0 hover:bg-accent-600">
                 <i class="ti ti-heart-handshake" aria-hidden="true"></i>

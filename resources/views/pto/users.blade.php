@@ -1,6 +1,6 @@
 @php
     $roles = collect($users)->pluck('role')->unique()->sort()->values();
-    $statusTone = fn ($status) => $status === 'Active' ? 'success' : 'neutral';
+    $statusTone = fn ($status) => $status === 'Active' ? 'success' : 'danger';
 @endphp
 
 <x-layouts.dashboard :user="$user" :nav-sections="$navSections" :page-title="$pageTitle" account-heading="System" :settings-href="route('pto.settings')">
@@ -33,7 +33,12 @@
                 <option value="Active">Active</option>
                 <option value="Inactive">Inactive</option>
             </select>
+            <button type="button" data-filter-reset class="rounded-sm border border-sand-300 px-3 py-2.5 text-sm font-semibold text-sand-700 hover:border-primary-300">
+                Reset
+            </button>
         </div>
+
+        <p class="mt-3 text-xs text-sand-500"><span data-result-count>{{ count($users) }}</span> of {{ count($users) }} accounts</p>
 
         <div class="mt-3 overflow-x-auto rounded-md border border-sand-200 bg-sand-0 shadow-sm">
             <table class="w-full min-w-[760px] border-collapse text-sm">
@@ -149,29 +154,29 @@
     <x-dashboard.modal id="user-form-modal" title="User">
         <form class="flex flex-col gap-4">
             <div>
-                <label class="mb-1 block text-xs font-semibold text-sand-700">Full Name</label>
-                <input name="name" type="text" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                <label class="mb-1 block text-xs font-semibold text-sand-700">Full Name <span class="text-danger" aria-hidden="true">*</span></label>
+                <input name="name" type="text" required class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
             </div>
             <div>
-                <label class="mb-1 block text-xs font-semibold text-sand-700">Email</label>
-                <input name="email" type="email" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                <label class="mb-1 block text-xs font-semibold text-sand-700">Email <span class="text-danger" aria-hidden="true">*</span></label>
+                <input name="email" type="email" required class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
             </div>
             <div>
-                <label class="mb-1 block text-xs font-semibold text-sand-700">Role</label>
-                <select name="role" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                <label class="mb-1 block text-xs font-semibold text-sand-700">Role <span class="text-danger" aria-hidden="true">*</span></label>
+                <select name="role" required class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
                     <option>PTO Administrator</option>
                     <option>LGU Tourism Personnel</option>
                     <option>Tourism Establishment</option>
                 </select>
             </div>
             <div>
-                <label class="mb-1 block text-xs font-semibold text-sand-700">Assigned Municipality / Establishment</label>
-                <input name="assignment" type="text" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                <label class="mb-1 block text-xs font-semibold text-sand-700">Assigned Municipality / Establishment <span class="text-danger" aria-hidden="true">*</span></label>
+                <input name="assignment" type="text" required class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
             </div>
         </form>
 
         <x-slot:footer>
-            <button type="button" data-modal-close class="rounded-sm border border-sand-300 px-4 py-2 text-sm font-semibold text-sand-700 hover:border-sand-400">Cancel</button>
+            <button type="button" data-modal-close class="rounded-sm border border-sand-300 bg-sand-0 px-4 py-2.5 text-sm font-semibold text-sand-800 hover:border-primary-300">Cancel</button>
             <button type="button" data-modal-close data-toast-message="User account saved." class="rounded-sm bg-primary-700 px-4 py-2 text-sm font-semibold text-sand-0 hover:bg-primary-900">
                 Save User
             </button>

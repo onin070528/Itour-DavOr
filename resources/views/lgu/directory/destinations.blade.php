@@ -113,8 +113,8 @@
     <x-dashboard.modal id="destination-form-modal" title="Destination">
         <form class="flex flex-col gap-4">
             <div>
-                <label class="mb-1 block text-xs font-semibold text-sand-700">Destination Name</label>
-                <input name="name" type="text" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                <label class="mb-1 block text-xs font-semibold text-sand-700">Destination Name <span class="text-danger" aria-hidden="true">*</span></label>
+                <input name="name" type="text" required class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
             </div>
             <div class="grid grid-cols-2 gap-3">
                 <div>
@@ -123,8 +123,8 @@
                     <p class="mt-1 text-[11px] text-sand-500">Set automatically from your account.</p>
                 </div>
                 <div>
-                    <label class="mb-1 block text-xs font-semibold text-sand-700">Barangay / Location</label>
-                    <input name="barangay" type="text" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                    <label class="mb-1 block text-xs font-semibold text-sand-700">Barangay / Location <span class="text-danger" aria-hidden="true">*</span></label>
+                    <input name="barangay" type="text" required class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
                 </div>
             </div>
             <div>
@@ -153,7 +153,7 @@
         </form>
 
         <x-slot:footer>
-            <button type="button" data-modal-close class="rounded-sm border border-sand-300 px-4 py-2 text-sm font-semibold text-sand-700 hover:border-sand-400">Cancel</button>
+            <button type="button" data-modal-close class="rounded-sm border border-sand-300 bg-sand-0 px-4 py-2.5 text-sm font-semibold text-sand-800 hover:border-primary-300">Cancel</button>
             <button type="button" data-modal-close data-toast-message="Destination saved." class="rounded-sm bg-primary-700 px-4 py-2 text-sm font-semibold text-sand-0 hover:bg-primary-900">
                 Save Destination
             </button>

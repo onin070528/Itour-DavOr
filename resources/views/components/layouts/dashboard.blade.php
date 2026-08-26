@@ -3,9 +3,18 @@
     'navSections' => [],
     'pageTitle' => 'Dashboard',
     'accountHeading' => 'Account',
-    'profileHref' => '#',
+    'profileHref' => null,
     'settingsHref' => '#',
 ])
+
+@php
+    // Establishment has a dedicated profile page; PTO and LGU manage their
+    // profile from within Settings, so "My Profile" points there instead
+    // unless a page explicitly overrides it.
+    $profileHref ??= $user->role === \App\Enums\UserRole::Establishment
+        ? route('establishment.profile')
+        : $settingsHref;
+@endphp
 
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
@@ -25,8 +34,10 @@
             $user->role === \App\Enums\UserRole::Establishment ? 'resources/js/establishment.js' : null,
         ]))
     </head>
-    <body class="flex min-h-screen bg-sand-100 text-sand-900">
-        <aside class="flex w-64 shrink-0 flex-col bg-primary-900 text-sand-0">
+    <body class="flex h-screen overflow-hidden bg-sand-100 text-sand-900">
+        {{-- Fixed-height flex row: the sidebar stretches to the full viewport
+             height and never scrolls with it — only <main> below scrolls. --}}
+        <aside class="flex h-full w-64 shrink-0 flex-col overflow-hidden bg-primary-900 text-sand-0">
             <div class="flex items-center justify-between px-5 pt-6 pb-4">
                 <a href="{{ url('/') }}" class="flex items-center gap-2">
                     <x-logo :dark="true" class="text-lg" />
@@ -52,7 +63,7 @@
                                         aria-expanded="{{ $item['active'] ? 'true' : 'false' }}"
                                         @class([
                                             'flex w-full items-center justify-between gap-2 rounded-sm px-2.5 py-2 text-left text-sm transition-colors',
-                                            'font-semibold text-sand-0' => $item['active'],
+                                            'bg-white/12 font-semibold text-sand-0' => $item['active'],
                                             'text-white/78 hover:bg-white/10 hover:text-sand-0' => ! $item['active'],
                                         ])
                                     >
@@ -131,8 +142,8 @@
             </div>
         </aside>
 
-        <div class="flex min-w-0 flex-1 flex-col">
-            <header class="flex items-center justify-between gap-4 border-b border-sand-200 bg-sand-0 px-6 py-3.5">
+        <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
+            <header class="flex shrink-0 items-center justify-between gap-4 border-b border-sand-200 bg-sand-0 px-6 py-3.5">
                 <p class="text-sm text-sand-500">
                     {{ $user->role->title() }} <span class="mx-1 text-sand-300">/</span> <span class="font-semibold text-sand-900">{{ $pageTitle }}</span>
                 </p>
@@ -155,23 +166,23 @@
                 </div>
             </header>
 
-            <main class="flex-1 p-6">
+            <main class="flex-1 overflow-y-auto p-6">
                 {{ $slot }}
             </main>
         </div>
 
         {{-- Shared confirmation dialog for archive / enable / disable actions.
-             Triggered via [data-confirm-trigger] — see resources/js/pto.js. --}}
+             Triggered via [data-confirm-trigger] — see resources/js/dashboard.js. --}}
         <div id="confirm-modal" data-modal class="fixed inset-0 z-50 hidden">
             <div data-modal-backdrop class="flex min-h-full items-center justify-center bg-sand-900/50 p-4">
                 <div class="w-full max-w-sm rounded-lg bg-sand-0 p-5 shadow-md">
                     <p data-confirm-title class="font-display text-base font-bold text-sand-900">Are you sure?</p>
                     <p data-confirm-message class="mt-1.5 text-sm text-sand-600">This action cannot be undone.</p>
                     <div class="mt-5 flex justify-end gap-2">
-                        <button type="button" data-modal-close class="rounded-sm border border-sand-300 px-4 py-2 text-sm font-semibold text-sand-700 hover:border-sand-400">
+                        <button type="button" data-modal-close class="rounded-sm border border-sand-300 bg-sand-0 px-4 py-2.5 text-sm font-semibold text-sand-800 hover:border-primary-300">
                             Cancel
                         </button>
-                        <button type="button" data-confirm-button class="rounded-sm bg-danger px-4 py-2 text-sm font-semibold text-white hover:opacity-90">
+                        <button type="button" data-confirm-button class="rounded-sm bg-danger px-4 py-2 text-sm font-semibold text-sand-0 hover:opacity-90">
                             Confirm
                         </button>
                     </div>
