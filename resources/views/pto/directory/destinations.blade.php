@@ -62,22 +62,26 @@
                                         data-modal-open="destination-form-modal"
                                         data-edit-trigger="destination-form-modal"
                                         data-edit-values="{{ $editValues }}"
+                                        data-edit-action="{{ route('pto.directory.destinations.update', $d['id']) }}"
                                         class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-sand-700 hover:bg-sand-50"
                                     >
                                         <i class="ti ti-pencil" aria-hidden="true"></i> Edit
                                     </button>
-                                    <button
-                                        type="button"
-                                        data-confirm-trigger
-                                        data-confirm-title="Archive {{ $d['name'] }}?"
-                                        data-confirm-message="Archived destinations are hidden from the public site until restored."
-                                        data-confirm-label="Archive"
-                                        data-confirm-tone="danger"
-                                        data-confirm-success="{{ $d['name'] }} was archived."
-                                        class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-danger hover:bg-danger-bg"
-                                    >
-                                        <i class="ti ti-archive" aria-hidden="true"></i> Archive
-                                    </button>
+                                    <form method="POST" action="{{ route('pto.directory.destinations.archive', $d['id']) }}">
+                                        @csrf
+                                        @method('PATCH')
+                                        <button
+                                            type="button"
+                                            data-confirm-trigger
+                                            data-confirm-title="Archive {{ $d['name'] }}?"
+                                            data-confirm-message="Archived destinations are hidden from the public site until restored."
+                                            data-confirm-label="Archive"
+                                            data-confirm-tone="danger"
+                                            class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-danger hover:bg-danger-bg"
+                                        >
+                                            <i class="ti ti-archive" aria-hidden="true"></i> Archive
+                                        </button>
+                                    </form>
                                 </div>
                             </div>
                         </div>
@@ -113,7 +117,15 @@
 
     {{-- Shared Add / Edit modal --}}
     <x-dashboard.modal id="destination-form-modal" title="Destination">
-        <form class="flex flex-col gap-4">
+        <form
+            id="destination-form"
+            method="POST"
+            action="{{ route('pto.directory.destinations.store') }}"
+            data-default-action="{{ route('pto.directory.destinations.store') }}"
+            data-default-method="POST"
+            class="flex flex-col gap-4"
+        >
+            @csrf
             <div>
                 <label class="mb-1 block text-xs font-semibold text-sand-700">Destination Name <span class="text-danger" aria-hidden="true">*</span></label>
                 <input name="name" type="text" required class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
@@ -160,9 +172,8 @@
         <x-slot:footer>
             <button type="button" data-modal-close class="rounded-sm border border-sand-300 bg-sand-0 px-4 py-2.5 text-sm font-semibold text-sand-800 hover:border-primary-300">Cancel</button>
             <button
-                type="button"
-                data-modal-close
-                data-toast-message="Destination saved."
+                type="submit"
+                form="destination-form"
                 class="rounded-sm bg-primary-700 px-4 py-2 text-sm font-semibold text-sand-0 hover:bg-primary-900"
             >Save Destination</button>
         </x-slot:footer>

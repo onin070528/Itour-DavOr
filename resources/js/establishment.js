@@ -1,9 +1,13 @@
+import QRCode from 'qrcode';
+
 /**
  * Establishment-specific frontend interactions that don't belong in the
- * shared dashboard.js engine: the Record Arrival wizard (Enter → Review →
- * Submit → Success) and the establishment profile's image gallery
- * (add/replace/remove/set-primary previews). No backend calls — everything
- * here is a frontend-only mock, consistent with the rest of the workspace.
+ * shared dashboard.js engine: the Record Arrival wizard's fetch-based final
+ * submit step (Enter → Review → Submit → Success), auto-submitting the
+ * Establishment Profile image gallery's hidden upload form, and rendering
+ * the establishment's QR code (resources/views/establishment/qr.blade.php)
+ * client-side (via the `qrcode` package). Every action here is now backed
+ * by a real endpoint — see App\Http\Controllers\Establishment.
  */
 document.addEventListener('DOMContentLoaded', () => {
     initArrivalWizard();
@@ -12,6 +16,8 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function initQrActions() {
+    renderEstablishmentQr();
+
     document.getElementById('qr-print')?.addEventListener('click', () => window.print());
 
     document.getElementById('qr-download')?.addEventListener('click', (e) => {
@@ -29,6 +35,30 @@ function initQrActions() {
         a.remove();
         URL.revokeObjectURL(url);
     });
+}
+
+/**
+ * Renders a real, scannable SVG QR code into #establishment-qr-mount,
+ * encoding that element's `data-qr-value` — this establishment's unique
+ * check-in URL (routes/web.php's /checkin/{establishment}). Replaces the
+ * old decorative placeholder pattern, which only ever looked like a QR
+ * code and could never actually be scanned.
+ */
+function renderEstablishmentQr() {
+    const mount = document.getElementById('establishment-qr-mount');
+    const value = mount?.dataset.qrValue;
+    if (!mount || !value) return;
+
+    QRCode.toString(value, { type: 'svg', margin: 1, width: 256 })
+        .then((svg) => {
+            mount.innerHTML = svg;
+            const svgEl = mount.querySelector('svg');
+            svgEl?.setAttribute('id', 'establishment-qr-svg');
+            svgEl?.classList.add('h-full', 'w-full');
+        })
+        .catch(() => {
+            mount.innerHTML = '<span class="text-xs text-danger">Couldn\'t generate QR code.</span>';
+        });
 }
 
 function initArrivalWizard() {
@@ -83,8 +113,31 @@ function initArrivalWizard() {
 
     wizard.querySelector('[data-step-back]')?.addEventListener('click', () => goTo('enter'));
 
-    wizard.querySelector('[data-step-submit]')?.addEventListener('click', () => {
-        goTo('success');
+    const submitButton = wizard.querySelector('[data-step-submit]');
+    submitButton?.addEventListener('click', async () => {
+        submitButton.disabled = true;
+
+        try {
+            const response = await fetch(submitButton.dataset.actionUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                },
+                body: JSON.stringify(Object.fromEntries(new FormData(form))),
+            });
+
+            if (!response.ok) {
+                throw new Error('Request failed');
+            }
+
+            goTo('success');
+        } catch {
+            window.dispatchEvent(new CustomEvent('itour:toast', { detail: { message: "Couldn't save this arrival — please try again.", tone: 'danger' } }));
+        } finally {
+            submitButton.disabled = false;
+        }
     });
 
     wizard.querySelector('[data-step-reset]')?.addEventListener('click', () => {
@@ -95,52 +148,21 @@ function initArrivalWizard() {
     goTo('enter');
 }
 
+/**
+ * Set-as-Featured, Remove, and Add Image are each a real per-photo
+ * `<form>` now (resources/views/establishment/profile.blade.php) — Set-
+ * as-Featured and Remove submit like any other form (Remove goes through
+ * the shared confirm-dialog flow in dashboard.js first), so the only
+ * gallery-specific behavior left here is auto-submitting the hidden Add
+ * Image form the moment a file is chosen.
+ */
 function initImageGallery() {
-    const gallery = document.getElementById('image-gallery');
-    if (!gallery) return;
-
-    // Removal itself is handled by the shared confirm-dialog flow in
-    // dashboard.js (via `data-confirm-trigger` + `data-confirm-remove-target`
-    // on the Remove button) so it goes through the same confirmation step as
-    // every other destructive action in the app.
-    gallery.addEventListener('click', (e) => {
-        const setPrimary = e.target.closest('[data-set-primary]');
-        if (setPrimary) {
-            gallery.querySelectorAll('[data-image-card]').forEach((card) => {
-                const isTarget = card === setPrimary.closest('[data-image-card]');
-                card.querySelector('[data-primary-badge]')?.classList.toggle('hidden', !isTarget);
-                card.querySelector('[data-set-primary]')?.classList.toggle('hidden', isTarget);
-            });
-        }
-    });
-
+    const uploadForm = document.getElementById('image-upload-form');
     const addInput = document.getElementById('image-upload-input');
-    addInput?.addEventListener('change', () => {
-        const file = addInput.files?.[0];
-        if (!file) return;
 
-        const url = URL.createObjectURL(file);
-        const card = document.createElement('div');
-        card.dataset.imageCard = '';
-        card.className = 'group relative overflow-hidden rounded-md border border-sand-200';
-        card.innerHTML = `
-            <img src="${url}" alt="${file.name}" class="h-32 w-full object-cover">
-            <div class="absolute inset-0 flex items-end justify-between bg-gradient-to-t from-sand-900/60 via-transparent to-transparent p-2 opacity-0 transition-opacity group-hover:opacity-100">
-                <button type="button" data-set-primary class="rounded-sm bg-sand-0/90 px-2 py-1 text-[11px] font-semibold text-sand-800">Set as Featured</button>
-                <button
-                    type="button"
-                    data-confirm-trigger
-                    data-confirm-title="Remove this photo?"
-                    data-confirm-message="This photo will be removed from your establishment's gallery."
-                    data-confirm-label="Remove"
-                    data-confirm-tone="danger"
-                    data-confirm-success="Photo removed."
-                    data-confirm-remove-target="[data-image-card]"
-                    class="rounded-sm bg-danger px-2 py-1 text-[11px] font-semibold text-sand-0"
-                >Remove</button>
-            </div>
-        `;
-        gallery.querySelector('[data-image-grid]')?.appendChild(card);
-        addInput.value = '';
+    addInput?.addEventListener('change', () => {
+        if (addInput.files?.length) {
+            uploadForm.submit();
+        }
     });
 }

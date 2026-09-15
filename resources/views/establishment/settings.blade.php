@@ -20,17 +20,18 @@
                     </div>
                 </div>
 
-                <form class="mt-6 flex flex-col gap-4">
+                <form method="POST" action="{{ route('establishment.settings.profile') }}" class="mt-6 flex flex-col gap-4">
+                    @csrf
                     <div>
                         <label class="mb-1 block text-xs font-semibold text-sand-700">Full Name <span class="text-danger" aria-hidden="true">*</span></label>
-                        <input type="text" value="{{ $user->name }}" required class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                        <input name="name" type="text" value="{{ $user->name }}" required class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
                     </div>
                     <div>
                         <label class="mb-1 block text-xs font-semibold text-sand-700">Login Email <span class="text-danger" aria-hidden="true">*</span></label>
-                        <input type="email" value="{{ $user->email }}" required class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                        <input name="email" type="email" value="{{ $user->email }}" required class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
                     </div>
                     <div>
-                        <button type="button" data-toast-trigger data-toast-message="Account profile saved." class="rounded-sm bg-primary-700 px-4 py-2 text-sm font-semibold text-sand-0 hover:bg-primary-900">
+                        <button type="submit" class="rounded-sm bg-primary-700 px-4 py-2 text-sm font-semibold text-sand-0 hover:bg-primary-900">
                             Save Changes
                         </button>
                     </div>
@@ -54,43 +55,43 @@
             </div>
 
             <div data-tab-panel="preferences" class="hidden max-w-lg">
-                <div class="flex flex-col gap-4">
-                    @foreach ([
-                        ['label' => 'Email me when a new tourist arrival is recorded', 'checked' => false],
-                        ['label' => 'Email me when new feedback is left about my establishment', 'checked' => true],
-                        ['label' => 'Email me a monthly visitor summary', 'checked' => true],
-                    ] as $pref)
-                        <label class="flex items-center justify-between gap-4 border-b border-sand-100 pb-3">
-                            <span class="text-sm text-sand-800">{{ $pref['label'] }}</span>
-                            <input type="checkbox" @checked($pref['checked']) class="h-4 w-4 rounded border-sand-300 text-primary-700 focus:ring-primary-500">
-                        </label>
-                    @endforeach
-                </div>
-                <button type="button" data-toast-trigger data-toast-message="Preferences saved." class="mt-5 rounded-sm bg-primary-700 px-4 py-2 text-sm font-semibold text-sand-0 hover:bg-primary-900">
-                    Save Preferences
-                </button>
+                <form method="POST" action="{{ route('establishment.settings.preferences') }}">
+                    @csrf
+                    <div class="flex flex-col gap-4">
+                        @foreach ($preferences as $pref)
+                            <label class="flex items-center justify-between gap-4 border-b border-sand-100 pb-3">
+                                <span class="text-sm text-sand-800">{{ $pref['label'] }}</span>
+                                <input type="checkbox" name="preferences[{{ $pref['key'] }}]" @checked($pref['checked']) class="h-4 w-4 rounded border-sand-300 text-primary-700 focus:ring-primary-500">
+                            </label>
+                        @endforeach
+                    </div>
+                    <button type="submit" class="mt-5 rounded-sm bg-primary-700 px-4 py-2 text-sm font-semibold text-sand-0 hover:bg-primary-900">
+                        Save Preferences
+                    </button>
+                </form>
             </div>
         </div>
     </div>
 
     <x-dashboard.modal id="change-password-modal" title="Change Password" max-width="max-w-sm">
-        <form class="flex flex-col gap-4">
+        <form id="change-password-form" method="POST" action="{{ route('establishment.settings.password') }}" class="flex flex-col gap-4">
+            @csrf
             <div>
                 <label class="mb-1 block text-xs font-semibold text-sand-700">Current Password <span class="text-danger" aria-hidden="true">*</span></label>
-                <input type="password" required class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                <input name="current_password" type="password" required class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
             </div>
             <div>
                 <label class="mb-1 block text-xs font-semibold text-sand-700">New Password <span class="text-danger" aria-hidden="true">*</span></label>
-                <input type="password" required class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                <input name="password" type="password" required class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
             </div>
             <div>
                 <label class="mb-1 block text-xs font-semibold text-sand-700">Confirm New Password <span class="text-danger" aria-hidden="true">*</span></label>
-                <input type="password" required class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                <input name="password_confirmation" type="password" required class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
             </div>
         </form>
         <x-slot:footer>
             <button type="button" data-modal-close class="rounded-sm border border-sand-300 bg-sand-0 px-4 py-2.5 text-sm font-semibold text-sand-800 hover:border-primary-300">Cancel</button>
-            <button type="button" data-modal-close data-toast-message="Password updated." class="rounded-sm bg-primary-700 px-4 py-2 text-sm font-semibold text-sand-0 hover:bg-primary-900">
+            <button type="submit" form="change-password-form" class="rounded-sm bg-primary-700 px-4 py-2 text-sm font-semibold text-sand-0 hover:bg-primary-900">
                 Update Password
             </button>
         </x-slot:footer>

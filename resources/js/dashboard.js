@@ -16,7 +16,28 @@ document.addEventListener('DOMContentLoaded', () => {
     initConfirmActions();
     initToastTriggers();
     initReportGenerator();
+    initFlashToast();
 });
+
+// Lets other, independently-bundled entry scripts (establishment.js, app.js)
+// trigger the same toast used everywhere else, without importing across
+// Vite entry points.
+window.addEventListener('itour:toast', (e) => {
+    showToast(e.detail?.message ?? 'Done.', e.detail?.tone ?? 'success');
+});
+
+/**
+ * Shows a toast for a message flashed by the server on the previous
+ * request — either `session('toast')` (a successful save/action) or the
+ * first validation error — via `data-flash-toast`/`data-flash-tone` on
+ * `<body>` (see resources/views/components/layouts/dashboard.blade.php).
+ */
+function initFlashToast() {
+    const message = document.body.dataset.flashToast;
+    if (message) {
+        showToast(message, document.body.dataset.flashTone || 'success');
+    }
+}
 
 function initSidebarSubmenus() {
     document.querySelectorAll('[data-nav-toggle]').forEach((button) => {
@@ -205,7 +226,13 @@ function closeModal(modal) {
 /**
  * Edit trigger: `[data-edit-trigger="modalId"]` with a `data-edit-values`
  * JSON blob copies those values into the named form fields inside that
- * modal, so one shared "Edit" modal can be reused for every row.
+ * modal, so one shared "Add/Edit" modal can be reused for every row.
+ *
+ * `data-edit-action` (the row's own update URL) repoints the shared form's
+ * `action` at that row for the duration of the edit, via a real PUT
+ * (method-spoofed with a hidden `_method` field the form doesn't otherwise
+ * have). Not clicking any edit trigger leaves the form on its blade-authored
+ * default `action`/method — the "Add" case.
  */
 function initEditTriggers() {
     document.querySelectorAll('[data-edit-trigger]').forEach((trigger) => {
@@ -219,6 +246,37 @@ function initEditTriggers() {
                 const field = form.elements.namedItem(key);
                 if (field) field.value = value;
             });
+
+            if (trigger.dataset.editAction) {
+                form.action = trigger.dataset.editAction;
+                form.method = 'POST';
+
+                let methodField = form.querySelector('input[name="_method"]');
+                if (!methodField) {
+                    methodField = document.createElement('input');
+                    methodField.type = 'hidden';
+                    methodField.name = '_method';
+                    form.prepend(methodField);
+                }
+                methodField.value = 'PUT';
+            }
+        });
+    });
+
+    // Opening the modal fresh via its own "Add" trigger (not an edit
+    // trigger) resets the form back to its original create action/method —
+    // otherwise a previous Edit click would leave it pointed at that row's
+    // update URL.
+    document.querySelectorAll('[data-modal-open]:not([data-edit-trigger])').forEach((trigger) => {
+        trigger.addEventListener('click', () => {
+            const modal = document.getElementById(trigger.dataset.modalOpen);
+            const form = modal?.querySelector('form[data-default-action]');
+            if (!form) return;
+
+            form.reset();
+            form.action = form.dataset.defaultAction;
+            form.method = form.dataset.defaultMethod || 'POST';
+            form.querySelector('input[name="_method"]')?.remove();
         });
     });
 }
@@ -228,10 +286,12 @@ function initEditTriggers() {
  * enable/disable, verify, remove): `[data-confirm-trigger]` with
  * `data-confirm-title`, `data-confirm-message`, `data-confirm-label`, and
  * `data-confirm-tone` ("danger" | "success") opens `#confirm-modal`.
- * Confirming shows a success toast and, if the trigger also carries
- * `data-confirm-remove-target="<selector>"`, removes the trigger's closest
- * matching ancestor from the DOM (used for e.g. "remove this photo").
- * There is no backend behind this yet.
+ * Confirming submits the trigger's own wrapping `<form>` (a real POST to
+ * the backend — the page reloads and the new state, plus a flashed toast,
+ * comes back from the server) when there is one. Otherwise it falls back
+ * to the original client-only behavior: show a toast and, if the trigger
+ * carries `data-confirm-remove-target="<selector>"`, remove the trigger's
+ * closest matching ancestor from the DOM.
  *
  * Delegated on `document` (rather than bound per-trigger) so it also works
  * for triggers added dynamically after page load, e.g. a newly uploaded
@@ -259,6 +319,14 @@ function initConfirmActions() {
         confirmButton.onclick = () => {
             modal.classList.add('hidden');
             document.body.classList.remove('overflow-hidden');
+
+            const ownForm = trigger.closest('form');
+            if (ownForm) {
+                ownForm.submit();
+
+                return;
+            }
+
             showToast(trigger.dataset.confirmSuccess ?? 'Done.', 'success');
 
             const removeTarget = trigger.dataset.confirmRemoveTarget;

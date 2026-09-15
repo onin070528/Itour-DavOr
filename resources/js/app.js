@@ -2,6 +2,8 @@ document.addEventListener('DOMContentLoaded', () => {
     initMobileMenu();
     initPasswordToggle();
     initExplorePage();
+    initChatbot();
+    initEstablishmentQrForm();
 });
 
 function initMobileMenu() {
@@ -274,4 +276,172 @@ function initExplorePage() {
     }
 
     render();
+}
+
+/**
+ * Floating AI assistant widget (bottom-right on the public site). Handles
+ * opening/closing the panel and appending messages to the thread.
+ *
+ * The bot reply below is a placeholder — once a real AI backend exists,
+ * replace the setTimeout block with a fetch() to that endpoint.
+ */
+function initChatbot() {
+    const toggle = document.getElementById('chatbot-toggle');
+    const panel = document.getElementById('chatbot-panel');
+    const closeButton = document.getElementById('chatbot-close');
+    const iconOpen = document.getElementById('chatbot-toggle-icon-open');
+    const iconClose = document.getElementById('chatbot-toggle-icon-close');
+    const form = document.getElementById('chatbot-form');
+    const input = document.getElementById('chatbot-input');
+    const messages = document.getElementById('chatbot-messages');
+
+    if (!toggle || !panel || !form || !input || !messages) {
+        return;
+    }
+
+    const setOpen = (open) => {
+        panel.classList.toggle('hidden', !open);
+        panel.classList.toggle('flex', open);
+        toggle.setAttribute('aria-expanded', String(open));
+        toggle.setAttribute('aria-label', open ? 'Close chat assistant' : 'Open chat assistant');
+        iconOpen?.classList.toggle('hidden', open);
+        iconClose?.classList.toggle('hidden', !open);
+        if (open) input.focus();
+    };
+
+    toggle.addEventListener('click', () => setOpen(panel.classList.contains('hidden')));
+    closeButton?.addEventListener('click', () => setOpen(false));
+
+    form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const text = input.value.trim();
+        if (!text) return;
+
+        appendMessage(text, 'user');
+        input.value = '';
+
+        window.setTimeout(() => {
+            appendMessage(
+                "Thanks for your message! The AI assistant is still being set up — in the meantime, try Explore to browse destinations, or check the Emergency contacts in the footer.",
+                'bot'
+            );
+        }, 500);
+    });
+
+    function appendMessage(text, from) {
+        const wrapper = document.createElement('div');
+        const bubble = document.createElement('div');
+        bubble.textContent = text;
+
+        if (from === 'user') {
+            wrapper.className = 'flex justify-end';
+            bubble.className = 'max-w-[85%] rounded-md rounded-tr-none bg-primary-700 px-3 py-2 text-sm leading-relaxed text-sand-0';
+            wrapper.appendChild(bubble);
+        } else {
+            wrapper.className = 'flex items-start gap-2';
+            wrapper.innerHTML = '<span class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-100 text-primary-700"><i class="ti ti-message-chatbot text-sm" aria-hidden="true"></i></span>';
+            bubble.className = 'max-w-[85%] rounded-md rounded-tl-none bg-sand-100 px-3 py-2 text-sm leading-relaxed text-sand-800';
+            wrapper.appendChild(bubble);
+        }
+
+        messages.appendChild(wrapper);
+        messages.scrollTop = messages.scrollHeight;
+    }
+}
+
+/**
+ * Establishment QR self-registration form (resources/views/lgu/establishmentQR.blade.php).
+ * Wires up every +/- counter, keeps the "Total Party Size" readout in sync,
+ * and swaps in a success step on submit.
+ *
+ * The total counts the visitor (1) plus companions — companions are read
+ * from the "By Gender" counters only, since every companion has exactly
+ * one gender, so summing that group (rather than also adding the Age
+ * Group / Tourist Type breakdowns) avoids counting the same person twice.
+ */
+function initEstablishmentQrForm() {
+    const form = document.getElementById('establishment-qr-form');
+    if (!form) return;
+
+    const counters = Array.from(form.querySelectorAll('[data-counter]'));
+    const genderCounters = counters.filter((el) => ['male', 'female'].includes(el.dataset.counter));
+    const totalValue = document.getElementById('qr-total-value');
+    const totalCaption = document.getElementById('qr-total-caption');
+    const formStep = document.getElementById('qr-form-step');
+    const successStep = document.getElementById('qr-success-step');
+    const resetButton = document.getElementById('qr-form-reset');
+
+    const readValue = (counter) => Number(counter.querySelector('[data-counter-value]').textContent) || 0;
+    const writeValue = (counter, value) => {
+        counter.querySelector('[data-counter-value]').textContent = String(Math.max(0, value));
+    };
+
+    function updateTotal() {
+        const companions = genderCounters.reduce((sum, counter) => sum + readValue(counter), 0);
+        totalValue.textContent = String(1 + companions);
+        totalCaption.innerHTML = `You + <b>${companions}</b> companion${companions === 1 ? '' : 's'}`;
+    }
+
+    counters.forEach((counter) => {
+        counter.querySelector('[data-counter-decrement]').addEventListener('click', () => {
+            writeValue(counter, readValue(counter) - 1);
+            updateTotal();
+        });
+        counter.querySelector('[data-counter-increment]').addEventListener('click', () => {
+            writeValue(counter, readValue(counter) + 1);
+            updateTotal();
+        });
+    });
+
+    form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        if (!form.reportValidity()) return;
+
+        const submitButton = form.querySelector('button[type="submit"]');
+        if (submitButton) submitButton.disabled = true;
+
+        try {
+            // Companion counts live in [data-counter-value] spans, not real
+            // form fields (see resources/views/components/lgu/qr-counter.blade.php),
+            // so they're read directly rather than via FormData.
+            const payload = {
+                visitorName: form.elements.namedItem('visitorName')?.value,
+                visitorContact: form.elements.namedItem('visitorContact')?.value,
+                ...Object.fromEntries(counters.map((counter) => [counter.dataset.counter, readValue(counter)])),
+            };
+
+            const response = await fetch(form.dataset.actionUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                },
+                body: JSON.stringify(payload),
+            });
+
+            if (!response.ok) {
+                throw new Error('Request failed');
+            }
+
+            formStep?.classList.add('hidden');
+            successStep?.classList.remove('hidden');
+            successStep?.classList.add('flex');
+        } catch {
+            alert("Couldn't submit your registration — please check your connection and try again.");
+        } finally {
+            if (submitButton) submitButton.disabled = false;
+        }
+    });
+
+    resetButton?.addEventListener('click', () => {
+        form.reset();
+        counters.forEach((counter) => writeValue(counter, 0));
+        updateTotal();
+        successStep?.classList.add('hidden');
+        successStep?.classList.remove('flex');
+        formStep?.classList.remove('hidden');
+    });
+
+    updateTotal();
 }

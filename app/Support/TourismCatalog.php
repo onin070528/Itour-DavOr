@@ -61,7 +61,50 @@ class TourismCatalog
     }
 
     /**
-     * Every destination and tourism establishment, in one unified shape.
+     * Every destination and tourism establishment, in one unified shape,
+     * read from the real `listings` table (App\Models\Listing) — the DB
+     * rows are seeded verbatim from self::seedData() by ListingSeeder, so
+     * every existing caller of listings() keeps working unchanged against
+     * real, editable data instead of this static array.
+     *
+     * @return array<int, array{
+     *     id: string, name: string, category: string, municipality: string, barangay: string,
+     *     description: ?string, rating: ?float, tags: array<int, string>, image: ?string,
+     *     contactOffice: ?string, contactPhone: ?string, hours: ?string, href: string,
+     *     status: string, email: ?string, website: ?string
+     * }>
+     */
+    public static function listings(): array
+    {
+        return \App\Models\Listing::query()
+            ->orderBy('id')
+            ->get()
+            ->map(fn ($listing) => [
+                'id' => $listing->slug,
+                'name' => $listing->name,
+                'category' => $listing->category,
+                'municipality' => $listing->municipality,
+                'barangay' => $listing->barangay,
+                'description' => $listing->description,
+                'rating' => $listing->rating !== null ? (float) $listing->rating : null,
+                'tags' => $listing->tags ?? [],
+                'image' => $listing->image,
+                'contactOffice' => $listing->contact_office,
+                'contactPhone' => $listing->contact_phone,
+                'hours' => $listing->hours,
+                'href' => '#',
+                'status' => $listing->status,
+                'email' => $listing->email,
+                'website' => $listing->website,
+            ])
+            ->all();
+    }
+
+    /**
+     * The original, hand-authored listing content — the seed data
+     * ListingSeeder loads into the `listings` table. Not used for reads
+     * anymore (see listings() above); kept here so the content itself has
+     * exactly one authored source.
      *
      * @return array<int, array{
      *     id: string, name: string, category: string, municipality: string, barangay: string,
@@ -69,7 +112,7 @@ class TourismCatalog
      *     contactOffice: string, contactPhone: string, hours: string, href: string
      * }>
      */
-    public static function listings(): array
+    public static function seedData(): array
     {
         return [
             [
@@ -286,23 +329,31 @@ class TourismCatalog
     }
 
     /**
-     * The first N destinations, for the homepage preview.
+     * The first N destinations, for the homepage preview. Only used by the
+     * fully-public landing page, so — unlike listings() itself, which
+     * LGU/PTO management tables also read — archived listings are filtered
+     * out here.
      */
     public static function featuredDestinations(int $limit = 8): array
     {
         return collect(self::listings())
             ->where('category', 'destinations')
+            ->where('status', 'Active')
             ->take($limit)
             ->all();
     }
 
     /**
-     * The first N tourism establishments (everything but destinations), for the homepage preview.
+     * The first N tourism establishments (everything but destinations), for
+     * the homepage preview. Only shows Active ones — Pending Review/
+     * Inactive/Archived establishments aren't yet meant to be publicly
+     * visible (see Lgu\DirectoryController@verifyEstablishment).
      */
     public static function featuredEstablishments(int $limit = 6): array
     {
         return collect(self::listings())
             ->where('category', '!=', 'destinations')
+            ->where('status', 'Active')
             ->take($limit)
             ->all();
     }

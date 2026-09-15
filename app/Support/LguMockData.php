@@ -32,23 +32,13 @@ class LguMockData
      */
     public static function establishments(string $municipality): array
     {
-        // Mirrors DirectoryController@establishments' mock accreditation status.
-        $pending = ['dahican-surf-guides', 'delicacies-hub'];
-        $inactive = ['tourist-transport-terminal'];
-
+        // `status` now comes straight from the listings table (real
+        // accreditation state, editable via Lgu\DirectoryController
+        // @verifyEstablishment) instead of a hardcoded pending/inactive id list.
         return collect(TourismCatalog::listings())
             ->where('category', '!=', 'destinations')
             ->where('municipality', $municipality)
             ->values()
-            ->map(function (array $listing) use ($pending, $inactive) {
-                $listing['status'] = match (true) {
-                    in_array($listing['id'], $pending, true) => 'Pending Review',
-                    in_array($listing['id'], $inactive, true) => 'Inactive',
-                    default => 'Active',
-                };
-
-                return $listing;
-            })
             ->all();
     }
 

@@ -95,19 +95,22 @@
 
                     <x-slot:footer>
                         @if ($listing['status'] === 'Pending Review')
-                            <button
-                                type="button"
-                                data-confirm-trigger
-                                data-confirm-title="Verify {{ $listing['name'] }}?"
-                                data-confirm-message="Verified establishments become publicly visible and accredited on the tourism directory."
-                                data-confirm-label="Verify Establishment"
-                                data-confirm-tone="success"
-                                data-confirm-success="{{ $listing['name'] }} marked as verified."
-                                class="rounded-sm bg-primary-700 px-4 py-2 text-sm font-semibold text-sand-0 hover:bg-primary-900"
-                            >
-                                <i class="ti ti-circle-check" aria-hidden="true"></i>
-                                Verify Establishment
-                            </button>
+                            <form method="POST" action="{{ route('lgu.directory.establishments.verify', $listing['id']) }}">
+                                @csrf
+                                @method('PATCH')
+                                <button
+                                    type="button"
+                                    data-confirm-trigger
+                                    data-confirm-title="Verify {{ $listing['name'] }}?"
+                                    data-confirm-message="Verified establishments become publicly visible and accredited on the tourism directory."
+                                    data-confirm-label="Verify Establishment"
+                                    data-confirm-tone="success"
+                                    class="rounded-sm bg-primary-700 px-4 py-2 text-sm font-semibold text-sand-0 hover:bg-primary-900"
+                                >
+                                    <i class="ti ti-circle-check" aria-hidden="true"></i>
+                                    Verify Establishment
+                                </button>
+                            </form>
                         @else
                             <span class="text-xs text-sand-500">Establishment profile is managed by its owner.</span>
                         @endif

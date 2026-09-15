@@ -4,6 +4,7 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="csrf-token" content="{{ csrf_token() }}">
 
         <title>{{ $title ? "{$title} · iTOUR Davao Oriental" : 'iTOUR — Discover Davao Oriental' }}</title>
         <meta name="description" content="iTOUR is the official tourism information platform of the Provincial Tourism Office of Davao Oriental — explore destinations, accommodations, restaurants, and tourism establishments across the province.">
@@ -21,5 +22,6 @@
         </main>
 
         <x-footer />
+        <x-chatbot />
     </body>
 </html>

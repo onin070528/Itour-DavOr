@@ -88,37 +88,40 @@
                                             data-modal-open="user-form-modal"
                                             data-edit-trigger="user-form-modal"
                                             data-edit-values="{{ $editValues }}"
+                                            data-edit-action="{{ route('pto.users.update', $u['id']) }}"
                                             class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-sand-700 hover:bg-sand-50"
                                         >
                                             <i class="ti ti-pencil" aria-hidden="true"></i> Edit
                                         </button>
-                                        @if ($u['status'] === 'Active')
-                                            <button
-                                                type="button"
-                                                data-confirm-trigger
-                                                data-confirm-title="Disable {{ $u['name'] }}?"
-                                                data-confirm-message="They will immediately lose access to their iTOUR account."
-                                                data-confirm-label="Disable Account"
-                                                data-confirm-tone="danger"
-                                                data-confirm-success="{{ $u['name'] }}'s account was disabled."
-                                                class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-danger hover:bg-danger-bg"
-                                            >
-                                                <i class="ti ti-toggle-left" aria-hidden="true"></i> Disable Account
-                                            </button>
-                                        @else
-                                            <button
-                                                type="button"
-                                                data-confirm-trigger
-                                                data-confirm-title="Enable {{ $u['name'] }}?"
-                                                data-confirm-message="They will regain access to their iTOUR account."
-                                                data-confirm-label="Enable Account"
-                                                data-confirm-tone="success"
-                                                data-confirm-success="{{ $u['name'] }}'s account was enabled."
-                                                class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-success hover:bg-success-bg"
-                                            >
-                                                <i class="ti ti-toggle-right" aria-hidden="true"></i> Enable Account
-                                            </button>
-                                        @endif
+                                        <form method="POST" action="{{ route('pto.users.toggleStatus', $u['id']) }}">
+                                            @csrf
+                                            @method('PATCH')
+                                            @if ($u['status'] === 'Active')
+                                                <button
+                                                    type="button"
+                                                    data-confirm-trigger
+                                                    data-confirm-title="Disable {{ $u['name'] }}?"
+                                                    data-confirm-message="They will immediately lose access to their iTOUR account."
+                                                    data-confirm-label="Disable Account"
+                                                    data-confirm-tone="danger"
+                                                    class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-danger hover:bg-danger-bg"
+                                                >
+                                                    <i class="ti ti-toggle-left" aria-hidden="true"></i> Disable Account
+                                                </button>
+                                            @else
+                                                <button
+                                                    type="button"
+                                                    data-confirm-trigger
+                                                    data-confirm-title="Enable {{ $u['name'] }}?"
+                                                    data-confirm-message="They will regain access to their iTOUR account."
+                                                    data-confirm-label="Enable Account"
+                                                    data-confirm-tone="success"
+                                                    class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-success hover:bg-success-bg"
+                                                >
+                                                    <i class="ti ti-toggle-right" aria-hidden="true"></i> Enable Account
+                                                </button>
+                                            @endif
+                                        </form>
                                     </div>
                                 </div>
                             </td>
@@ -152,7 +155,15 @@
     </div>
 
     <x-dashboard.modal id="user-form-modal" title="User">
-        <form class="flex flex-col gap-4">
+        <form
+            id="user-form"
+            method="POST"
+            action="{{ route('pto.users.store') }}"
+            data-default-action="{{ route('pto.users.store') }}"
+            data-default-method="POST"
+            class="flex flex-col gap-4"
+        >
+            @csrf
             <div>
                 <label class="mb-1 block text-xs font-semibold text-sand-700">Full Name <span class="text-danger" aria-hidden="true">*</span></label>
                 <input name="name" type="text" required class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
@@ -177,7 +188,7 @@
 
         <x-slot:footer>
             <button type="button" data-modal-close class="rounded-sm border border-sand-300 bg-sand-0 px-4 py-2.5 text-sm font-semibold text-sand-800 hover:border-primary-300">Cancel</button>
-            <button type="button" data-modal-close data-toast-message="User account saved." class="rounded-sm bg-primary-700 px-4 py-2 text-sm font-semibold text-sand-0 hover:bg-primary-900">
+            <button type="submit" form="user-form" class="rounded-sm bg-primary-700 px-4 py-2 text-sm font-semibold text-sand-0 hover:bg-primary-900">
                 Save User
             </button>
         </x-slot:footer>

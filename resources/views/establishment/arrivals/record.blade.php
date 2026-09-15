@@ -78,7 +78,7 @@
                         <i class="ti ti-arrow-left" aria-hidden="true"></i>
                         Back
                     </button>
-                    <button type="button" data-step-submit class="rounded-sm bg-primary-700 px-5 py-2.5 text-sm font-semibold text-sand-0 hover:bg-primary-900">
+                    <button type="button" data-step-submit data-action-url="{{ route('establishment.arrivals.store') }}" class="rounded-sm bg-primary-700 px-5 py-2.5 text-sm font-semibold text-sand-0 hover:bg-primary-900">
                         Confirm & Submit
                     </button>
                 </div>

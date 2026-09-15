@@ -118,6 +118,33 @@ class PtoMockData
      */
     public static function users(): array
     {
+        return \App\Models\User::query()
+            ->orderByDesc('last_login_at')
+            ->get()
+            ->map(fn ($user) => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'role' => $user->role->title(),
+                // Mirrors Pto\UsersController's write-side mapping: the LGU
+                // role's meaningful field is organization_subtitle (the
+                // municipality), every other role's is organization_name.
+                'assignment' => $user->role === \App\Enums\UserRole::Lgu ? $user->organization_subtitle : $user->organization_name,
+                'status' => $user->status,
+                'lastActive' => $user->last_login_at?->toDateString() ?? $user->created_at->toDateString(),
+            ])
+            ->all();
+    }
+
+    /**
+     * The original, hand-authored account list — the seed data
+     * database/seeders/UserSeeder.php loads into the real `users` table.
+     * Not used for reads anymore (see users() above).
+     *
+     * @return array<int, array{name: string, email: string, role: string, assignment: string, status: string, lastActive: string}>
+     */
+    public static function seedUsers(): array
+    {
         $rows = [
             ['Ma. Elena Bautista', 'ebautista@davaooriental.gov.ph', 'PTO Administrator', 'Provincial Tourism Office', 'Active', '2026-08-22'],
             ['Arnel Dizon', 'adizon@mati.gov.ph', 'LGU Tourism Personnel', 'City of Mati', 'Active', '2026-08-22'],

@@ -27,10 +27,11 @@ class EstablishmentMockData
     }
 
     /**
-     * Featured/primary image plus a small photo gallery. Reuses existing
-     * itour-images assets — there's no multi-image upload backend yet.
+     * The establishment's photo gallery, read from the real
+     * `listing_images` table (App\Models\ListingImage) — backs add/
+     * remove/set-featured on the Establishment Profile page.
      *
-     * @return array<int, array{path: string, caption: string, primary: bool}>
+     * @return array<int, array{id: int, path: string, caption: ?string, primary: bool}>
      */
     public static function galleryImages(string $name): array
     {
@@ -39,24 +40,65 @@ class EstablishmentMockData
             return [];
         }
 
-        $extras = ['dahican.jpg', 'pujada-bay.jpg', 'sunrise-point.jpg', 'cove.jpg'];
-        $extras = array_values(array_diff($extras, [$profile['image']]));
-
-        return [
-            ['path' => $profile['image'], 'caption' => 'Featured photo', 'primary' => true],
-            ['path' => $extras[0], 'caption' => 'Grounds & surroundings', 'primary' => false],
-            ['path' => $extras[1], 'caption' => 'Nearby view', 'primary' => false],
-        ];
+        return \App\Models\Listing::query()
+            ->where('slug', $profile['id'])
+            ->firstOrFail()
+            ->images
+            ->map(fn ($image) => [
+                'id' => $image->id,
+                'path' => $image->path,
+                'caption' => $image->caption,
+                'primary' => $image->is_primary,
+            ])
+            ->all();
     }
 
     /**
-     * Individual guest arrival records for this establishment. Only
-     * populated for establishments that have demo data — an establishment
-     * with no submissions yet correctly sees an empty state.
+     * Individual guest arrival records for this establishment, read from
+     * the real `arrivals` table (App\Models\Arrival, source=staff — i.e.
+     * submissions from the front-desk "Record Arrival" wizard). Seeded
+     * verbatim from self::seedArrivals() by ArrivalSeeder, so every
+     * existing caller of arrivals() (this class' own dashboardSummary(),
+     * Establishment\ArrivalsController) keeps working unchanged against
+     * real, growing data.
+     *
+     * @return array<int, array{id: string, date: string, visitorName: ?string, gender: ?string, classification: ?string, remarks: ?string, status: string}>
+     */
+    public static function arrivals(string $name): array
+    {
+        $listing = collect(TourismCatalog::listings())->firstWhere('name', $name);
+
+        if (! $listing) {
+            return [];
+        }
+
+        return \App\Models\Arrival::query()
+            ->whereHas('listing', fn ($q) => $q->where('slug', $listing['id']))
+            ->where('source', 'staff')
+            ->orderByDesc('date')
+            ->orderByDesc('id')
+            ->get()
+            ->map(fn ($arrival) => [
+                'id' => 'GR-'.$arrival->id,
+                'date' => $arrival->date->toDateString(),
+                'visitorName' => $arrival->visitor_name,
+                'gender' => $arrival->gender,
+                'classification' => $arrival->classification,
+                'remarks' => $arrival->remarks,
+                'status' => $arrival->status,
+            ])
+            ->all();
+    }
+
+    /**
+     * The original, hand-authored arrival demo rows for Botanika Nature
+     * Resort — the only establishment with any — kept here as the single
+     * authored source ArrivalSeeder loads into the `arrivals` table. Not
+     * used for reads anymore (see arrivals() above).
      *
      * @return array<int, array{id: string, date: string, visitorName: ?string, gender: string, classification: string, remarks: ?string, status: string}>
      */
-    public static function arrivals(string $name): array
+    public static function seedArrivals(string $name): array
     {
         $rows = match ($name) {
             'Botanika Nature Resort' => [

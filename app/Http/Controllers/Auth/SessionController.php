@@ -36,10 +36,21 @@ class SessionController extends Controller
             ]);
         }
 
-        $request->session()->regenerate();
-
         /** @var User $user */
         $user = Auth::user();
+
+        // PTO's "Disable Account" action (Pto\UsersController::toggleStatus)
+        // is documented as immediate loss of access — enforce that here.
+        if ($user->status === 'Inactive') {
+            Auth::guard('web')->logout();
+
+            throw ValidationException::withMessages([
+                'email' => __('This account has been disabled. Contact your Provincial Tourism Office administrator.'),
+            ]);
+        }
+
+        $request->session()->regenerate();
+        $user->forceFill(['last_login_at' => now()])->save();
 
         return redirect()->intended(
             $user->role ? route($user->role->dashboardRouteName()) : route('home')

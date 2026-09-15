@@ -21,6 +21,7 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="csrf-token" content="{{ csrf_token() }}">
 
         <title>{{ $pageTitle }} · iTOUR</title>
 
@@ -34,7 +35,12 @@
             $user->role === \App\Enums\UserRole::Establishment ? 'resources/js/establishment.js' : null,
         ]))
     </head>
-    <body class="flex h-screen overflow-hidden bg-sand-100 text-sand-900">
+    <body
+        class="flex h-screen overflow-hidden bg-sand-100 text-sand-900"
+        @if (session('toast')) data-flash-toast="{{ session('toast') }}" data-flash-tone="{{ session('toast_tone', 'success') }}"
+        @elseif ($errors->any()) data-flash-toast="{{ $errors->first() }}" data-flash-tone="danger"
+        @endif
+    >
         {{-- Fixed-height flex row: the sidebar stretches to the full viewport
              height and never scrolls with it — only <main> below scrolls. --}}
         <aside class="flex h-full w-64 shrink-0 flex-col overflow-hidden bg-primary-900 text-sand-0">

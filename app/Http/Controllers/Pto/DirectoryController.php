@@ -2,12 +2,17 @@
 
 namespace App\Http\Controllers\Pto;
 
+use App\Http\Controllers\Concerns\ManagesDestinationListings;
+use App\Models\Listing;
 use App\Support\TourismCatalog;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class DirectoryController extends PtoController
 {
+    use ManagesDestinationListings;
+
     /**
      * Destinations: province-wide destination management.
      */
@@ -20,29 +25,48 @@ class DirectoryController extends PtoController
         ]);
     }
 
+    public function storeDestination(Request $request): RedirectResponse
+    {
+        $listing = $this->createDestination(
+            $this->validatedDestinationFields($request),
+            $this->validatedMunicipality($request),
+        );
+
+        return back()->with('toast', "{$listing->name} was added.");
+    }
+
+    public function updateDestination(Request $request, Listing $listing): RedirectResponse
+    {
+        abort_if($listing->category !== 'destinations', 404);
+
+        $listing->update([
+            ...$this->validatedDestinationFields($request),
+            'municipality' => $this->validatedMunicipality($request),
+        ]);
+
+        return back()->with('toast', 'Destination saved.');
+    }
+
+    public function archiveDestination(Listing $listing): RedirectResponse
+    {
+        abort_if($listing->category !== 'destinations', 404);
+
+        $listing->update(['status' => 'Archived']);
+
+        return back()->with('toast', "{$listing->name} was archived.");
+    }
+
     /**
      * Establishments: accredited tourism establishments, province-wide.
      */
     public function establishments(Request $request): View
     {
-        // Accreditation status is mock data for now — a handful of
-        // establishments are shown Pending/Inactive so the status
-        // presentation has something to demonstrate.
-        $pending = ['dahican-surf-guides', 'delicacies-hub'];
-        $inactive = ['tourist-transport-terminal'];
-
+        // `status` (Active / Pending Review / Inactive) comes straight from
+        // the listings table now — real accreditation state, editable via
+        // Lgu\DirectoryController@verifyEstablishment.
         $listings = collect(TourismCatalog::listings())
             ->where('category', '!=', 'destinations')
-            ->values()
-            ->map(function (array $listing) use ($pending, $inactive) {
-                $listing['status'] = match (true) {
-                    in_array($listing['id'], $pending, true) => 'Pending Review',
-                    in_array($listing['id'], $inactive, true) => 'Inactive',
-                    default => 'Active',
-                };
-
-                return $listing;
-            });
+            ->values();
 
         return $this->renderPto($request, 'pto.directory.establishments', 'directory.establishments', 'Establishments', [
             'listings' => $listings->all(),

@@ -22,7 +22,10 @@
                 <label class="inline-flex cursor-pointer items-center gap-2 rounded-sm border border-sand-300 bg-sand-0 px-4 py-2.5 text-sm font-semibold text-sand-800 hover:border-primary-300">
                     <i class="ti ti-photo-plus" aria-hidden="true"></i>
                     Add Image
-                    <input id="image-upload-input" type="file" accept="image/*" class="hidden">
+                    <form id="image-upload-form" method="POST" action="{{ route('establishment.profile.images.store') }}" enctype="multipart/form-data" class="hidden">
+                        @csrf
+                        <input id="image-upload-input" name="image" type="file" accept="image/*">
+                    </form>
                 </label>
             </div>
 
@@ -32,18 +35,24 @@
                         <img src="{{ asset('storage/itour-images/'.$image['path']) }}" alt="{{ $image['caption'] }}" class="h-32 w-full object-cover">
                         <span data-primary-badge @class(['absolute top-2 left-2 rounded-sm bg-primary-700 px-2 py-0.5 text-[10px] font-semibold text-sand-0', 'hidden' => ! $image['primary']])>Featured</span>
                         <div class="absolute inset-0 flex items-end justify-between bg-gradient-to-t from-sand-900/60 via-transparent to-transparent p-2 opacity-0 transition-opacity group-hover:opacity-100">
-                            <button type="button" data-set-primary @class(['rounded-sm bg-sand-0/90 px-2 py-1 text-[11px] font-semibold text-sand-800', 'hidden' => $image['primary']])>Set as Featured</button>
-                            <button
-                                type="button"
-                                data-confirm-trigger
-                                data-confirm-title="Remove this photo?"
-                                data-confirm-message="This photo will be removed from your establishment's gallery."
-                                data-confirm-label="Remove"
-                                data-confirm-tone="danger"
-                                data-confirm-success="Photo removed."
-                                data-confirm-remove-target="[data-image-card]"
-                                class="rounded-sm bg-danger px-2 py-1 text-[11px] font-semibold text-sand-0"
-                            >Remove</button>
+                            <form method="POST" action="{{ route('establishment.profile.images.primary', $image['id']) }}">
+                                @csrf
+                                @method('PATCH')
+                                <button type="submit" data-set-primary @class(['rounded-sm bg-sand-0/90 px-2 py-1 text-[11px] font-semibold text-sand-800', 'hidden' => $image['primary']])>Set as Featured</button>
+                            </form>
+                            <form method="POST" action="{{ route('establishment.profile.images.destroy', $image['id']) }}">
+                                @csrf
+                                @method('DELETE')
+                                <button
+                                    type="button"
+                                    data-confirm-trigger
+                                    data-confirm-title="Remove this photo?"
+                                    data-confirm-message="This photo will be removed from your establishment's gallery."
+                                    data-confirm-label="Remove"
+                                    data-confirm-tone="danger"
+                                    class="rounded-sm bg-danger px-2 py-1 text-[11px] font-semibold text-sand-0"
+                                >Remove</button>
+                            </form>
                         </div>
                     </div>
                 @endforeach
@@ -51,7 +60,9 @@
         </div>
 
         {{-- Profile form --}}
-        <form class="mt-6 rounded-md border border-sand-200 bg-sand-0 p-5">
+        <form method="POST" action="{{ route('establishment.profile.update') }}" class="mt-6 rounded-md border border-sand-200 bg-sand-0 p-5">
+            @csrf
+            @method('PUT')
             <h2 class="font-display text-base font-bold text-sand-900">Establishment Information</h2>
 
             <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -99,17 +110,17 @@
 
                 <div data-field>
                     <label class="mb-1 block text-xs font-semibold text-sand-700">Email</label>
-                    <input name="email" type="email" placeholder="you@example.com" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                    <input name="email" type="email" value="{{ $profile['email'] }}" placeholder="you@example.com" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
                 </div>
 
                 <div data-field>
                     <label class="mb-1 block text-xs font-semibold text-sand-700">Website / Social Media</label>
-                    <input name="website" type="text" placeholder="Optional" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                    <input name="website" type="text" value="{{ $profile['website'] }}" placeholder="Optional" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
                 </div>
             </div>
 
             <div class="mt-5 flex justify-end gap-2 border-t border-sand-200 pt-5">
-                <button type="button" data-toast-trigger data-toast-message="Establishment profile updated." class="rounded-sm bg-primary-700 px-5 py-2.5 text-sm font-semibold text-sand-0 hover:bg-primary-900">
+                <button type="submit" class="rounded-sm bg-primary-700 px-5 py-2.5 text-sm font-semibold text-sand-0 hover:bg-primary-900">
                     Save Changes
                 </button>
             </div>
