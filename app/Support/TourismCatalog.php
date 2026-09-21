@@ -1,5 +1,13 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Single source of truth for tourism destinations/establishments shown on the public site.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 namespace App\Support;
 
 /**
@@ -69,6 +77,7 @@ class TourismCatalog
      *
      * @return array<int, array{
      *     id: string, name: string, category: string, municipality: string, barangay: string,
+     *     lat: ?float, lng: ?float,
      *     description: ?string, rating: ?float, tags: array<int, string>, image: ?string,
      *     contactOffice: ?string, contactPhone: ?string, hours: ?string, href: string,
      *     status: string, email: ?string, website: ?string
@@ -85,6 +94,8 @@ class TourismCatalog
                 'category' => $listing->category,
                 'municipality' => $listing->municipality,
                 'barangay' => $listing->barangay,
+                'lat' => $listing->lat,
+                'lng' => $listing->lng,
                 'description' => $listing->description,
                 'rating' => $listing->rating !== null ? (float) $listing->rating : null,
                 'tags' => $listing->tags ?? [],
@@ -121,6 +132,8 @@ class TourismCatalog
                 'category' => 'destinations',
                 'municipality' => 'City of Mati',
                 'barangay' => 'Brgy. Dahican',
+                'lat' => 6.9578,
+                'lng' => 126.2478,
                 'description' => 'A seven-kilometre stretch of cream-coloured sand facing the Pacific, known for skimboarding, surfing, and sunrise watching.',
                 'rating' => 4.7,
                 'tags' => ['Beach', 'Surfing', 'Sunrise'],
@@ -136,6 +149,8 @@ class TourismCatalog
                 'category' => 'destinations',
                 'municipality' => 'Cateel',
                 'barangay' => 'Brgy. Aliwagwag',
+                'lat' => 7.7947,
+                'lng' => 126.3550,
                 'description' => 'A multi-tiered stairway of waterfalls cascading down the Cateel River, with a canopy walk and zipline.',
                 'rating' => 4.8,
                 'tags' => ['Waterfalls', 'Eco-park', 'Zipline'],
@@ -151,6 +166,8 @@ class TourismCatalog
                 'category' => 'destinations',
                 'municipality' => 'San Isidro',
                 'barangay' => 'Brgy. La Union',
+                'lat' => 6.7419,
+                'lng' => 126.1725,
                 'description' => "The Philippines' sixth UNESCO World Heritage Site — a pygmy forest of century-old bonsai trees, pitcher plants, and rare wildlife.",
                 'rating' => 4.9,
                 'tags' => ['UNESCO', 'Trekking', 'Wildlife'],
@@ -166,6 +183,8 @@ class TourismCatalog
                 'category' => 'destinations',
                 'municipality' => 'Governor Generoso',
                 'barangay' => 'Brgy. Lavigan',
+                'lat' => 6.6667,
+                'lng' => 126.1667,
                 'description' => 'A cliffside viewpoint over Pujada Bay, known for its rock formations and panoramic sunrise views.',
                 'rating' => 4.6,
                 'tags' => ['Viewpoint', 'Sunrise'],
@@ -181,6 +200,8 @@ class TourismCatalog
                 'category' => 'destinations',
                 'municipality' => 'Governor Generoso',
                 'barangay' => 'Brgy. Lavigan',
+                'lat' => 6.2680,
+                'lng' => 126.1841,
                 'description' => 'The easternmost point of Mindanao, marked by a lighthouse where the Pacific meets the Davao Gulf.',
                 'rating' => 4.5,
                 'tags' => ['Lighthouse', 'Coastline'],
@@ -196,6 +217,8 @@ class TourismCatalog
                 'category' => 'destinations',
                 'municipality' => 'City of Mati',
                 'barangay' => 'Brgy. Badas',
+                'lat' => 6.8833,
+                'lng' => 126.3167,
                 'description' => 'A small islet off Pujada Bay whose silhouette resembles a resting dinosaur, ringed by clear shallow water.',
                 'rating' => 4.6,
                 'tags' => ['Island', 'Snorkeling'],
@@ -211,6 +234,8 @@ class TourismCatalog
                 'category' => 'destinations',
                 'municipality' => 'City of Mati',
                 'barangay' => 'Brgy. Badas',
+                'lat' => 6.8500,
+                'lng' => 126.3000,
                 'description' => 'A protected seascape of mangroves and coral gardens, ringed by the very shoreline where the Philippines meets the Pacific.',
                 'rating' => 4.7,
                 'tags' => ['Protected Seascape', 'Mangroves'],
@@ -226,6 +251,8 @@ class TourismCatalog
                 'category' => 'destinations',
                 'municipality' => 'City of Mati',
                 'barangay' => 'Brgy. Central',
+                'lat' => 6.9530,
+                'lng' => 126.2140,
                 'description' => "The province's heritage museum, tracing Davao Oriental's history, culture, and indigenous communities.",
                 'rating' => 4.4,
                 'tags' => ['Heritage', 'Museum'],
@@ -241,6 +268,8 @@ class TourismCatalog
                 'category' => 'accommodation',
                 'municipality' => 'City of Mati',
                 'barangay' => 'Brgy. Dahican',
+                'lat' => 6.9600,
+                'lng' => 126.2500,
                 'description' => 'Beachfront resort on Dahican with garden villas, an infinity pool, and a farm-to-table restaurant.',
                 'rating' => 4.6,
                 'tags' => ['Resort', 'Beachfront'],
@@ -256,6 +285,8 @@ class TourismCatalog
                 'category' => 'restaurants',
                 'municipality' => 'City of Mati',
                 'barangay' => 'Brgy. Dahican',
+                'lat' => 6.9550,
+                'lng' => 126.2450,
                 'description' => 'Overwater dining on Pujada Bay serving kinilaw na malasugue, grilled tuna belly, and seaweed salad.',
                 'rating' => 4.5,
                 'tags' => ['Seafood', 'Bay View'],
@@ -271,6 +302,8 @@ class TourismCatalog
                 'category' => 'local-delicacies',
                 'municipality' => 'City of Mati',
                 'barangay' => 'Brgy. Central',
+                'lat' => 6.9520,
+                'lng' => 126.2130,
                 'description' => 'One-stop shop for dagmay textiles, abaca crafts, tablea, and packaged delicacies from all 11 LGUs.',
                 'rating' => 4.5,
                 'tags' => ['Souvenirs', 'Crafts'],
@@ -286,6 +319,8 @@ class TourismCatalog
                 'category' => 'tour-guides',
                 'municipality' => 'City of Mati',
                 'barangay' => 'Brgy. Dahican',
+                'lat' => 6.9585,
+                'lng' => 126.2470,
                 'description' => 'Surf lessons, board rentals, and guided sunrise paddle-outs led by the local surfing community.',
                 'rating' => 4.7,
                 'tags' => ['Surfing', 'Guided Tours'],
@@ -301,6 +336,8 @@ class TourismCatalog
                 'category' => 'local-delicacies',
                 'municipality' => 'City of Mati',
                 'barangay' => 'Brgy. Central',
+                'lat' => 6.9525,
+                'lng' => 126.2135,
                 'description' => 'Home-made tablea, bibingka, and native kakanin sourced from cooperatives across the province.',
                 'rating' => 4.4,
                 'tags' => ['Delicacies', 'Local Products'],
@@ -316,6 +353,8 @@ class TourismCatalog
                 'category' => 'transportation',
                 'municipality' => 'City of Mati',
                 'barangay' => 'Brgy. Central',
+                'lat' => 6.9500,
+                'lng' => 126.2100,
                 'description' => 'Vans and buses connecting Mati to every municipality in the province, plus routes to Davao City.',
                 'rating' => 4.3,
                 'tags' => ['Vans', 'Bus Routes'],

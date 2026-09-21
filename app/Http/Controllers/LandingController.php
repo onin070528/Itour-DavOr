@@ -1,5 +1,14 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Renders the public landing page — featured destinations,
+ * establishments, municipalities, visitor reviews, and the nearby-places map.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 namespace App\Http\Controllers;
 
 use App\Support\TourismCatalog;
@@ -22,7 +31,33 @@ class LandingController extends Controller
             'establishments' => TourismCatalog::featuredEstablishments(6),
             'municipalities' => TourismCatalog::municipalities(),
             'reviews' => $this->reviews(),
+            'nearbyPlaces' => $this->nearbyPlaces(),
         ]);
+    }
+
+    /**
+     * Active listings that have coordinates, in the shape the "Find Places
+     * Near You" Mapbox map on the landing page plots markers from.
+     *
+     * @return array<int, array{name: string, category: string, municipality: string, barangay: string, lat: float, lng: float}>
+     */
+    private function nearbyPlaces(): array
+    {
+        return collect(TourismCatalog::listings())
+            ->where('status', 'Active')
+            ->filter(fn ($listing) => $listing['lat'] !== null && $listing['lng'] !== null)
+            ->map(fn ($listing) => [
+                'name' => $listing['name'],
+                'category' => $listing['category'],
+                'categoryLabel' => TourismCatalog::categoryLabel($listing['category']),
+                'municipality' => $listing['municipality'],
+                'barangay' => $listing['barangay'],
+                'lat' => $listing['lat'],
+                'lng' => $listing['lng'],
+                'href' => $listing['href'],
+            ])
+            ->values()
+            ->all();
     }
 
     /**

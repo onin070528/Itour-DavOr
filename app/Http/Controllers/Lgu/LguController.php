@@ -1,5 +1,14 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Base controller shared by every LGU-role controller; renders
+ * pages with the LGU sidebar chrome and the account's municipality pre-wired.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 namespace App\Http\Controllers\Lgu;
 
 use App\Http\Controllers\Controller;

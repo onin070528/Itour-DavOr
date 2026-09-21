@@ -1,5 +1,14 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Base controller shared by every PTO-role controller; renders
+ * pages with the PTO sidebar chrome pre-wired.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 namespace App\Http\Controllers\Pto;
 
 use App\Http\Controllers\Controller;

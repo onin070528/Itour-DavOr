@@ -46,6 +46,8 @@ class ListingSeeder extends Seeder
                     'category' => $listing['category'],
                     'municipality' => $listing['municipality'],
                     'barangay' => $listing['barangay'],
+                    'lat' => $listing['lat'] ?? null,
+                    'lng' => $listing['lng'] ?? null,
                     'description' => $listing['description'],
                     'rating' => $listing['rating'],
                     'tags' => $listing['tags'],

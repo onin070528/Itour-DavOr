@@ -1,5 +1,14 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Report generation and history for province-wide PTO-level
+ * tourism reports.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 namespace App\Http\Controllers\Pto;
 
 use App\Support\PtoMockData;

@@ -1,5 +1,14 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Province-wide destination management (add/edit/archive) and
+ * read-only monitoring of accredited establishments and the tourism map.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 namespace App\Http\Controllers\Pto;
 
 use App\Http\Controllers\Concerns\ManagesDestinationListings;
@@ -7,6 +16,7 @@ use App\Models\Listing;
 use App\Support\TourismCatalog;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 
 class DirectoryController extends PtoController
@@ -27,10 +37,16 @@ class DirectoryController extends PtoController
 
     public function storeDestination(Request $request): RedirectResponse
     {
-        $listing = $this->createDestination(
-            $this->validatedDestinationFields($request),
-            $this->validatedMunicipality($request),
-        );
+        $fields = $this->validatedDestinationFields($request);
+        $municipality = $this->validatedMunicipality($request);
+
+        try {
+            $listing = $this->createDestination($fields, $municipality);
+        } catch (\Throwable $e) {
+            Log::error('Failed to create PTO destination.', ['exception' => $e]);
+
+            return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
+        }
 
         return back()->with('toast', "{$listing->name} was added.");
     }
@@ -39,10 +55,16 @@ class DirectoryController extends PtoController
     {
         abort_if($listing->category !== 'destinations', 404);
 
-        $listing->update([
-            ...$this->validatedDestinationFields($request),
-            'municipality' => $this->validatedMunicipality($request),
-        ]);
+        $fields = $this->validatedDestinationFields($request);
+        $municipality = $this->validatedMunicipality($request);
+
+        try {
+            $listing->update([...$fields, 'municipality' => $municipality]);
+        } catch (\Throwable $e) {
+            Log::error('Failed to update PTO destination.', ['exception' => $e, 'listing_id' => $listing->id]);
+
+            return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
+        }
 
         return back()->with('toast', 'Destination saved.');
     }
@@ -51,7 +73,13 @@ class DirectoryController extends PtoController
     {
         abort_if($listing->category !== 'destinations', 404);
 
-        $listing->update(['status' => 'Archived']);
+        try {
+            $listing->update(['status' => 'Archived']);
+        } catch (\Throwable $e) {
+            Log::error('Failed to archive PTO destination.', ['exception' => $e, 'listing_id' => $listing->id]);
+
+            return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
+        }
 
         return back()->with('toast', "{$listing->name} was archived.");
     }

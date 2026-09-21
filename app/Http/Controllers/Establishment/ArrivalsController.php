@@ -1,11 +1,21 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Handles the Establishment role's manual arrival-recording wizard —
+ * showing the form and persisting a staff-entered guest arrival.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 namespace App\Http\Controllers\Establishment;
 
 use App\Models\Listing;
 use App\Support\EstablishmentMockData;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -36,16 +46,22 @@ class ArrivalsController extends EstablishmentController
 
         $listing = Listing::query()->where('name', $request->user()->organization_name)->firstOrFail();
 
-        $listing->arrivals()->create([
-            'source' => 'staff',
-            'date' => $data['date'],
-            'visitor_name' => $data['visitorName'] ?? null,
-            'gender' => $data['gender'],
-            'classification' => $data['classification'],
-            'remarks' => $data['remarks'] ?? null,
-            'party_size' => 1,
-            'status' => 'Recorded',
-        ]);
+        try {
+            $listing->arrivals()->create([
+                'source' => 'staff',
+                'date' => $data['date'],
+                'visitor_name' => $data['visitorName'] ?? null,
+                'gender' => $data['gender'],
+                'classification' => $data['classification'],
+                'remarks' => $data['remarks'] ?? null,
+                'party_size' => 1,
+                'status' => 'Recorded',
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Failed to record arrival.', ['exception' => $e, 'listing_id' => $listing->id]);
+
+            return response()->json(['message' => 'Something went wrong while recording the arrival. Please try again.'], 500);
+        }
 
         return response()->json(['message' => 'Arrival recorded.']);
     }

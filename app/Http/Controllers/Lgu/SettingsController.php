@@ -1,5 +1,14 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: LGU account settings page (profile, password, notification
+ * preferences), backed by the shared UpdatesAccountSettings trait.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 namespace App\Http\Controllers\Lgu;
 
 use App\Http\Controllers\Concerns\UpdatesAccountSettings;

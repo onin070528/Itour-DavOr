@@ -1,5 +1,14 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Abstract base controller for the Establishment role — shares the
+ * sidebar chrome and account-scoped rendering used by every Establishment page.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 namespace App\Http\Controllers\Establishment;
 
 use App\Http\Controllers\Controller;

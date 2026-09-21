@@ -1,5 +1,14 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Renders the LGU dashboard, a municipality-scoped snapshot of
+ * tourism activity (arrivals, destinations, establishments, sentiment).
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 namespace App\Http\Controllers\Lgu;
 
 use App\Support\LguMockData;

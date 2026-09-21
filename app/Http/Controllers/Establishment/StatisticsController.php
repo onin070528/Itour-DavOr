@@ -1,5 +1,14 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Renders the Establishment role's Tourism Statistics page — visitor
+ * trend, classification, and gender breakdown for the account's own listing.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 namespace App\Http\Controllers\Establishment;
 
 use App\Support\EstablishmentMockData;

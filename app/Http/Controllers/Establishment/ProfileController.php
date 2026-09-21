@@ -1,5 +1,14 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Handles the Establishment role's public tourism profile — editing
+ * profile details and managing the photo gallery (upload, feature, remove).
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 namespace App\Http\Controllers\Establishment;
 
 use App\Models\Listing;
@@ -8,6 +17,7 @@ use App\Support\EstablishmentMockData;
 use App\Support\TourismCatalog;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
@@ -44,22 +54,28 @@ class ProfileController extends EstablishmentController
             'website' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $listing->update([
-            'name' => $data['name'],
-            'category' => $data['category'],
-            'barangay' => $data['address'],
-            'description' => $data['description'] ?? null,
-            'contact_phone' => $data['phone'],
-            'hours' => $data['hours'],
-            'email' => $data['email'] ?? null,
-            'website' => $data['website'] ?? null,
-        ]);
+        try {
+            $listing->update([
+                'name' => $data['name'],
+                'category' => $data['category'],
+                'barangay' => $data['address'],
+                'description' => $data['description'] ?? null,
+                'contact_phone' => $data['phone'],
+                'hours' => $data['hours'],
+                'email' => $data['email'] ?? null,
+                'website' => $data['website'] ?? null,
+            ]);
 
-        // The account's organization_name is how every EstablishmentMockData
-        // lookup finds this listing back — keep it in sync so renaming the
-        // listing here doesn't orphan the account from its own profile.
-        if ($data['name'] !== $request->user()->organization_name) {
-            $request->user()->update(['organization_name' => $data['name']]);
+            // The account's organization_name is how every EstablishmentMockData
+            // lookup finds this listing back — keep it in sync so renaming the
+            // listing here doesn't orphan the account from its own profile.
+            if ($data['name'] !== $request->user()->organization_name) {
+                $request->user()->update(['organization_name' => $data['name']]);
+            }
+        } catch (\Throwable $e) {
+            Log::error('Failed to update establishment profile.', ['exception' => $e, 'listing_id' => $listing->id]);
+
+            return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
 
         return back()->with('toast', 'Establishment profile updated.');
@@ -73,14 +89,20 @@ class ProfileController extends EstablishmentController
             'image' => ['required', 'image', 'max:5120'],
         ]);
 
-        $path = $request->file('image')->store('itour-images', 'public');
+        try {
+            $path = $request->file('image')->store('itour-images', 'public');
 
-        $listing->images()->create([
-            'path' => basename($path),
-            'caption' => null,
-            'is_primary' => ! $listing->images()->exists(),
-            'sort_order' => $listing->images()->count(),
-        ]);
+            $listing->images()->create([
+                'path' => basename($path),
+                'caption' => null,
+                'is_primary' => ! $listing->images()->exists(),
+                'sort_order' => $listing->images()->count(),
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Failed to store establishment photo.', ['exception' => $e, 'listing_id' => $listing->id]);
+
+            return back()->with('toast', 'Something went wrong while uploading the photo. Please try again.')->with('toast_tone', 'danger');
+        }
 
         return back()->with('toast', 'Photo added.');
     }
@@ -90,8 +112,14 @@ class ProfileController extends EstablishmentController
         $listing = $this->ownListing($request);
         abort_unless($image->listing_id === $listing->id, 403);
 
-        $listing->images()->update(['is_primary' => false]);
-        $image->update(['is_primary' => true]);
+        try {
+            $listing->images()->update(['is_primary' => false]);
+            $image->update(['is_primary' => true]);
+        } catch (\Throwable $e) {
+            Log::error('Failed to set primary establishment photo.', ['exception' => $e, 'listing_id' => $listing->id, 'image_id' => $image->id]);
+
+            return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
+        }
 
         return back()->with('toast', 'Featured photo updated.');
     }
@@ -103,13 +131,19 @@ class ProfileController extends EstablishmentController
 
         $wasPrimary = $image->is_primary;
 
-        Storage::disk('public')->delete('itour-images/'.$image->path);
-        $image->delete();
+        try {
+            Storage::disk('public')->delete('itour-images/'.$image->path);
+            $image->delete();
 
-        // Removing the featured photo shouldn't leave the gallery with none
-        // — promote whatever's left, if anything.
-        if ($wasPrimary) {
-            $listing->images()->orderBy('sort_order')->first()?->update(['is_primary' => true]);
+            // Removing the featured photo shouldn't leave the gallery with none
+            // — promote whatever's left, if anything.
+            if ($wasPrimary) {
+                $listing->images()->orderBy('sort_order')->first()?->update(['is_primary' => true]);
+            }
+        } catch (\Throwable $e) {
+            Log::error('Failed to remove establishment photo.', ['exception' => $e, 'listing_id' => $listing->id, 'image_id' => $image->id]);
+
+            return back()->with('toast', 'Something went wrong while removing the photo. Please try again.')->with('toast_tone', 'danger');
         }
 
         return back()->with('toast', 'Photo removed.');

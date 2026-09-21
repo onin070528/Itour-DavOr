@@ -1,5 +1,14 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Shared Add/Edit/Archive Destination logic used by the LGU and PTO
+ * directory controllers (validation, creation, and unique slug generation).
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 namespace App\Http\Controllers\Concerns;
 
 use App\Models\Listing;

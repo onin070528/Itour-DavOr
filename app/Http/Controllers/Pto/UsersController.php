@@ -1,5 +1,14 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: PTO-only user account management — create, edit, and
+ * enable/disable PTO, LGU, and Establishment accounts province-wide.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 namespace App\Http\Controllers\Pto;
 
 use App\Enums\UserRole;
@@ -9,6 +18,7 @@ use App\Support\PtoMockData;
 use App\Support\TourismCatalog;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -29,20 +39,26 @@ class UsersController extends PtoController
     {
         $data = $this->validated($request);
 
-        User::query()->create([
-            'name' => $data['name'],
-            'email' => $data['email'],
-            // The Add User form has no password field — new accounts get
-            // the same placeholder password every other demo account in
-            // this app uses (see database/seeders/UserSeeder.php), since
-            // there's nowhere on screen to set or show a real one yet.
-            'password' => 'password',
-            'email_verified_at' => now(),
-            'role' => $data['role'],
-            'organization_name' => $data['organization_name'],
-            'organization_subtitle' => $data['organization_subtitle'],
-            'status' => 'Active',
-        ]);
+        try {
+            User::query()->create([
+                'name' => $data['name'],
+                'email' => $data['email'],
+                // The Add User form has no password field — new accounts get
+                // the same placeholder password every other demo account in
+                // this app uses (see database/seeders/UserSeeder.php), since
+                // there's nowhere on screen to set or show a real one yet.
+                'password' => 'password',
+                'email_verified_at' => now(),
+                'role' => $data['role'],
+                'organization_name' => $data['organization_name'],
+                'organization_subtitle' => $data['organization_subtitle'],
+                'status' => 'Active',
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Failed to create user account.', ['exception' => $e]);
+
+            return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
+        }
 
         return back()->with('toast', 'User account saved.');
     }
@@ -51,13 +67,19 @@ class UsersController extends PtoController
     {
         $data = $this->validated($request, $user);
 
-        $user->update([
-            'name' => $data['name'],
-            'email' => $data['email'],
-            'role' => $data['role'],
-            'organization_name' => $data['organization_name'],
-            'organization_subtitle' => $data['organization_subtitle'],
-        ]);
+        try {
+            $user->update([
+                'name' => $data['name'],
+                'email' => $data['email'],
+                'role' => $data['role'],
+                'organization_name' => $data['organization_name'],
+                'organization_subtitle' => $data['organization_subtitle'],
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Failed to update user account.', ['exception' => $e, 'user_id' => $user->id]);
+
+            return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
+        }
 
         return back()->with('toast', 'User account saved.');
     }
@@ -65,7 +87,14 @@ class UsersController extends PtoController
     public function toggleStatus(User $user): RedirectResponse
     {
         $next = $user->status === 'Active' ? 'Inactive' : 'Active';
-        $user->update(['status' => $next]);
+
+        try {
+            $user->update(['status' => $next]);
+        } catch (\Throwable $e) {
+            Log::error('Failed to toggle user account status.', ['exception' => $e, 'user_id' => $user->id]);
+
+            return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
+        }
 
         $verb = $next === 'Active' ? 'enabled' : 'disabled';
 

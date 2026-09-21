@@ -1,5 +1,14 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: LGU destination management (add/edit/archive, municipality-scoped)
+ * and read-only monitoring of establishments in the account's municipality.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 namespace App\Http\Controllers\Lgu;
 
 use App\Http\Controllers\Concerns\ManagesDestinationListings;
@@ -7,6 +16,7 @@ use App\Models\Listing;
 use App\Support\LguMockData;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 
 class DirectoryController extends LguController
@@ -30,10 +40,16 @@ class DirectoryController extends LguController
 
     public function storeDestination(Request $request): RedirectResponse
     {
-        $listing = $this->createDestination(
-            $this->validatedDestinationFields($request),
-            $request->user()->organization_subtitle,
-        );
+        $fields = $this->validatedDestinationFields($request);
+        $municipality = $request->user()->organization_subtitle;
+
+        try {
+            $listing = $this->createDestination($fields, $municipality);
+        } catch (\Throwable $e) {
+            Log::error('Failed to create LGU destination.', ['exception' => $e]);
+
+            return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
+        }
 
         return back()->with('toast', "{$listing->name} was added.");
     }
@@ -43,7 +59,15 @@ class DirectoryController extends LguController
         $this->authorizeOwnMunicipality($request, $listing);
         abort_if($listing->category !== 'destinations', 404);
 
-        $listing->update($this->validatedDestinationFields($request));
+        $fields = $this->validatedDestinationFields($request);
+
+        try {
+            $listing->update($fields);
+        } catch (\Throwable $e) {
+            Log::error('Failed to update LGU destination.', ['exception' => $e, 'listing_id' => $listing->id]);
+
+            return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
+        }
 
         return back()->with('toast', 'Destination saved.');
     }
@@ -53,7 +77,13 @@ class DirectoryController extends LguController
         $this->authorizeOwnMunicipality($request, $listing);
         abort_if($listing->category !== 'destinations', 404);
 
-        $listing->update(['status' => 'Archived']);
+        try {
+            $listing->update(['status' => 'Archived']);
+        } catch (\Throwable $e) {
+            Log::error('Failed to archive LGU destination.', ['exception' => $e, 'listing_id' => $listing->id]);
+
+            return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
+        }
 
         return back()->with('toast', "{$listing->name} was archived.");
     }
@@ -77,7 +107,13 @@ class DirectoryController extends LguController
 
         abort_if($listing->category === 'destinations', 404);
 
-        $listing->update(['status' => 'Active']);
+        try {
+            $listing->update(['status' => 'Active']);
+        } catch (\Throwable $e) {
+            Log::error('Failed to verify establishment.', ['exception' => $e, 'listing_id' => $listing->id]);
+
+            return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
+        }
 
         return back()->with('toast', "{$listing->name} marked as verified.");
     }

@@ -2,6 +2,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initMobileMenu();
     initPasswordToggle();
     initExplorePage();
+    initNearbyMap();
     initChatbot();
     initEstablishmentQrForm();
 });
@@ -276,6 +277,144 @@ function initExplorePage() {
     }
 
     render();
+}
+
+/**
+ * Landing page "Find Places Near You" section (resources/views/components/
+ * near-you-section.blade.php): a live Mapbox GL map plotting every active,
+ * geocoded destination/establishment, plus a geolocation-driven button that
+ * flies to the visitor's position and highlights the nearest place.
+ */
+function initNearbyMap() {
+    const container = document.getElementById('nearby-map');
+    const dataEl = document.getElementById('nearby-map-data');
+    const button = document.getElementById('find-near-you-button');
+    const statusText = document.getElementById('nearby-map-status-text');
+
+    if (!container || !dataEl) {
+        return;
+    }
+
+    const token = container.dataset.mapboxToken;
+    if (!window.mapboxgl || !token) {
+        if (statusText) statusText.textContent = 'Map is currently unavailable';
+        console.error('[nearby-map] mapbox-gl failed to load, or no Mapbox token was configured.');
+        return;
+    }
+
+    if (!mapboxgl.supported()) {
+        if (statusText) statusText.textContent = "Your browser doesn't support this map (WebGL required)";
+        console.error('[nearby-map] mapboxgl.supported() returned false — no WebGL in this browser.');
+        return;
+    }
+
+    const places = JSON.parse(dataEl.textContent);
+    const centerLat = Number(container.dataset.mapboxCenterLat);
+    const centerLng = Number(container.dataset.mapboxCenterLng);
+
+    mapboxgl.accessToken = token;
+
+    let map;
+    try {
+        map = new mapboxgl.Map({
+            container,
+            style: 'mapbox://styles/mapbox/light-v11',
+            center: [centerLng, centerLat],
+            zoom: 8.4,
+        });
+    } catch (error) {
+        if (statusText) statusText.textContent = 'Map failed to start — see console for details';
+        console.error('[nearby-map] mapboxgl.Map() threw:', error);
+        return;
+    }
+
+    map.on('error', (event) => {
+        console.error('[nearby-map] map error:', event?.error ?? event);
+        if (statusText) statusText.textContent = 'Map failed to load tiles — check your connection';
+    });
+
+    map.on('load', () => {
+        map.resize();
+    });
+
+    map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+
+    const placeMarkers = places.map((place) => {
+        const marker = new mapboxgl.Marker({ color: '#125d5a' })
+            .setLngLat([place.lng, place.lat])
+            .setPopup(new mapboxgl.Popup({ offset: 24 }).setHTML(`
+                <p class="font-semibold text-sand-900">${escapeHtml(place.name)}</p>
+                <p class="text-xs text-sand-600">${escapeHtml(place.categoryLabel)} · ${escapeHtml(place.barangay)}, ${escapeHtml(place.municipality)}</p>
+            `))
+            .addTo(map);
+
+        return { place, marker };
+    });
+
+    let userMarker = null;
+
+    button?.addEventListener('click', () => {
+        if (!navigator.geolocation) {
+            if (statusText) statusText.textContent = "Your browser doesn't support geolocation";
+            return;
+        }
+
+        button.disabled = true;
+        const originalLabel = button.innerHTML;
+        button.innerHTML = '<i class="ti ti-loader-2 animate-spin" aria-hidden="true"></i> Locating you…';
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const { latitude, longitude } = position.coords;
+
+                if (userMarker) userMarker.remove();
+                userMarker = new mapboxgl.Marker({ color: '#cb6e30' })
+                    .setLngLat([longitude, latitude])
+                    .setPopup(new mapboxgl.Popup({ offset: 24 }).setText('You are here'))
+                    .addTo(map);
+
+                map.flyTo({ center: [longitude, latitude], zoom: 11 });
+
+                if (placeMarkers.length) {
+                    const nearest = placeMarkers.reduce((closest, entry) => {
+                        const distance = haversineDistanceKm(latitude, longitude, entry.place.lat, entry.place.lng);
+                        return !closest || distance < closest.distance ? { ...entry, distance } : closest;
+                    }, null);
+
+                    nearest.marker.togglePopup();
+                    if (statusText) {
+                        statusText.textContent = `Nearest to you: ${nearest.place.name} (${nearest.distance.toFixed(1)} km away)`;
+                    }
+                } else if (statusText) {
+                    statusText.textContent = "You're on the map — no nearby listings to compare yet";
+                }
+
+                button.disabled = false;
+                button.innerHTML = originalLabel;
+            },
+            () => {
+                if (statusText) statusText.textContent = "Couldn't get your location — check your browser's location permission";
+                button.disabled = false;
+                button.innerHTML = originalLabel;
+            },
+            { enableHighAccuracy: true, timeout: 10000 }
+        );
+    });
+}
+
+function haversineDistanceKm(lat1, lon1, lat2, lon2) {
+    const toRad = (deg) => (deg * Math.PI) / 180;
+    const R = 6371;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function escapeHtml(value) {
+    const div = document.createElement('div');
+    div.textContent = value ?? '';
+    return div.innerHTML;
 }
 
 /**

@@ -1,10 +1,21 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Shared Account Profile, Change Password, and Notifications
+ * settings-tab handling used by the Establishment, LGU, and PTO Settings
+ * controllers.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 namespace App\Http\Controllers\Concerns;
 
 use App\Models\NotificationPreference;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 
 /**
@@ -53,7 +64,13 @@ trait UpdatesAccountSettings
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user)],
         ]);
 
-        $user->update($data);
+        try {
+            $user->update($data);
+        } catch (\Throwable $e) {
+            Log::error('Failed to update account profile.', ['exception' => $e, 'user_id' => $user->id]);
+
+            return back()->with('toast', 'Something went wrong while saving your profile. Please try again.')->with('toast_tone', 'danger');
+        }
 
         return back()->with('toast', 'Profile changes saved.');
     }
@@ -65,7 +82,13 @@ trait UpdatesAccountSettings
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
 
-        $request->user()->update(['password' => $data['password']]);
+        try {
+            $request->user()->update(['password' => $data['password']]);
+        } catch (\Throwable $e) {
+            Log::error('Failed to update account password.', ['exception' => $e, 'user_id' => $request->user()->id]);
+
+            return back()->with('toast', 'Something went wrong while updating your password. Please try again.')->with('toast_tone', 'danger');
+        }
 
         return back()->with('toast', 'Password updated.');
     }
@@ -75,11 +98,17 @@ trait UpdatesAccountSettings
         $user = $request->user();
         $keys = collect($this->notificationPreferenceDefinitions())->pluck('key');
 
-        foreach ($keys as $key) {
-            NotificationPreference::query()->updateOrCreate(
-                ['user_id' => $user->id, 'key' => $key],
-                ['enabled' => $request->boolean("preferences.{$key}")],
-            );
+        try {
+            foreach ($keys as $key) {
+                NotificationPreference::query()->updateOrCreate(
+                    ['user_id' => $user->id, 'key' => $key],
+                    ['enabled' => $request->boolean("preferences.{$key}")],
+                );
+            }
+        } catch (\Throwable $e) {
+            Log::error('Failed to update notification preferences.', ['exception' => $e, 'user_id' => $user->id]);
+
+            return back()->with('toast', 'Something went wrong while saving your preferences. Please try again.')->with('toast_tone', 'danger');
         }
 
         return back()->with('toast', 'Preferences saved.');

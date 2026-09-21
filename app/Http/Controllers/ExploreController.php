@@ -1,5 +1,14 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Renders the public Explore hub listing every active destination
+ * and tourism establishment, with client-side grid/table/map filtering.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 namespace App\Http\Controllers;
 
 use App\Support\TourismCatalog;

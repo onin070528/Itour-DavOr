@@ -1,3 +1,5 @@
+@props(['places' => []])
+
 <section id="near-you" class="border-y border-sand-200 bg-sand-100">
     <div class="mx-auto grid max-w-7xl gap-10 px-4 py-16 sm:px-6 lg:grid-cols-2 lg:items-center lg:px-8">
         <div>
@@ -22,27 +24,31 @@
                 </li>
             </ul>
 
-            <a href="#" class="mt-8 inline-flex items-center justify-center gap-2 rounded-sm bg-primary-700 px-6 py-3 text-sm font-semibold text-sand-0 shadow-sm transition-colors hover:bg-primary-900">
+            <button
+                type="button"
+                id="find-near-you-button"
+                class="mt-8 inline-flex items-center justify-center gap-2 rounded-sm bg-primary-700 px-6 py-3 text-sm font-semibold text-sand-0 shadow-sm transition-colors hover:bg-primary-900 disabled:cursor-wait disabled:opacity-70"
+            >
                 <i class="ti ti-current-location" aria-hidden="true"></i>
                 Find Places Near You
-            </a>
+            </button>
         </div>
 
-        {{-- Map placeholder. `data-map-container` marks the mount point for the future Mapbox GL integration. --}}
-        <div
-            id="nearby-map"
-            data-map-container
-            class="relative h-80 overflow-hidden rounded-lg border border-sand-200 bg-gradient-to-br from-sand-200 to-primary-100 shadow-sm sm:h-96"
-        >
-            <i class="ti ti-map-pin absolute top-[38%] left-[42%] text-3xl text-primary-700 drop-shadow" aria-hidden="true"></i>
-            <i class="ti ti-map-pin absolute top-[55%] left-[60%] text-4xl text-accent-600 drop-shadow" aria-hidden="true"></i>
-            <i class="ti ti-map-pin absolute top-[28%] left-[65%] text-2xl text-primary-700 drop-shadow" aria-hidden="true"></i>
-            <i class="ti ti-map-pin absolute top-[68%] left-[30%] text-2xl text-primary-700 drop-shadow" aria-hidden="true"></i>
+        <div class="relative h-80 overflow-hidden rounded-lg border border-sand-200 shadow-sm sm:h-96">
+            <div
+                id="nearby-map"
+                data-mapbox-token="{{ config('services.mapbox.token') }}"
+                data-mapbox-center-lat="6.9214"
+                data-mapbox-center-lng="126.2686"
+                class="absolute inset-0 bg-gradient-to-br from-sand-200 to-primary-100"
+            ></div>
 
-            <span class="absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-sm bg-sand-0 px-2.5 py-1.5 text-xs font-semibold text-sand-700 shadow-sm">
+            <span id="nearby-map-status" class="pointer-events-none absolute bottom-3 left-3 inline-flex max-w-[calc(100%-1.5rem)] items-center gap-1.5 rounded-sm bg-sand-0 px-2.5 py-1.5 text-xs font-semibold text-sand-700 shadow-sm">
                 <i class="ti ti-map-2" aria-hidden="true"></i>
-                Map view — live map coming soon
+                <span id="nearby-map-status-text">Showing destinations & establishments across Davao Oriental</span>
             </span>
         </div>
+
+        <script type="application/json" id="nearby-map-data">{!! json_encode($places) !!}</script>
     </div>
 </section>

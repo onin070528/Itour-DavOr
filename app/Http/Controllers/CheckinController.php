@@ -1,11 +1,21 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Handles the tourist-facing QR self check-in flow — showing the
+ * self-registration form and persisting the submitted arrival.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 namespace App\Http\Controllers;
 
 use App\Models\Listing;
 use App\Support\TourismCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 
 class CheckinController extends Controller
@@ -56,21 +66,27 @@ class CheckinController extends Controller
         $companions = collect(['male', 'female', 'adults', 'children', 'seniors', 'local', 'foreign'])
             ->mapWithKeys(fn ($key) => [$key => (int) ($data[$key] ?? 0)]);
 
-        $listing->arrivals()->create([
-            'source' => 'self_checkin',
-            'date' => now()->toDateString(),
-            'visitor_name' => $data['visitorName'],
-            'visitor_contact' => $data['visitorContact'],
-            'party_male' => $companions['male'],
-            'party_female' => $companions['female'],
-            'party_adults' => $companions['adults'],
-            'party_children' => $companions['children'],
-            'party_seniors' => $companions['seniors'],
-            'party_local' => $companions['local'],
-            'party_foreign' => $companions['foreign'],
-            'party_size' => 1 + $companions['male'] + $companions['female'],
-            'status' => 'Recorded',
-        ]);
+        try {
+            $listing->arrivals()->create([
+                'source' => 'self_checkin',
+                'date' => now()->toDateString(),
+                'visitor_name' => $data['visitorName'],
+                'visitor_contact' => $data['visitorContact'],
+                'party_male' => $companions['male'],
+                'party_female' => $companions['female'],
+                'party_adults' => $companions['adults'],
+                'party_children' => $companions['children'],
+                'party_seniors' => $companions['seniors'],
+                'party_local' => $companions['local'],
+                'party_foreign' => $companions['foreign'],
+                'party_size' => 1 + $companions['male'] + $companions['female'],
+                'status' => 'Recorded',
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Failed to record self check-in.', ['exception' => $e, 'establishment' => $establishment]);
+
+            return response()->json(['message' => 'Something went wrong while submitting your check-in. Please try again.'], 500);
+        }
 
         return response()->json(['message' => 'Registration submitted.']);
     }
