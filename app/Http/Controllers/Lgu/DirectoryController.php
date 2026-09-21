@@ -121,10 +121,16 @@ class DirectoryController extends LguController
     /**
      * Every write here must stay inside the account's own municipality —
      * this is the LGU directory's whole reason for having a separate
-     * controller from PTO's (province-wide) equivalent.
+     * controller from PTO's (province-wide) equivalent. Compares the real
+     * municipality_id FK, not the display-only municipality/organization_subtitle
+     * strings, so this can't be fooled by a name mismatch or a listing whose
+     * FK backfill didn't resolve.
      */
     private function authorizeOwnMunicipality(Request $request, Listing $listing): void
     {
-        abort_unless($listing->municipality === $request->user()->organization_subtitle, 403);
+        abort_unless(
+            $listing->municipality_id !== null && $listing->municipality_id === $request->user()->municipality_id,
+            403
+        );
     }
 }

@@ -17,10 +17,12 @@ use App\Http\Controllers\Lgu\FeedbackController as LguFeedbackController;
 use App\Http\Controllers\Lgu\MonitoringController as LguMonitoringController;
 use App\Http\Controllers\Lgu\ReportsController as LguReportsController;
 use App\Http\Controllers\Lgu\SettingsController as LguSettingsController;
+use App\Http\Controllers\Lgu\UsersController as LguUsersController;
 use App\Http\Controllers\Pto\DashboardController as PtoDashboardController;
 use App\Http\Controllers\Pto\DirectoryController as PtoDirectoryController;
 use App\Http\Controllers\Pto\FeedbackController as PtoFeedbackController;
 use App\Http\Controllers\Pto\MonitoringController as PtoMonitoringController;
+use App\Http\Controllers\Pto\MunicipalReportsController as PtoMunicipalReportsController;
 use App\Http\Controllers\Pto\ReportsController as PtoReportsController;
 use App\Http\Controllers\Pto\SettingsController as PtoSettingsController;
 use App\Http\Controllers\Pto\UsersController as PtoUsersController;
@@ -38,7 +40,7 @@ Route::post('/checkin/{establishment}', [CheckinController::class, 'store'])->na
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [SessionController::class, 'create'])->name('login');
-    Route::post('/login', [SessionController::class, 'store'])->name('login.store');
+    Route::post('/login', [SessionController::class, 'store'])->middleware('throttle:login')->name('login.store');
 });
 
 Route::post('/logout', [SessionController::class, 'destroy'])
@@ -52,6 +54,13 @@ Route::middleware(['auth', 'role:pto_administrator'])->prefix('pto')->name('pto.
         Route::get('/arrivals', [PtoMonitoringController::class, 'arrivals'])->name('arrivals');
         Route::get('/statistics', [PtoMonitoringController::class, 'statistics'])->name('statistics');
         Route::get('/destination-performance', [PtoMonitoringController::class, 'destinations'])->name('destinations');
+    });
+
+    Route::prefix('municipal-reports')->name('municipalReports.')->group(function () {
+        Route::get('/', [PtoMunicipalReportsController::class, 'index'])->name('index');
+        Route::get('/{municipalReport}', [PtoMunicipalReportsController::class, 'show'])->name('show');
+        Route::patch('/{municipalReport}/approve', [PtoMunicipalReportsController::class, 'approve'])->name('approve');
+        Route::patch('/{municipalReport}/return', [PtoMunicipalReportsController::class, 'return'])->name('return');
     });
 
     Route::prefix('directory')->name('directory.')->group(function () {
@@ -105,6 +114,11 @@ Route::middleware(['auth', 'role:lgu', 'lgu.municipality'])->prefix('lgu')->name
     });
 
     Route::get('/reports', [LguReportsController::class, 'index'])->name('reports');
+
+    Route::get('/users', [LguUsersController::class, 'index'])->name('users');
+    Route::post('/users', [LguUsersController::class, 'store'])->name('users.store');
+    Route::put('/users/{user}', [LguUsersController::class, 'update'])->name('users.update');
+    Route::patch('/users/{user}/toggle-status', [LguUsersController::class, 'toggleStatus'])->name('users.toggleStatus');
 
     Route::get('/settings', [LguSettingsController::class, 'index'])->name('settings');
     Route::post('/settings/profile', [LguSettingsController::class, 'updateProfile'])->name('settings.profile');

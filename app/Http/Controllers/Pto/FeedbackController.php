@@ -23,19 +23,32 @@ class FeedbackController extends PtoController
      */
     public function index(Request $request): View
     {
-        return $this->renderPto($request, 'pto.feedback.index', 'feedback.index', 'Tourist Feedback', [
-            'feedback' => PtoMockData::feedback(),
-        ]);
+        return $this->renderFeedback($request, 'index');
     }
 
     /**
      * Experience Analytics: sentiment breakdown and trends.
+     *
+     * Kept as its own route/method so the pre-existing URL still resolves
+     * directly (no redirect) — it renders the same merged Tourist Feedback
+     * page with the Experience Analytics tab pre-selected.
      */
     public function analytics(Request $request): View
     {
+        return $this->renderFeedback($request, 'analytics');
+    }
+
+    /**
+     * Renders the merged Tourist Feedback page (All Feedback / Experience
+     * Analytics tabs) with the requested tab pre-selected.
+     */
+    private function renderFeedback(Request $request, string $activeTab): View
+    {
         $feedback = collect(PtoMockData::feedback());
 
-        return $this->renderPto($request, 'pto.feedback.analytics', 'feedback.analytics', 'Experience Analytics', [
+        return $this->renderPto($request, 'pto.feedback.index', 'feedback', 'Tourist Feedback', [
+            'activeTab' => $activeTab,
+            'feedback' => $feedback->all(),
             'sentiment' => PtoMockData::sentimentBreakdown(),
             'sentimentTrend' => PtoMockData::sentimentTrend(),
             'byDestination' => $feedback->whereIn('subject', collect(TourismCatalog::featuredDestinations())->pluck('name'))

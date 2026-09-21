@@ -16,6 +16,7 @@ test('every PTO page renders for an authenticated PTO administrator', function (
     'pto.monitoring.arrivals',
     'pto.monitoring.statistics',
     'pto.monitoring.destinations',
+    'pto.municipalReports.index',
     'pto.directory.destinations',
     'pto.directory.establishments',
     'pto.directory.map',

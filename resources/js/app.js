@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     initMobileMenu();
     initPasswordToggle();
+    initLoginForm();
     initExplorePage();
     initNearbyMap();
     initChatbot();
@@ -46,6 +47,75 @@ function initPasswordToggle() {
             showIcon?.classList.toggle('hidden', isPassword);
             hideIcon?.classList.toggle('hidden', !isPassword);
         });
+    });
+}
+
+/**
+ * Login form (resources/views/auth/login.blade.php): inline client-side
+ * validation (required + email format) surfaced in the same aria-live
+ * region the server-rendered error uses, so the message styling and
+ * screen-reader announcement behavior are identical either way. The form
+ * has `novalidate` specifically so we control that message instead of the
+ * browser's own validation bubble. Once client-side checks pass, the form
+ * submits normally (no fetch/AJAX — this is a real POST to /login) and a
+ * loading state is shown on the button while that navigation completes.
+ */
+function initLoginForm() {
+    const form = document.getElementById('login-form');
+    if (!form) return;
+
+    const emailInput = document.getElementById('email');
+    const passwordInput = document.getElementById('password');
+    const errorEl = document.getElementById('login-error');
+    const submitButton = document.getElementById('login-submit');
+    const submitLabel = submitButton?.querySelector('[data-submit-label]');
+    const submitSpinner = submitButton?.querySelector('[data-submit-spinner]');
+
+    function showError(message) {
+        if (!errorEl) return;
+        errorEl.textContent = message;
+        errorEl.classList.remove('hidden');
+    }
+
+    function clearError() {
+        errorEl?.classList.add('hidden');
+    }
+
+    [emailInput, passwordInput].forEach((input) => {
+        input?.addEventListener('input', () => {
+            input.removeAttribute('aria-invalid');
+            clearError();
+        });
+    });
+
+    form.addEventListener('submit', (event) => {
+        if (!emailInput.checkValidity()) {
+            event.preventDefault();
+            emailInput.setAttribute('aria-invalid', 'true');
+            emailInput.focus();
+            showError(emailInput.validity.valueMissing ? 'Please enter your email address.' : 'Please enter a valid email address.');
+
+            return;
+        }
+
+        if (!passwordInput.checkValidity()) {
+            event.preventDefault();
+            passwordInput.setAttribute('aria-invalid', 'true');
+            passwordInput.focus();
+            showError('Please enter your password.');
+
+            return;
+        }
+
+        // Validation passed — the browser proceeds with the real POST
+        // submission below; this only shows a loading state on the button
+        // while that navigation is in flight.
+        if (submitButton) {
+            submitButton.disabled = true;
+            submitButton.setAttribute('aria-busy', 'true');
+        }
+        if (submitLabel) submitLabel.textContent = 'Signing in…';
+        submitSpinner?.classList.remove('hidden');
     });
 }
 

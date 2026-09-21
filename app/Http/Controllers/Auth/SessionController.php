@@ -13,6 +13,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Support\AuditLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -31,6 +32,8 @@ class SessionController extends Controller
 
     /**
      * Authenticate the user and redirect to their role's dashboard.
+     * Rate-limited via the 'login' limiter (routes/web.php, 'throttle:login')
+     * — see AppServiceProvider::boot().
      */
     public function store(Request $request): RedirectResponse
     {
@@ -40,6 +43,11 @@ class SessionController extends Controller
         ]);
 
         if (! Auth::attempt($credentials, $request->boolean('remember'))) {
+            AuditLogger::record(
+                User::query()->where('email', $credentials['email'])->first(),
+                'login.failed'
+            );
+
             throw ValidationException::withMessages([
                 'email' => __('These credentials do not match our records.'),
             ]);
@@ -53,6 +61,8 @@ class SessionController extends Controller
         if ($user->status === 'Inactive') {
             Auth::guard('web')->logout();
 
+            AuditLogger::record($user, 'login.blocked_suspended');
+
             throw ValidationException::withMessages([
                 'email' => __('This account has been disabled. Contact your Provincial Tourism Office administrator.'),
             ]);
@@ -60,6 +70,8 @@ class SessionController extends Controller
 
         $request->session()->regenerate();
         $user->forceFill(['last_login_at' => now()])->save();
+
+        AuditLogger::record($user, 'login.success');
 
         return redirect()->intended(
             $user->role ? route($user->role->dashboardRouteName()) : route('home')
@@ -71,10 +83,14 @@ class SessionController extends Controller
      */
     public function destroy(Request $request): RedirectResponse
     {
+        $user = $request->user();
+
         Auth::guard('web')->logout();
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();
+
+        AuditLogger::record($user, 'logout');
 
         return redirect()->route('home');
     }

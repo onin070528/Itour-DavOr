@@ -15,9 +15,13 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
+            MunicipalitySeeder::class,
             UserSeeder::class,
             ListingSeeder::class,
             ArrivalSeeder::class,
+            MunicipalReportSeeder::class,
+            RbacScopeBackfillSeeder::class,
+            RbacDemoAccountSeeder::class,
         ]);
     }
 }

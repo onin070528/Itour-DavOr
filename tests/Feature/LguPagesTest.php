@@ -1,14 +1,21 @@
 <?php
 
 use App\Enums\UserRole;
+use App\Models\Municipality;
 use App\Models\User;
 
 function actingAsLgu(string $municipality): User
 {
+    $record = Municipality::query()->firstOrCreate(
+        ['code' => strtoupper(substr(preg_replace('/[^A-Za-z]/', '', $municipality), 0, 4))],
+        ['name' => $municipality]
+    );
+
     return User::factory()->create([
         'role' => UserRole::Lgu,
         'organization_name' => "{$municipality} Tourism Office",
         'organization_subtitle' => $municipality,
+        'municipality_id' => $record->id,
     ]);
 }
 

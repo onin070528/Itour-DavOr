@@ -12,8 +12,10 @@ namespace App\Support;
 
 /**
  * Builds the LGU sidebar navigation tree. Deliberately smaller than the PTO
- * tree — no Map, no User Management — reflecting the LGU's municipality-only
- * access boundary.
+ * tree — no Map — reflecting the LGU's municipality-only access boundary.
+ * "Users" here is scoped to Establishment accounts within the LGU's own
+ * municipality only (Lgu\UsersController), unlike PTO's province-wide
+ * Users page.
  *
  * @see PtoNavigation for the province-wide equivalent.
  */
@@ -59,6 +61,9 @@ class LguNavigation
                     $item('feedback.analytics', 'ti-heart-handshake', 'Experience Analytics', 'lgu.feedback.analytics'),
                 ]),
                 $item('reports', 'ti-file-report', 'Reports', 'lgu.reports'),
+            ],
+            'User Management' => [
+                $item('users', 'ti-users-group', 'Users', 'lgu.users'),
             ],
         ];
     }

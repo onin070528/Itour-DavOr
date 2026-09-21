@@ -11,7 +11,6 @@
 
 namespace App\Http\Controllers\Establishment;
 
-use App\Models\Listing;
 use App\Support\EstablishmentMockData;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -44,7 +43,10 @@ class ArrivalsController extends EstablishmentController
             'remarks' => ['nullable', 'string'],
         ]);
 
-        $listing = Listing::query()->where('name', $request->user()->organization_name)->firstOrFail();
+        // Resolved via establishment_id, not a Listing.name match against
+        // organization_name — see Establishment\ProfileController::ownListing().
+        abort_if($request->user()->establishment_id === null, 403, 'Your account is not linked to an establishment yet.');
+        $listing = $request->user()->establishment()->firstOrFail();
 
         try {
             $listing->arrivals()->create([

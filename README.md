@@ -7,6 +7,10 @@
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
 </p>
 
+## iTOUR — Davao Oriental Tourism Information System
+
+This is the iTOUR backend. For local development demo accounts (PTO / LGU / Establishment logins), see [docs/DEV_ACCOUNTS.md](docs/DEV_ACCOUNTS.md).
+
 ## About Laravel
 
 Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:

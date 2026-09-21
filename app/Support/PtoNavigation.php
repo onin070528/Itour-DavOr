@@ -44,20 +44,16 @@ class PtoNavigation
             'Main' => [
                 $item('dashboard', 'ti-layout-dashboard', 'Dashboard', 'pto.dashboard'),
                 $group('monitoring', 'ti-chart-line', 'Tourism Monitoring', [
-                    $item('monitoring.arrivals', 'ti-users', 'Tourist Arrivals', 'pto.monitoring.arrivals'),
-                    $item('monitoring.statistics', 'ti-chart-bar', 'Visitation Statistics', 'pto.monitoring.statistics'),
-                    $item('monitoring.destinations', 'ti-trophy', 'Destination Performance', 'pto.monitoring.destinations'),
+                    $item('monitoring.arrivals', 'ti-users', 'Arrivals', 'pto.monitoring.arrivals'),
+                    $item('monitoring.reports', 'ti-file-report', 'Reports', 'pto.reports'),
                 ]),
+                $item('municipalReports', 'ti-clipboard-check', 'Municipal Reports', 'pto.municipalReports.index'),
                 $group('directory', 'ti-list-details', 'Tourism Directory', [
                     $item('directory.destinations', 'ti-map-pin', 'Destinations', 'pto.directory.destinations'),
                     $item('directory.establishments', 'ti-building-store', 'Establishments', 'pto.directory.establishments'),
                     $item('directory.map', 'ti-map', 'Map', 'pto.directory.map'),
                 ]),
-                $group('feedback', 'ti-message-2', 'Tourist Feedback', [
-                    $item('feedback.index', 'ti-messages', 'All Feedback', 'pto.feedback.index'),
-                    $item('feedback.analytics', 'ti-heart-handshake', 'Experience Analytics', 'pto.feedback.analytics'),
-                ]),
-                $item('reports', 'ti-file-report', 'Reports', 'pto.reports'),
+                $item('feedback', 'ti-message-2', 'Tourist Feedback', 'pto.feedback.index'),
             ],
             'User Management' => [
                 $item('users', 'ti-users-group', 'Users', 'pto.users'),

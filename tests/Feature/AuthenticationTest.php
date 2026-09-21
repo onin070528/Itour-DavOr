@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\UserRole;
+use App\Models\Municipality;
 use App\Models\User;
 
 test('guests can view the login page', function () {
@@ -14,10 +15,15 @@ test('guests are redirected to login when visiting a protected dashboard', funct
 });
 
 test('each role can sign in and reach their own dashboard', function (UserRole $role, string $path) {
+    $municipality = $role === UserRole::Lgu
+        ? Municipality::query()->firstOrCreate(['code' => 'MATI'], ['name' => 'City of Mati'])
+        : null;
+
     $user = User::factory()->create([
         'role' => $role,
         'organization_name' => 'Test Organization',
         'organization_subtitle' => $role === UserRole::Lgu ? 'City of Mati' : 'Test Coverage',
+        'municipality_id' => $municipality?->id,
     ]);
 
     $this->post('/login', [
@@ -33,7 +39,8 @@ test('each role can sign in and reach their own dashboard', function (UserRole $
 ]);
 
 test('a role cannot access another role\'s dashboard', function () {
-    $lgu = User::factory()->create(['role' => UserRole::Lgu, 'organization_subtitle' => 'City of Mati']);
+    $municipality = Municipality::query()->firstOrCreate(['code' => 'MATI'], ['name' => 'City of Mati']);
+    $lgu = User::factory()->create(['role' => UserRole::Lgu, 'organization_subtitle' => 'City of Mati', 'municipality_id' => $municipality->id]);
 
     $this->actingAs($lgu);
 

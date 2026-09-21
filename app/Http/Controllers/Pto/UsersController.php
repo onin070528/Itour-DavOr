@@ -3,8 +3,11 @@
 /**
  * iTOUR — Davao Oriental Tourism Information System
  *
- * Purpose: PTO-only user account management — create, edit, and
- * enable/disable PTO, LGU, and Establishment accounts province-wide.
+ * Purpose: PTO-only user account management — create/edit LGU and
+ * Establishment accounts province-wide, plus edit (never create/promote)
+ * existing PTO Administrator accounts. See Lgu\UsersController for the
+ * LGU-scoped equivalent (LGU creates Establishment accounts within its own
+ * municipality only).
  * Programmer/s: iTOUR Development Team
  * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
  */
@@ -13,9 +16,10 @@ namespace App\Http\Controllers\Pto;
 
 use App\Enums\UserRole;
 use App\Models\Listing;
+use App\Models\Municipality;
 use App\Models\User;
+use App\Support\AuditLogger;
 use App\Support\PtoMockData;
-use App\Support\TourismCatalog;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -40,7 +44,7 @@ class UsersController extends PtoController
         $data = $this->validated($request);
 
         try {
-            User::query()->create([
+            $user = User::query()->create([
                 'name' => $data['name'],
                 'email' => $data['email'],
                 // The Add User form has no password field — new accounts get
@@ -52,6 +56,8 @@ class UsersController extends PtoController
                 'role' => $data['role'],
                 'organization_name' => $data['organization_name'],
                 'organization_subtitle' => $data['organization_subtitle'],
+                'municipality_id' => $data['municipality_id'],
+                'establishment_id' => $data['establishment_id'],
                 'status' => 'Active',
             ]);
         } catch (\Throwable $e) {
@@ -60,12 +66,20 @@ class UsersController extends PtoController
             return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
 
+        AuditLogger::record($request->user(), 'user.created', $user, [
+            'role' => $user->role?->value,
+            'municipality_id' => $user->municipality_id,
+            'establishment_id' => $user->establishment_id,
+        ]);
+
         return back()->with('toast', 'User account saved.');
     }
 
     public function update(Request $request, User $user): RedirectResponse
     {
         $data = $this->validated($request, $user);
+        $before = $user->only(['role', 'municipality_id', 'establishment_id', 'status']);
+        $before['role'] = $before['role']?->value;
 
         try {
             $user->update([
@@ -74,6 +88,8 @@ class UsersController extends PtoController
                 'role' => $data['role'],
                 'organization_name' => $data['organization_name'],
                 'organization_subtitle' => $data['organization_subtitle'],
+                'municipality_id' => $data['municipality_id'],
+                'establishment_id' => $data['establishment_id'],
             ]);
         } catch (\Throwable $e) {
             Log::error('Failed to update user account.', ['exception' => $e, 'user_id' => $user->id]);
@@ -81,11 +97,19 @@ class UsersController extends PtoController
             return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
 
+        AuditLogger::recordUserScopeChange($request->user(), $user, $before);
+
         return back()->with('toast', 'User account saved.');
     }
 
-    public function toggleStatus(User $user): RedirectResponse
+    public function toggleStatus(Request $request, User $user): RedirectResponse
     {
+        // Nobody — including a PTO administrator — can change their own status.
+        abort_if($user->id === $request->user()->id, 403, 'You cannot change the status of your own account.');
+
+        $before = $user->only(['role', 'municipality_id', 'establishment_id', 'status']);
+        $before['role'] = $before['role']?->value;
+
         $next = $user->status === 'Active' ? 'Inactive' : 'Active';
 
         try {
@@ -95,6 +119,8 @@ class UsersController extends PtoController
 
             return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
+
+        AuditLogger::recordUserScopeChange($request->user(), $user, $before);
 
         $verb = $next === 'Active' ? 'enabled' : 'disabled';
 
@@ -110,14 +136,21 @@ class UsersController extends PtoController
      *    is then derived from that same listing's real barangay/
      *    municipality, the same "{barangay}, {municipality}" shape
      *    UserSeeder already uses for the Botanika demo account.
+     *    municipality_id/establishment_id are resolved from that same
+     *    Listing row.
      *  - Lgu: the municipality itself (organization_subtitle — the field
      *    EnsureLguHasMunicipality / municipality-scoped queries actually
-     *    read), validated against the real municipality list.
+     *    read), validated against the real `municipalities` table.
      *    organization_name has no independent source field to fill it
      *    from, so it's set to the same value rather than invented.
-     *  - PtoAdministrator: both fields take the input value as-is.
+     *  - PtoAdministrator: both fields take the input value as-is, no
+     *    municipality_id/establishment_id (province-wide scope). Creating
+     *    a NEW PTO account, or promoting an existing LGU/Establishment
+     *    account TO PtoAdministrator, is rejected here — "nobody can
+     *    create an account at their own level or above." Editing an
+     *    *existing* PTO account's name/email (role unchanged) is allowed.
      *
-     * @return array{name: string, email: string, role: UserRole, organization_name: string, organization_subtitle: string}
+     * @return array{name: string, email: string, role: UserRole, organization_name: string, organization_subtitle: string, municipality_id: ?int, establishment_id: ?int}
      */
     private function validated(Request $request, ?User $user = null): array
     {
@@ -132,10 +165,16 @@ class UsersController extends PtoController
 
         $role = $roleByTitle[$data['role']];
 
-        [$organizationName, $organizationSubtitle] = match ($role) {
-            UserRole::Establishment => $this->resolveEstablishment($data['assignment']),
+        if ($role === UserRole::PtoAdministrator && $user?->role !== UserRole::PtoAdministrator) {
+            throw ValidationException::withMessages([
+                'role' => 'PTO Administrator accounts cannot be created or granted from this page.',
+            ]);
+        }
+
+        [$organizationName, $organizationSubtitle, $municipalityId, $establishmentId] = match ($role) {
+            UserRole::Establishment => $this->resolveEstablishment($data['assignment'], $user),
             UserRole::Lgu => $this->resolveMunicipality($data['assignment']),
-            UserRole::PtoAdministrator => [$data['assignment'], $data['assignment']],
+            UserRole::PtoAdministrator => [$data['assignment'], $data['assignment'], null, null],
         };
 
         return [
@@ -144,13 +183,15 @@ class UsersController extends PtoController
             'role' => $role,
             'organization_name' => $organizationName,
             'organization_subtitle' => $organizationSubtitle,
+            'municipality_id' => $municipalityId,
+            'establishment_id' => $establishmentId,
         ];
     }
 
     /**
-     * @return array{0: string, 1: string}
+     * @return array{0: string, 1: string, 2: ?int, 3: int}
      */
-    private function resolveEstablishment(string $assignment): array
+    private function resolveEstablishment(string $assignment, ?User $user): array
     {
         $listing = Listing::query()->where('name', $assignment)->where('category', '!=', 'destinations')->first();
 
@@ -160,22 +201,33 @@ class UsersController extends PtoController
             ]);
         }
 
-        return [$listing->name, "{$listing->barangay}, {$listing->municipality}"];
+        $linkedToAnotherUser = User::query()
+            ->where('establishment_id', $listing->id)
+            ->when($user, fn ($q) => $q->whereKeyNot($user->id))
+            ->exists();
+
+        if ($linkedToAnotherUser) {
+            throw ValidationException::withMessages([
+                'assignment' => "\"{$assignment}\" already has an account linked to it.",
+            ]);
+        }
+
+        return [$listing->name, "{$listing->barangay}, {$listing->municipality}", $listing->municipality_id, $listing->id];
     }
 
     /**
-     * @return array{0: string, 1: string}
+     * @return array{0: string, 1: string, 2: int, 3: null}
      */
     private function resolveMunicipality(string $assignment): array
     {
-        $exists = collect(TourismCatalog::municipalities())->contains('name', $assignment);
+        $municipality = Municipality::query()->where('name', $assignment)->first();
 
-        if (! $exists) {
+        if (! $municipality) {
             throw ValidationException::withMessages([
                 'assignment' => "\"{$assignment}\" isn't one of the province's municipalities.",
             ]);
         }
 
-        return [$assignment, $assignment];
+        return [$assignment, $assignment, $municipality->id, null];
     }
 }

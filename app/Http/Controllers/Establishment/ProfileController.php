@@ -66,9 +66,10 @@ class ProfileController extends EstablishmentController
                 'website' => $data['website'] ?? null,
             ]);
 
-            // The account's organization_name is how every EstablishmentMockData
-            // lookup finds this listing back — keep it in sync so renaming the
-            // listing here doesn't orphan the account from its own profile.
+            // The account's organization_name is a display label only (the
+            // join to $listing is via establishment_id, not this string) —
+            // still kept in sync so EstablishmentMockData's name-keyed
+            // lookups (profile/gallery/arrivals reads) don't go stale.
             if ($data['name'] !== $request->user()->organization_name) {
                 $request->user()->update(['organization_name' => $data['name']]);
             }
@@ -167,8 +168,16 @@ class ProfileController extends EstablishmentController
         ]);
     }
 
+    /**
+     * Resolved via the account's establishment_id FK — not by matching
+     * Listing.name against organization_name, which is a mutable display
+     * string an account could otherwise rename to collide with a different
+     * establishment's listing.
+     */
     private function ownListing(Request $request): Listing
     {
-        return Listing::query()->where('name', $request->user()->organization_name)->firstOrFail();
+        abort_if($request->user()->establishment_id === null, 403, 'Your account is not linked to an establishment yet.');
+
+        return $request->user()->establishment()->firstOrFail();
     }
 }

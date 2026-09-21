@@ -23,7 +23,7 @@ class ReportsController extends PtoController
      */
     public function index(Request $request): View
     {
-        return $this->renderPto($request, 'pto.reports', 'reports', 'Reports', [
+        return $this->renderPto($request, 'pto.reports', 'monitoring.reports', 'Reports', [
             'reportTypes' => PtoMockData::reportTypes(),
             'history' => PtoMockData::reportHistory(),
             'previewData' => PtoMockData::reportPreviewData(),
