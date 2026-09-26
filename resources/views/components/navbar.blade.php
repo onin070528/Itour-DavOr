@@ -2,7 +2,8 @@
     $navLinks = [
         ['label' => 'Home', 'href' => url('/'), 'active' => request()->routeIs('home')],
         ['label' => 'Explore', 'href' => route('explore'), 'active' => request()->routeIs('explore')],
-        ['label' => 'Near Me', 'href' => url('/').'#near-you', 'active' => false],
+        ['label' => 'Nearby', 'href' => url('/').'#near-you', 'active' => false],
+        ['label' => 'Reviews', 'href' => url('/').'#reviews', 'active' => false],
         ['label' => 'About', 'href' => url('/').'#about', 'active' => false],
     ];
 
@@ -12,7 +13,7 @@
 @endphp
 
 <header class="sticky top-0 z-40 border-b border-sand-200 bg-sand-0/95 backdrop-blur supports-[backdrop-filter]:bg-sand-0/80">
-    <nav class="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8" aria-label="Primary">
+    <nav class="mx-auto flex max-w-[1200px] items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8" aria-label="Primary">
         <a href="{{ url('/') }}" class="flex items-center gap-2.5 shrink-0">
             <x-logo class="text-2xl" />
             <span class="hidden text-[10px] font-semibold tracking-widest text-sand-500 uppercase sm:block">Davao Oriental</span>

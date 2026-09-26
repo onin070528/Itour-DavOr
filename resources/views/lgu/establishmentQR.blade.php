@@ -64,53 +64,82 @@
                         </div>
                     </div>
 
-                    {{-- Companion Details --}}
+                    {{-- Your Travel Companions: a Local/International x Male/Female x
+                         Age-group matrix (12 granular counters, Local shown first). The
+                         Total Group Size card below derives Local/International/Total
+                         from these cells client-side (resources/js/app.js), and on submit
+                         they're also rolled back up into the flat
+                         male/female/adults/children/seniors/local/foreign fields the
+                         backend already expects — no schema change needed. --}}
                     <div class="rounded-md border border-sand-200 bg-sand-0 p-5 shadow-sm">
                         <div class="flex items-center gap-3">
                             <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-700 text-sand-0">
                                 <i class="ti ti-users text-lg" aria-hidden="true"></i>
                             </span>
                             <div>
-                                <h2 class="font-display text-sm font-bold text-sand-900">Companion Details</h2>
-                                <p class="text-xs text-sand-500">How many companions are with you? (excluding yourself)</p>
+                                <h2 class="font-display text-sm font-bold text-sand-900">Your Travel Companions</h2>
+                                <p class="text-xs text-sand-500">Tap (+) to add people traveling with you (do not count yourself).</p>
                             </div>
                         </div>
 
-                        <div class="mt-5 border-t border-sand-200 pt-4">
-                            <p class="text-xs font-semibold tracking-wide text-sand-500 uppercase">By Gender</p>
-                            <div class="mt-3 grid grid-cols-2 gap-3">
-                                <x-lgu.qr-counter name="male" label="Male" />
-                                <x-lgu.qr-counter name="female" label="Female" />
-                            </div>
-                        </div>
+                        @foreach ([
+                            ['key' => 'local', 'icon' => 'ti-home', 'label' => 'Local / Domestic Guests'],
+                            ['key' => 'foreign', 'icon' => 'ti-world', 'label' => 'International / Foreign Guests'],
+                        ] as $group)
+                            <div class="mt-5 border-t border-dashed border-sand-200 pt-4">
+                                <p class="flex items-center gap-1.5 text-xs font-semibold tracking-wide text-sand-500 uppercase">
+                                    <i class="ti {{ $group['icon'] }} text-sm" aria-hidden="true"></i>
+                                    {{ $group['label'] }}
+                                </p>
 
-                        <div class="mt-5 border-t border-dashed border-sand-200 pt-4">
-                            <p class="text-xs font-semibold tracking-wide text-sand-500 uppercase">By Age Group</p>
-                            <div class="mt-3 grid grid-cols-3 gap-3">
-                                <x-lgu.qr-counter name="adults" label="Adults" caption="18-59" />
-                                <x-lgu.qr-counter name="children" label="Children" caption="Below 18" />
-                                <x-lgu.qr-counter name="seniors" label="Seniors" caption="60+" />
-                            </div>
-                        </div>
+                                <div class="mt-3 overflow-hidden rounded-sm border border-sand-200">
+                                    <div class="grid grid-cols-3 bg-sand-100 text-[10px] font-semibold tracking-wide text-sand-500 uppercase">
+                                        <span class="px-3 py-2">Age Group</span>
+                                        <span class="border-l border-sand-200 px-2 py-2 text-center">Male</span>
+                                        <span class="border-l border-sand-200 px-2 py-2 text-center">Female</span>
+                                    </div>
 
-                        <div class="mt-5 border-t border-dashed border-sand-200 pt-4">
-                            <p class="text-xs font-semibold tracking-wide text-sand-500 uppercase">By Tourist Type</p>
-                            <div class="mt-3 grid grid-cols-2 gap-3">
-                                <x-lgu.qr-counter name="local" label="Local" />
-                                <x-lgu.qr-counter name="foreign" label="Foreign" />
+                                    @foreach ([
+                                        ['key' => 'adults', 'label' => 'Adults (18 to 59)'],
+                                        ['key' => 'children', 'label' => 'Kids (Under 18)'],
+                                        ['key' => 'seniors', 'label' => 'Seniors (60 & above)'],
+                                    ] as $row)
+                                        <div class="grid grid-cols-3 items-center border-t border-sand-200">
+                                            <div class="px-3 py-2">
+                                                <p class="text-xs font-semibold text-sand-900">{{ $row['label'] }}</p>
+                                            </div>
+                                            <div class="flex justify-center border-l border-sand-200 py-2">
+                                                <x-lgu.qr-counter
+                                                    compact
+                                                    name="{{ $group['key'] }}-male-{{ $row['key'] }}"
+                                                    label="{{ $row['label'] }} · Male · {{ $group['label'] }}"
+                                                />
+                                            </div>
+                                            <div class="flex justify-center border-l border-sand-200 py-2">
+                                                <x-lgu.qr-counter
+                                                    compact
+                                                    name="{{ $group['key'] }}-female-{{ $row['key'] }}"
+                                                    label="{{ $row['label'] }} · Female · {{ $group['label'] }}"
+                                                />
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
                             </div>
-                        </div>
+                        @endforeach
                     </div>
 
-                    {{-- Total Party Size --}}
-                    <div class="flex items-center justify-between rounded-md border-2 border-primary-700 bg-primary-100/40 px-5 py-4">
-                        <div>
-                            <p class="text-xs font-semibold tracking-wide text-primary-700 uppercase">Total Party Size</p>
-                            <p id="qr-total-caption" class="text-sm text-sand-700">You + <b>0</b> companions</p>
+                    {{-- Total Group Size --}}
+                    <div class="rounded-md border-2 border-primary-700 bg-primary-100/40 px-5 py-4">
+                        <p class="text-xs font-semibold tracking-wide text-primary-700 uppercase">Total Group Size</p>
+                        <div class="mt-1.5 flex items-center justify-between gap-3">
+                            <p id="qr-total-caption" class="text-sm text-sand-700">
+                                You (<b>1</b>) + Local (<b id="qr-local-value">0</b>) + International (<b id="qr-foreign-value">0</b>)
+                            </p>
+                            <p class="shrink-0 font-display text-3xl font-extrabold text-primary-900">
+                                <span id="qr-total-value">1</span> <span class="text-sm font-semibold text-sand-500">People</span>
+                            </p>
                         </div>
-                        <p class="font-display text-3xl font-extrabold text-primary-900">
-                            <span id="qr-total-value">1</span> <span class="text-sm font-semibold text-sand-500">person</span>
-                        </p>
                     </div>
 
                     <button type="submit" class="flex items-center justify-center gap-2 rounded-md bg-primary-700 px-5 py-3.5 text-sm font-semibold text-sand-0 shadow-md transition-colors hover:bg-primary-900">

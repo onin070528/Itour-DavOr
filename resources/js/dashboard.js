@@ -7,6 +7,7 @@
  */
 document.addEventListener('DOMContentLoaded', () => {
     initSidebarSubmenus();
+    initSidebarDrawer();
     initFilterableTables();
     initTabs();
     initModals();
@@ -39,6 +40,14 @@ function initFlashToast() {
     }
 }
 
+/**
+ * Sidebar accordion submenus animate via a CSS-grid `grid-template-rows`
+ * transition (0fr <-> 1fr — see the `[data-nav-submenu]` markup in
+ * dashboard.blade.php) instead of toggling `hidden`, so opening/closing one
+ * eases the items below it up/down rather than snapping them instantly.
+ * `inert` is kept in sync so a closed submenu's links drop out of tab order
+ * and the accessibility tree even though they're still technically in the DOM.
+ */
 function initSidebarSubmenus() {
     document.querySelectorAll('[data-nav-toggle]').forEach((button) => {
         const submenu = button.nextElementSibling;
@@ -46,10 +55,44 @@ function initSidebarSubmenus() {
         if (!submenu) return;
 
         button.addEventListener('click', () => {
-            const isOpen = submenu.classList.toggle('hidden') === false;
-            button.setAttribute('aria-expanded', String(isOpen));
-            chevron?.classList.toggle('rotate-180', isOpen);
+            const isOpen = submenu.classList.contains('grid-rows-[1fr]');
+            submenu.classList.toggle('grid-rows-[1fr]', !isOpen);
+            submenu.classList.toggle('grid-rows-[0fr]', isOpen);
+            submenu.toggleAttribute('inert', isOpen);
+            button.setAttribute('aria-expanded', String(!isOpen));
+            chevron?.classList.toggle('rotate-180', !isOpen);
         });
+    });
+}
+
+/**
+ * Off-canvas sidebar drawer, below the `standard` (1024px) breakpoint —
+ * see the `standard:*` classes on `[data-sidebar]` in
+ * resources/views/components/layouts/dashboard.blade.php. The header's
+ * `[data-sidebar-toggle]` button (itself hidden at `standard` and up) opens
+ * it; the backdrop, Escape, or navigating to a link closes it. At `standard`
+ * and up the sidebar is always visible via CSS alone — this only matters
+ * below that breakpoint.
+ */
+function initSidebarDrawer() {
+    const toggle = document.querySelector('[data-sidebar-toggle]');
+    const sidebar = document.querySelector('[data-sidebar]');
+    const backdrop = document.querySelector('[data-sidebar-backdrop]');
+    if (!toggle || !sidebar) return;
+
+    function setOpen(open) {
+        sidebar.classList.toggle('-translate-x-full', !open);
+        sidebar.classList.toggle('translate-x-0', open);
+        backdrop?.classList.toggle('hidden', !open);
+        toggle.setAttribute('aria-expanded', String(open));
+    }
+
+    toggle.addEventListener('click', () => setOpen(sidebar.classList.contains('-translate-x-full')));
+    backdrop?.addEventListener('click', () => setOpen(false));
+    sidebar.querySelectorAll('a').forEach((link) => link.addEventListener('click', () => setOpen(false)));
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') setOpen(false);
     });
 }
 

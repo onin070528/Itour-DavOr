@@ -560,22 +560,25 @@ function initChatbot() {
 
 /**
  * Establishment QR self-registration form (resources/views/lgu/establishmentQR.blade.php).
- * Wires up every +/- counter, keeps the "Total Party Size" readout in sync,
- * and swaps in a success step on submit.
+ * Wires up every +/- counter, keeps the "Total Registration Headcount" readout
+ * in sync, and swaps in a success step on submit.
  *
- * The total counts the visitor (1) plus companions — companions are read
- * from the "By Gender" counters only, since every companion has exactly
- * one gender, so summing that group (rather than also adding the Age
- * Group / Tourist Type breakdowns) avoids counting the same person twice.
+ * Companion Headcount is a Foreign/Local x Male/Female x Adults/Children/Seniors
+ * matrix — each cell's data-counter is "<group>-<gender>-<age>" (e.g.
+ * "foreign-male-adults"). computeMatrixSums() parses that key on every cell to
+ * roll the 12 granular counters back up into the 7 flat totals
+ * (male/female/adults/children/seniors/local/foreign) CheckinController
+ * already validates and stores — every companion is counted exactly once per
+ * dimension, so foreign+local always equals male+female.
  */
 function initEstablishmentQrForm() {
     const form = document.getElementById('establishment-qr-form');
     if (!form) return;
 
     const counters = Array.from(form.querySelectorAll('[data-counter]'));
-    const genderCounters = counters.filter((el) => ['male', 'female'].includes(el.dataset.counter));
     const totalValue = document.getElementById('qr-total-value');
-    const totalCaption = document.getElementById('qr-total-caption');
+    const foreignValue = document.getElementById('qr-foreign-value');
+    const localValue = document.getElementById('qr-local-value');
     const formStep = document.getElementById('qr-form-step');
     const successStep = document.getElementById('qr-success-step');
     const resetButton = document.getElementById('qr-form-reset');
@@ -585,10 +588,24 @@ function initEstablishmentQrForm() {
         counter.querySelector('[data-counter-value]').textContent = String(Math.max(0, value));
     };
 
+    function computeMatrixSums() {
+        const sums = { male: 0, female: 0, adults: 0, children: 0, seniors: 0, local: 0, foreign: 0 };
+        counters.forEach((counter) => {
+            const [group, gender, age] = counter.dataset.counter.split('-');
+            const value = readValue(counter);
+            sums[group] += value;
+            sums[gender] += value;
+            sums[age] += value;
+        });
+        return sums;
+    }
+
     function updateTotal() {
-        const companions = genderCounters.reduce((sum, counter) => sum + readValue(counter), 0);
+        const sums = computeMatrixSums();
+        const companions = sums.foreign + sums.local;
         totalValue.textContent = String(1 + companions);
-        totalCaption.innerHTML = `You + <b>${companions}</b> companion${companions === 1 ? '' : 's'}`;
+        foreignValue.textContent = String(sums.foreign);
+        localValue.textContent = String(sums.local);
     }
 
     counters.forEach((counter) => {
@@ -612,11 +629,13 @@ function initEstablishmentQrForm() {
         try {
             // Companion counts live in [data-counter-value] spans, not real
             // form fields (see resources/views/components/lgu/qr-counter.blade.php),
-            // so they're read directly rather than via FormData.
+            // so they're read directly rather than via FormData, then rolled
+            // up from the 12-cell matrix into the 7 flat fields the backend
+            // validates (see computeMatrixSums() above).
             const payload = {
                 visitorName: form.elements.namedItem('visitorName')?.value,
                 visitorContact: form.elements.namedItem('visitorContact')?.value,
-                ...Object.fromEntries(counters.map((counter) => [counter.dataset.counter, readValue(counter)])),
+                ...computeMatrixSums(),
             };
 
             const response = await fetch(form.dataset.actionUrl, {

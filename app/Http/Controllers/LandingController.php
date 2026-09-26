@@ -19,16 +19,16 @@ class LandingController extends Controller
     /**
      * Display the public iTOUR landing page.
      *
-     * Destinations and establishments come from TourismCatalog, the single
-     * source of truth shared with the /explore hub. Reviews are static
-     * frontend mock data — shaped to match what an API resource will
-     * eventually return.
+     * The Signature Experiences showcase (a curated mix of destinations and
+     * establishments) comes from TourismCatalog, the single source of truth
+     * shared with the /explore hub. Reviews are static frontend mock data —
+     * shaped to match what an API resource will eventually return.
      */
     public function index(): View
     {
         return view('landing', [
-            'destinations' => TourismCatalog::featuredDestinations(8),
-            'establishments' => TourismCatalog::featuredEstablishments(6),
+            'signatureExperiences' => TourismCatalog::signatureExperiences(),
+            'featuredEstablishments' => TourismCatalog::featuredEstablishments(4),
             'municipalities' => TourismCatalog::municipalities(),
             'reviews' => $this->reviews(),
             'nearbyPlaces' => $this->nearbyPlaces(),

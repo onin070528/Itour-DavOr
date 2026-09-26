@@ -8,13 +8,14 @@ return new class extends Migration
 {
     /**
      * One row per visitor-arrival submission, from either of the app's two
-     * arrival forms:
-     *  - `staff`: the establishment front-desk "Record Arrival" wizard
-     *    (single visitor: gender + classification + optional remarks).
-     *  - `self_checkin`: the public QR self-registration form (a party,
-     *    described by gender/age/tourist-type counters).
-     * The `party_*` columns are only ever set for `self_checkin` rows; the
-     * `gender`/`classification` columns only for `staff` rows.
+     * arrival forms — both describe a party via the same `party_*`
+     * gender/age/tourist-type counters:
+     *  - `staff`: the establishment front-desk "Record Arrival" wizard,
+     *    used when a guest can't scan the QR.
+     *  - `self_checkin`: the public QR self-registration form.
+     * `gender`/`classification` are legacy single-visitor columns from an
+     * earlier version of the staff wizard — left in place (nullable) for
+     * historical rows, no longer written by either form.
      */
     public function up(): void
     {

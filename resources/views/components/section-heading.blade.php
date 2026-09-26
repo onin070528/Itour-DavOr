@@ -3,7 +3,7 @@
 <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
     <div class="max-w-xl">
         @if ($eyebrow)
-            <p class="text-xs font-bold tracking-widest text-primary-700 uppercase">{{ $eyebrow }}</p>
+            <p class="text-xs font-bold tracking-widest text-accent-700 uppercase">{{ $eyebrow }}</p>
         @endif
         <h2 class="mt-2 text-2xl sm:text-3xl">{{ $slot }}</h2>
         @if ($description)

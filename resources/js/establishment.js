@@ -1,16 +1,24 @@
+import Alpine from 'alpinejs';
 import QRCode from 'qrcode';
 
 /**
  * Establishment-specific frontend interactions that don't belong in the
- * shared dashboard.js engine: the Record Arrival wizard's fetch-based final
- * submit step (Enter → Review → Submit → Success), auto-submitting the
+ * shared dashboard.js engine: the Record Arrival page's reactive
+ * Alpine.js form (see arrivalForm() below), auto-submitting the
  * Establishment Profile image gallery's hidden upload form, and rendering
  * the establishment's QR code (resources/views/establishment/qr.blade.php)
  * client-side (via the `qrcode` package). Every action here is now backed
  * by a real endpoint — see App\Http\Controllers\Establishment.
+ *
+ * Alpine is scoped to this bundle only (not app.js/dashboard.js, which stay
+ * on the rest of the app's plain data-attribute JS convention) since Record
+ * Arrival is the one page in this codebase built with it.
  */
+window.Alpine = Alpine;
+Alpine.data('arrivalForm', arrivalForm);
+Alpine.start();
+
 document.addEventListener('DOMContentLoaded', () => {
-    initArrivalWizard();
     initImageGallery();
     initQrActions();
 });
@@ -61,91 +69,117 @@ function renderEstablishmentQr() {
         });
 }
 
-function initArrivalWizard() {
-    const wizard = document.getElementById('arrival-wizard');
-    if (!wizard) return;
+/**
+ * Alpine component backing the Record Arrival page
+ * (resources/views/establishment/arrivals/record.blade.php) — a two-column
+ * layout with a Local/International x Male/Female x Age-group companion
+ * matrix on the left and a sticky live-totals summary + submit button on
+ * the right. Registered via Alpine.data() and instantiated in the view as
+ * `x-data="arrivalForm(@json(...), @json(...))"`.
+ *
+ * The matrix/sum shape mirrors the public QR self-checkin form's Companion
+ * Headcount (computeMatrixSums() in resources/js/app.js) — duplicated
+ * rather than shared since app.js and establishment.js are separate Vite
+ * entry bundles — and submits into the same flat
+ * male/female/adults/children/seniors/local/foreign fields the backend
+ * already validates, plus the new visitType field.
+ */
+function arrivalForm(actionUrl, defaultDate) {
+    return {
+        actionUrl,
+        date: defaultDate,
+        leadVisitorName: '',
+        visitType: 'Daytour',
+        submitting: false,
+        guests: emptyGuestMatrix(),
+        ageRows: [
+            { key: 'adults', label: 'Adults (18 to 59)' },
+            { key: 'children', label: 'Kids (Under 18)' },
+            { key: 'seniors', label: 'Seniors (60 & above)' },
+        ],
 
-    const form = wizard.querySelector('form');
-    const steps = ['enter', 'review', 'success'];
-    const stepEls = Object.fromEntries(steps.map((s) => [s, wizard.querySelector(`[data-step="${s}"]`)]));
-    const stepper = wizard.querySelectorAll('[data-stepper-item]');
+        inc(group, age, gender) {
+            this.guests[group][age][gender]++;
+        },
 
-    function goTo(step) {
-        steps.forEach((s) => stepEls[s]?.classList.toggle('hidden', s !== step));
-        stepper.forEach((el, i) => {
-            const stepIndex = steps.indexOf(step);
-            el.classList.toggle('text-primary-700', i <= stepIndex);
-            el.classList.toggle('text-sand-400', i > stepIndex);
-            el.querySelector('[data-stepper-dot]')?.classList.toggle('bg-primary-700', i <= stepIndex);
-            el.querySelector('[data-stepper-dot]')?.classList.toggle('bg-sand-300', i > stepIndex);
-        });
-    }
+        dec(group, age, gender) {
+            this.guests[group][age][gender] = Math.max(0, this.guests[group][age][gender] - 1);
+        },
 
-    function fieldLabel(field) {
-        return field.closest('[data-field]')?.querySelector('label')?.textContent.trim() ?? field.name;
-    }
-
-    function populateReview() {
-        const summary = wizard.querySelector('[data-review-summary]');
-        if (!summary) return;
-
-        const rows = Array.from(form.elements)
-            .filter((el) => el.name && el.type !== 'submit' && el.type !== 'button')
-            .map((el) => {
-                const value = el.value.trim();
-                return `
-                    <div class="flex items-center justify-between border-b border-sand-100 py-2 text-sm last:border-0">
-                        <span class="text-sand-500">${fieldLabel(el)}</span>
-                        <span class="font-medium text-sand-900">${value || '—'}</span>
-                    </div>
-                `;
-            })
-            .join('');
-
-        summary.innerHTML = rows;
-    }
-
-    wizard.querySelector('[data-step-next]')?.addEventListener('click', () => {
-        if (!form.reportValidity()) return;
-        populateReview();
-        goTo('review');
-    });
-
-    wizard.querySelector('[data-step-back]')?.addEventListener('click', () => goTo('enter'));
-
-    const submitButton = wizard.querySelector('[data-step-submit]');
-    submitButton?.addEventListener('click', async () => {
-        submitButton.disabled = true;
-
-        try {
-            const response = await fetch(submitButton.dataset.actionUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Accept: 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
-                },
-                body: JSON.stringify(Object.fromEntries(new FormData(form))),
-            });
-
-            if (!response.ok) {
-                throw new Error('Request failed');
+        sums() {
+            const totals = { male: 0, female: 0, adults: 0, children: 0, seniors: 0, local: 0, foreign: 0 };
+            for (const group of ['local', 'foreign']) {
+                for (const age of ['adults', 'children', 'seniors']) {
+                    for (const gender of ['male', 'female']) {
+                        const value = this.guests[group][age][gender];
+                        totals[group] += value;
+                        totals[age] += value;
+                        totals[gender] += value;
+                    }
+                }
             }
+            return totals;
+        },
 
-            goTo('success');
-        } catch {
-            window.dispatchEvent(new CustomEvent('itour:toast', { detail: { message: "Couldn't save this arrival — please try again.", tone: 'danger' } }));
-        } finally {
-            submitButton.disabled = false;
-        }
-    });
+        get localTotal() {
+            return this.sums().local;
+        },
 
-    wizard.querySelector('[data-step-reset]')?.addEventListener('click', () => {
-        form.reset();
-        goTo('enter');
-    });
+        get foreignTotal() {
+            return this.sums().foreign;
+        },
 
-    goTo('enter');
+        get totalPeople() {
+            return 1 + this.localTotal + this.foreignTotal;
+        },
+
+        async submit() {
+            if (!this.$refs.form.reportValidity()) return;
+
+            this.submitting = true;
+
+            try {
+                const response = await fetch(this.actionUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Accept: 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                    },
+                    body: JSON.stringify({
+                        date: this.date,
+                        visitorName: this.leadVisitorName,
+                        visitType: this.visitType,
+                        ...this.sums(),
+                    }),
+                });
+
+                if (!response.ok) {
+                    throw new Error('Request failed');
+                }
+
+                window.dispatchEvent(new CustomEvent('itour:toast', { detail: { message: 'Arrival recorded.', tone: 'success' } }));
+
+                this.leadVisitorName = '';
+                this.visitType = 'Daytour';
+                this.date = defaultDate;
+                this.guests = emptyGuestMatrix();
+            } catch {
+                window.dispatchEvent(new CustomEvent('itour:toast', { detail: { message: "Couldn't save this arrival — please try again.", tone: 'danger' } }));
+            } finally {
+                this.submitting = false;
+            }
+        },
+    };
+}
+
+function emptyGuestMatrix() {
+    const emptyAgeRow = () => ({ male: 0, female: 0 });
+
+    return {
+        local: { adults: emptyAgeRow(), children: emptyAgeRow(), seniors: emptyAgeRow() },
+        foreign: { adults: emptyAgeRow(), children: emptyAgeRow(), seniors: emptyAgeRow() },
+    };
 }
 
 /**

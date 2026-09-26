@@ -61,6 +61,23 @@
 
     --shadow-sm: 0 1px 2px rgba(33, 31, 26, 0.07);
     --shadow-md: 0 6px 20px rgba(33, 31, 26, 0.09);
+
+    /*
+     * Named breakpoints matching the Penpot design-canvas widths, alongside
+     * Tailwind's defaults (sm/md/lg/xl/2xl — still used everywhere else in
+     * the app and left untouched). Use these where a component needs to
+     * speak the same viewport vocabulary as the Penpot mockups:
+     *   xs:         640px  — Minimum Display Limit (viewport floor)
+     *   standard:   1024px — Standard Display View
+     *   canvas-sm:  1248px — Penpot desktop canvas
+     *   canvas-md:  1366px — Penpot desktop canvas
+     *   canvas-lg:  1920px — Penpot desktop canvas
+     */
+    --breakpoint-xs: 40rem;
+    --breakpoint-standard: 64rem;
+    --breakpoint-canvas-sm: 78rem;
+    --breakpoint-canvas-md: 85.375rem;
+    --breakpoint-canvas-lg: 120rem;
 }
 
 @layer base {
@@ -73,5 +90,18 @@
     h3,
     h4 {
         @apply font-display font-bold text-sand-900;
+    }
+}
+
+@layer utilities {
+    /* For horizontally-scrollable single-row chip/pill lists (e.g. the hero
+       category pills) — scrolls on overflow without showing a scrollbar. */
+    .scrollbar-hide {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+
+    .scrollbar-hide::-webkit-scrollbar {
+        display: none;
     }
 }
