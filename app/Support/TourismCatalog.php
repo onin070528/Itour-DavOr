@@ -396,4 +396,35 @@ class TourismCatalog
             ->take($limit)
             ->all();
     }
+
+    /**
+     * A hand-picked mix of the province's flagship destinations and
+     * establishments for the landing page's single "Signature Experiences"
+     * showcase — deliberately curated by id (not just the first N by
+     * insertion order), so the homepage always leads with the most
+     * recognizable places rather than whatever happens to be seeded first.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public static function signatureExperiences(): array
+    {
+        $order = [
+            'dahican-beach',
+            'aliwagwag-falls',
+            'hamiguitan',
+            'botanika-nature-resort',
+            'badjao-seafront',
+            'pasalubong-center',
+        ];
+
+        $byId = collect(self::listings())
+            ->where('status', 'Active')
+            ->keyBy('id');
+
+        return collect($order)
+            ->map(fn (string $id) => $byId->get($id))
+            ->filter()
+            ->values()
+            ->all();
+    }
 }

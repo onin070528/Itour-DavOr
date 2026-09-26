@@ -47,6 +47,13 @@ class RbacDemoAccountSeeder extends Seeder
         // data. Baganga has zero seeded listings today, so its demo
         // establishment also doubles as the cross-municipality-denial test
         // fixture used by tests/Feature/Rbac/MunicipalityScopingTest.php.
+        //
+        // status stays 'Pending Review' (not 'Active') so these no-image,
+        // no-rating placeholders never surface in public-facing curation
+        // (TourismCatalog::featuredEstablishments()/signatureExperiences(),
+        // the /explore hub — both filter to Active only). The linked demo
+        // Establishment account can still manage its own listing regardless
+        // of status, same as any real not-yet-verified establishment.
         $matiEstablishment = Listing::query()->updateOrCreate(
             ['slug' => 'itour-demo-establishment-mati'],
             [
@@ -56,7 +63,7 @@ class RbacDemoAccountSeeder extends Seeder
                 'municipality_id' => $mati->id,
                 'barangay' => 'Poblacion',
                 'description' => 'RBAC demo/test fixture — not a real establishment.',
-                'status' => 'Active',
+                'status' => 'Pending Review',
             ]
         );
 
@@ -69,7 +76,7 @@ class RbacDemoAccountSeeder extends Seeder
                 'municipality_id' => $baganga->id,
                 'barangay' => 'Poblacion',
                 'description' => 'RBAC demo/test fixture — not a real establishment. Used to verify cross-municipality access denial.',
-                'status' => 'Active',
+                'status' => 'Pending Review',
             ]
         );
 

@@ -41,9 +41,19 @@
         @elseif ($errors->any()) data-flash-toast="{{ $errors->first() }}" data-flash-tone="danger"
         @endif
     >
-        {{-- Fixed-height flex row: the sidebar stretches to the full viewport
-             height and never scrolls with it — only <main> below scrolls. --}}
-        <aside class="flex h-full w-64 shrink-0 flex-col overflow-hidden bg-primary-900 text-sand-0">
+        {{-- Below the `standard` (1024px) breakpoint the sidebar becomes an
+             off-canvas drawer (fixed, translated off-screen, toggled via the
+             header button below) so it never eats into the content column
+             down to the 640×360 minimum viewport — see initSidebarDrawer()
+             in resources/js/dashboard.js. At `standard` and up it reverts to
+             the original always-visible flex-item sidebar. --}}
+        <div data-sidebar-backdrop class="fixed inset-0 z-40 hidden bg-sand-900/50 standard:hidden" aria-hidden="true"></div>
+
+        <aside
+            id="dashboard-sidebar"
+            data-sidebar
+            class="fixed inset-y-0 left-0 z-50 flex h-full w-64 max-w-[85vw] -translate-x-full flex-col overflow-hidden bg-primary-900 text-sand-0 transition-transform duration-200 standard:static standard:z-auto standard:max-w-none standard:translate-x-0 standard:shrink-0 standard:transition-none"
+        >
             <div class="flex items-center justify-between px-5 pt-6 pb-4">
                 <a href="{{ url('/') }}" class="flex items-center gap-2">
                     <x-logo :dark="true" class="text-lg" />
@@ -56,7 +66,7 @@
                 <p class="text-xs text-white/65">{{ $user->organization_subtitle }}</p>
             </div>
 
-            <nav class="flex-1 px-3 pb-4" aria-label="Dashboard" data-nav>
+            <nav class="flex-1 overflow-y-auto px-3 pb-4" aria-label="Dashboard" data-nav>
                 @foreach ($navSections as $heading => $items)
                     <p class="mt-4 mb-1.5 px-2 text-[10px] font-bold tracking-widest text-white/45 uppercase">{{ $heading }}</p>
                     <ul class="flex flex-col gap-0.5">
@@ -149,12 +159,25 @@
         </aside>
 
         <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
-            <header class="flex shrink-0 items-center justify-between gap-4 border-b border-sand-200 bg-sand-0 px-6 py-3.5">
-                <p class="text-sm text-sand-500">
-                    {{ $user->role->title() }} <span class="mx-1 text-sand-300">/</span> <span class="font-semibold text-sand-900">{{ $pageTitle }}</span>
-                </p>
+            <header class="flex shrink-0 items-center justify-between gap-4 border-b border-sand-200 bg-sand-0 px-4 py-3.5 standard:px-6">
+                <div class="flex min-w-0 items-center gap-3">
+                    <button
+                        type="button"
+                        data-sidebar-toggle
+                        aria-expanded="false"
+                        aria-controls="dashboard-sidebar"
+                        aria-label="Toggle navigation menu"
+                        class="flex shrink-0 items-center justify-center rounded-sm border border-sand-300 p-2 text-sand-700 standard:hidden"
+                    >
+                        <i class="ti ti-menu-2 text-lg" aria-hidden="true"></i>
+                    </button>
 
-                <div class="flex items-center gap-4">
+                    <p class="min-w-0 truncate text-sm text-sand-500">
+                        {{ $user->role->title() }} <span class="mx-1 text-sand-300">/</span> <span class="font-semibold text-sand-900">{{ $pageTitle }}</span>
+                    </p>
+                </div>
+
+                <div class="flex shrink-0 items-center gap-4">
                     <button type="button" class="relative text-sand-600" aria-label="Notifications">
                         <i class="ti ti-bell text-lg" aria-hidden="true"></i>
                         <span class="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-accent-500"></span>
