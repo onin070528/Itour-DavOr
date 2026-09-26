@@ -23,6 +23,7 @@ use App\Support\PtoMockData;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -48,10 +49,9 @@ class UsersController extends PtoController
                 'name' => $data['name'],
                 'email' => $data['email'],
                 // The Add User form has no password field — new accounts get
-                // the same placeholder password every other demo account in
-                // this app uses (see database/seeders/UserSeeder.php), since
-                // there's nowhere on screen to set or show a real one yet.
-                'password' => 'password',
+                // a random password nobody knows, and the account holder sets
+                // their own via "Forgot password?" on the sign-in page.
+                'password' => Str::password(32),
                 'email_verified_at' => now(),
                 'role' => $data['role'],
                 'organization_name' => $data['organization_name'],

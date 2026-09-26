@@ -28,7 +28,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * branches on `category` instead.
  */
 #[Fillable([
-    'slug', 'name', 'category', 'municipality', 'municipality_id', 'barangay', 'lat', 'lng', 'description',
+    'slug', 'name', 'owner_name', 'category', 'municipality', 'municipality_id', 'barangay', 'lat', 'lng', 'description',
     'rating', 'tags', 'image', 'contact_office', 'contact_phone', 'hours',
     'email', 'website', 'status',
 ])]

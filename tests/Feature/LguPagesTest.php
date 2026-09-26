@@ -34,6 +34,7 @@ test('every LGU page renders for a municipality with data', function (string $ro
     'lgu.feedback.analytics',
     'lgu.reports',
     'lgu.settings',
+    'lgu.users',
 ]);
 
 test('every LGU page renders for a municipality with no mock data (empty states)', function (string $routeName) {
@@ -51,6 +52,7 @@ test('every LGU page renders for a municipality with no mock data (empty states)
     'lgu.feedback.analytics',
     'lgu.reports',
     'lgu.settings',
+    'lgu.users',
 ]);
 
 test('the dashboard only shows data scoped to the LGU\'s own municipality', function () {

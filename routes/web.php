@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Auth\NewPasswordController;
+use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\SessionController;
 use App\Http\Controllers\CheckinController;
 use App\Http\Controllers\Establishment\ArrivalsController as EstablishmentArrivalsController;
@@ -41,6 +43,11 @@ Route::post('/checkin/{establishment}', [CheckinController::class, 'store'])->na
 Route::middleware('guest')->group(function () {
     Route::get('/login', [SessionController::class, 'create'])->name('login');
     Route::post('/login', [SessionController::class, 'store'])->middleware('throttle:login')->name('login.store');
+
+    Route::get('/forgot-password', [PasswordResetLinkController::class, 'create'])->name('password.request');
+    Route::post('/forgot-password', [PasswordResetLinkController::class, 'store'])->middleware('throttle:6,1')->name('password.email');
+    Route::get('/reset-password/{token}', [NewPasswordController::class, 'create'])->name('password.reset');
+    Route::post('/reset-password', [NewPasswordController::class, 'store'])->middleware('throttle:6,1')->name('password.store');
 });
 
 Route::post('/logout', [SessionController::class, 'destroy'])
