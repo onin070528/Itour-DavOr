@@ -21,7 +21,7 @@ use Illuminate\View\View;
 class ArrivalsController extends EstablishmentController
 {
     /**
-     * Record Arrival: the Enter → Review → Submit wizard used to log a guest.
+     * Record Arrival: the two-column, Alpine.js-driven form used to log a guest.
      */
     public function record(Request $request): View
     {
@@ -29,19 +29,31 @@ class ArrivalsController extends EstablishmentController
     }
 
     /**
-     * Submits the wizard (called via fetch by initArrivalWizard() in
-     * resources/js/establishment.js, which then shows the existing
-     * JS-driven success step rather than reloading the page).
+     * Submits the form (called via fetch by arrivalForm()'s submit() method in
+     * resources/js/establishment.js, which then shows a toast rather than
+     * reloading the page). This is the staff-entered fallback for a guest who
+     * can't scan the QR, so it captures the same visit type and
+     * Local/International x Male/Female x Age-group companion breakdown as
+     * the public self-checkin form (see CheckinController::store) rather than
+     * one visitor's own gender/classification.
      */
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
             'date' => ['required', 'date'],
             'visitorName' => ['nullable', 'string', 'max:255'],
-            'gender' => ['required', Rule::in(['Male', 'Female'])],
-            'classification' => ['required', Rule::in(['Local (Same Province)', 'Domestic (Other Province)', 'Foreign'])],
-            'remarks' => ['nullable', 'string'],
+            'visitType' => ['required', Rule::in(['Daytour', 'Overnight'])],
+            'male' => ['nullable', 'integer', 'min:0'],
+            'female' => ['nullable', 'integer', 'min:0'],
+            'adults' => ['nullable', 'integer', 'min:0'],
+            'children' => ['nullable', 'integer', 'min:0'],
+            'seniors' => ['nullable', 'integer', 'min:0'],
+            'local' => ['nullable', 'integer', 'min:0'],
+            'foreign' => ['nullable', 'integer', 'min:0'],
         ]);
+
+        $companions = collect(['male', 'female', 'adults', 'children', 'seniors', 'local', 'foreign'])
+            ->mapWithKeys(fn ($key) => [$key => (int) ($data[$key] ?? 0)]);
 
         // Resolved via establishment_id, not a Listing.name match against
         // organization_name — see Establishment\ProfileController::ownListing().
@@ -53,10 +65,15 @@ class ArrivalsController extends EstablishmentController
                 'source' => 'staff',
                 'date' => $data['date'],
                 'visitor_name' => $data['visitorName'] ?? null,
-                'gender' => $data['gender'],
-                'classification' => $data['classification'],
-                'remarks' => $data['remarks'] ?? null,
-                'party_size' => 1,
+                'visit_type' => $data['visitType'],
+                'party_male' => $companions['male'],
+                'party_female' => $companions['female'],
+                'party_adults' => $companions['adults'],
+                'party_children' => $companions['children'],
+                'party_seniors' => $companions['seniors'],
+                'party_local' => $companions['local'],
+                'party_foreign' => $companions['foreign'],
+                'party_size' => 1 + $companions['male'] + $companions['female'],
                 'status' => 'Recorded',
             ]);
         } catch (\Throwable $e) {

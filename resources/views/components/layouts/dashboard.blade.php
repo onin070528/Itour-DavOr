@@ -52,7 +52,7 @@
         <aside
             id="dashboard-sidebar"
             data-sidebar
-            class="fixed inset-y-0 left-0 z-50 flex h-full w-64 max-w-[85vw] -translate-x-full flex-col overflow-hidden bg-primary-900 text-sand-0 transition-transform duration-200 standard:static standard:z-auto standard:max-w-none standard:translate-x-0 standard:shrink-0 standard:transition-none"
+            class="fixed inset-y-0 left-0 z-50 flex h-full w-64 max-w-[85vw] -translate-x-full flex-col overflow-hidden bg-primary-900 text-sand-0 transition-transform duration-200 standard:static standard:z-auto standard:max-w-none standard:min-w-64 standard:translate-x-0 standard:shrink-0 standard:transition-none"
         >
             <div class="flex items-center justify-between px-5 pt-6 pb-4">
                 <a href="{{ url('/') }}" class="flex items-center gap-2">
@@ -66,7 +66,7 @@
                 <p class="text-xs text-white/65">{{ $user->organization_subtitle }}</p>
             </div>
 
-            <nav class="flex-1 overflow-y-auto px-3 pb-4" aria-label="Dashboard" data-nav>
+            <nav class="flex-1 overflow-y-auto px-3 pb-4 [scrollbar-gutter:stable]" aria-label="Dashboard" data-nav>
                 @foreach ($navSections as $heading => $items)
                     <p class="mt-4 mb-1.5 px-2 text-[10px] font-bold tracking-widest text-white/45 uppercase">{{ $heading }}</p>
                     <ul class="flex flex-col gap-0.5">
@@ -78,8 +78,8 @@
                                         data-nav-toggle
                                         aria-expanded="{{ $item['active'] ? 'true' : 'false' }}"
                                         @class([
-                                            'flex w-full items-center justify-between gap-2 rounded-sm px-2.5 py-2 text-left text-sm transition-colors',
-                                            'bg-white/12 font-semibold text-sand-0' => $item['active'],
+                                            'flex w-full items-center justify-between gap-2 rounded-sm border border-transparent px-2.5 py-2 text-left text-sm font-semibold transition-colors',
+                                            'bg-white/12 text-sand-0' => $item['active'],
                                             'text-white/78 hover:bg-white/10 hover:text-sand-0' => ! $item['active'],
                                         ])
                                     >
@@ -89,29 +89,45 @@
                                         </span>
                                         <i class="ti ti-chevron-down text-sm transition-transform" data-nav-chevron aria-hidden="true"></i>
                                     </button>
-                                    <ul @class(['flex flex-col gap-0.5 py-0.5 pl-7', 'hidden' => ! $item['active']]) data-nav-submenu>
-                                        @foreach ($item['children'] as $child)
-                                            <li>
-                                                <a
-                                                    href="{{ $child['href'] }}"
-                                                    @class([
-                                                        'flex items-center gap-2.5 rounded-sm px-2.5 py-2 text-sm transition-colors',
-                                                        'bg-white/12 font-semibold text-sand-0' => $child['active'] ?? false,
-                                                        'text-white/78 hover:bg-white/10 hover:text-sand-0' => ! ($child['active'] ?? false),
-                                                    ])
-                                                >
-                                                    <i class="ti {{ $child['icon'] }} text-sm" aria-hidden="true"></i>
-                                                    {{ $child['label'] }}
-                                                </a>
-                                            </li>
-                                        @endforeach
-                                    </ul>
+                                    {{-- CSS-grid accordion: grid-template-rows animates 0fr -> 1fr so the
+                                         submenu's height transitions smoothly instead of the abrupt
+                                         `hidden` toggle that used to snap every item below it up/down.
+                                         The inner <ul> needs overflow-hidden so the 0fr row can actually
+                                         clip it to zero instead of keeping its min-content height, and
+                                         `inert` when closed keeps its links out of tab order / a11y tree. --}}
+                                    <div
+                                        data-nav-submenu
+                                        @class([
+                                            'grid transition-[grid-template-rows] duration-200 ease-out',
+                                            'grid-rows-[1fr]' => $item['active'],
+                                            'grid-rows-[0fr]' => ! $item['active'],
+                                        ])
+                                        @if (! $item['active']) inert @endif
+                                    >
+                                        <ul class="flex flex-col gap-0.5 overflow-hidden pl-7">
+                                            @foreach ($item['children'] as $child)
+                                                <li>
+                                                    <a
+                                                        href="{{ $child['href'] }}"
+                                                        @class([
+                                                            'flex items-center gap-2.5 rounded-sm border border-transparent px-2.5 py-2 text-sm font-semibold transition-colors',
+                                                            'bg-white/12 text-sand-0' => $child['active'] ?? false,
+                                                            'text-white/78 hover:bg-white/10 hover:text-sand-0' => ! ($child['active'] ?? false),
+                                                        ])
+                                                    >
+                                                        <i class="ti {{ $child['icon'] }} text-sm" aria-hidden="true"></i>
+                                                        {{ $child['label'] }}
+                                                    </a>
+                                                </li>
+                                            @endforeach
+                                        </ul>
+                                    </div>
                                 @else
                                     <a
                                         href="{{ $item['href'] }}"
                                         @class([
-                                            'flex items-center justify-between gap-2 rounded-sm px-2.5 py-2 text-sm transition-colors',
-                                            'bg-white/12 font-semibold text-sand-0' => $item['active'] ?? false,
+                                            'flex items-center justify-between gap-2 rounded-sm border border-transparent px-2.5 py-2 text-sm font-semibold transition-colors',
+                                            'bg-white/12 text-sand-0' => $item['active'] ?? false,
                                             'text-white/78 hover:bg-white/10 hover:text-sand-0' => ! ($item['active'] ?? false),
                                         ])
                                     >

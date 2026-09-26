@@ -40,6 +40,14 @@ function initFlashToast() {
     }
 }
 
+/**
+ * Sidebar accordion submenus animate via a CSS-grid `grid-template-rows`
+ * transition (0fr <-> 1fr — see the `[data-nav-submenu]` markup in
+ * dashboard.blade.php) instead of toggling `hidden`, so opening/closing one
+ * eases the items below it up/down rather than snapping them instantly.
+ * `inert` is kept in sync so a closed submenu's links drop out of tab order
+ * and the accessibility tree even though they're still technically in the DOM.
+ */
 function initSidebarSubmenus() {
     document.querySelectorAll('[data-nav-toggle]').forEach((button) => {
         const submenu = button.nextElementSibling;
@@ -47,9 +55,12 @@ function initSidebarSubmenus() {
         if (!submenu) return;
 
         button.addEventListener('click', () => {
-            const isOpen = submenu.classList.toggle('hidden') === false;
-            button.setAttribute('aria-expanded', String(isOpen));
-            chevron?.classList.toggle('rotate-180', isOpen);
+            const isOpen = submenu.classList.contains('grid-rows-[1fr]');
+            submenu.classList.toggle('grid-rows-[1fr]', !isOpen);
+            submenu.classList.toggle('grid-rows-[0fr]', isOpen);
+            submenu.toggleAttribute('inert', isOpen);
+            button.setAttribute('aria-expanded', String(!isOpen));
+            chevron?.classList.toggle('rotate-180', !isOpen);
         });
     });
 }
