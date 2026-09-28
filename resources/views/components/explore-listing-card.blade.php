@@ -19,7 +19,7 @@
             <h3 class="font-display text-lg font-bold text-sand-900">{{ $listing['name'] }}</h3>
             <span class="mt-0.5 inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-sand-800">
                 <i class="ti ti-star text-accent-500" aria-hidden="true"></i>
-                {{ number_format($listing['rating'], 1) }}
+                {{ $listing['rating'] !== null ? number_format($listing['rating'], 1) : 'New' }}
             </span>
         </div>
 

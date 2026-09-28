@@ -27,6 +27,7 @@
 
         @fonts
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/3.46.0/tabler-icons.min.css">
+        @stack('head')
 
         @vite(array_filter([
             'resources/css/app.css',

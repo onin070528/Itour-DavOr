@@ -18,7 +18,133 @@ document.addEventListener('DOMContentLoaded', () => {
     initToastTriggers();
     initReportGenerator();
     initFlashToast();
+    initTourismMap();
 });
+
+/**
+ * PTO Tourism Map (resources/views/pto/directory/map.blade.php): a Mapbox GL
+ * map of every geocoded listing. Satellite (real aerial imagery) and Streets
+ * base styles, an independent 3D terrain toggle, and legend checkboxes that
+ * show/hide destinations vs establishments.
+ */
+function initTourismMap() {
+    const container = document.getElementById('tourism-map');
+    const dataEl = document.getElementById('tourism-map-data');
+    const statusEl = document.getElementById('tourism-map-status');
+
+    if (!container || !dataEl) {
+        return;
+    }
+
+    const setStatus = (message) => {
+        statusEl.hidden = !message;
+        statusEl.textContent = message ?? '';
+    };
+
+    const token = container.dataset.mapboxToken;
+    if (!window.mapboxgl || !token) {
+        setStatus('The map is currently unavailable — Mapbox failed to load or no token is configured.');
+        return;
+    }
+
+    if (!mapboxgl.supported()) {
+        setStatus("Your browser doesn't support this map (WebGL required).");
+        return;
+    }
+
+    const styles = {
+        satellite: 'mapbox://styles/mapbox/satellite-streets-v12',
+        streets: 'mapbox://styles/mapbox/streets-v12',
+    };
+    const listings = JSON.parse(dataEl.textContent);
+    const styleButtons = Array.from(document.querySelectorAll('[data-tourism-map-style]'));
+    const terrainButton = document.getElementById('tourism-map-3d');
+    const filters = Array.from(document.querySelectorAll('[data-tourism-map-filter]'));
+    let terrainEnabled = false;
+
+    mapboxgl.accessToken = token;
+
+    const map = new mapboxgl.Map({
+        container,
+        style: styles.satellite,
+        center: [Number(container.dataset.mapboxCenterLng), Number(container.dataset.mapboxCenterLat)],
+        zoom: 8.3,
+    });
+
+    map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), 'top-right');
+    map.addControl(new mapboxgl.FullscreenControl(), 'top-right');
+    map.addControl(new mapboxgl.ScaleControl(), 'bottom-right');
+    map.on('error', (event) => console.error('[tourism-map] map error:', event?.error ?? event));
+
+    // Custom sources/terrain are dropped whenever the style changes, so
+    // re-apply 3D terrain after every style load.
+    map.on('style.load', () => {
+        if (!map.getSource('mapbox-dem')) {
+            map.addSource('mapbox-dem', { type: 'raster-dem', url: 'mapbox://mapbox.mapbox-terrain-dem-v1', tileSize: 512, maxzoom: 14 });
+        }
+        map.setTerrain(terrainEnabled ? { source: 'mapbox-dem', exaggeration: 1.5 } : null);
+    });
+
+    const markers = listings.map((listing) => {
+        const photo = listing.image
+            ? `<img src="${escapeAttr(listing.image)}" alt="" class="mb-2 h-24 w-full rounded-sm object-cover">`
+            : '';
+
+        const marker = new mapboxgl.Marker({ color: listing.isDestination ? '#125d5a' : '#cb6e30' })
+            .setLngLat([listing.lng, listing.lat])
+            .setPopup(new mapboxgl.Popup({ offset: 24, maxWidth: '240px' }).setHTML(`
+                ${photo}
+                <p class="font-semibold text-sand-900">${escapeAttr(listing.name)}</p>
+                <p class="text-xs text-sand-600">${escapeAttr(listing.categoryLabel)} · ${escapeAttr(listing.barangay)}, ${escapeAttr(listing.municipality)}</p>
+                <p class="mt-1 text-xs text-sand-500">Status: ${escapeAttr(listing.status)}</p>
+            `))
+            .addTo(map);
+
+        return { listing, marker };
+    });
+
+    if (markers.length) {
+        const bounds = new mapboxgl.LngLatBounds();
+        listings.forEach((listing) => bounds.extend([listing.lng, listing.lat]));
+        map.fitBounds(bounds, { padding: 60, maxZoom: 12, duration: 0 });
+    } else {
+        setStatus('No listings with coordinates to plot yet.');
+    }
+
+    styleButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+            if (button.getAttribute('aria-pressed') === 'true') return;
+
+            styleButtons.forEach((other) => other.setAttribute('aria-pressed', String(other === button)));
+            map.setStyle(styles[button.dataset.tourismMapStyle]);
+        });
+    });
+
+    terrainButton?.addEventListener('click', () => {
+        terrainEnabled = !terrainEnabled;
+        terrainButton.setAttribute('aria-pressed', String(terrainEnabled));
+        map.setTerrain(terrainEnabled ? { source: 'mapbox-dem', exaggeration: 1.5 } : null);
+        map.easeTo({ pitch: terrainEnabled ? 60 : 0, bearing: terrainEnabled ? -20 : 0, duration: 1000 });
+    });
+
+    filters.forEach((checkbox) => {
+        checkbox.addEventListener('change', () => {
+            const visible = Object.fromEntries(filters.map((filter) => [filter.dataset.tourismMapFilter, filter.checked]));
+
+            markers.forEach(({ listing, marker }) => {
+                const show = listing.isDestination ? visible.destinations : visible.establishments;
+                marker.getElement().hidden = !show;
+                if (!show && marker.getPopup()?.isOpen()) marker.togglePopup();
+            });
+        });
+    });
+}
+
+function escapeAttr(value) {
+    const div = document.createElement('div');
+    div.textContent = value ?? '';
+    return div.innerHTML.replace(/"/g, '&quot;');
+}
 
 // Lets other, independently-bundled entry scripts (establishment.js, app.js)
 // trigger the same toast used everywhere else, without importing across

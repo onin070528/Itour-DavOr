@@ -1,4 +1,4 @@
-@props(['eyebrow' => null, 'description' => null, 'actionLabel' => null, 'actionHref' => null])
+@props(['eyebrow' => null, 'description' => null, 'actionLabel' => null, 'actionHref' => null, 'actionId' => null])
 
 <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
     <div class="max-w-xl">
@@ -12,9 +12,9 @@
     </div>
 
     @if ($actionLabel && $actionHref)
-        <a href="{{ $actionHref }}" class="inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold text-primary-700 transition-colors hover:text-primary-900">
-            {{ $actionLabel }}
-            <i class="ti ti-arrow-right" aria-hidden="true"></i>
+        <a href="{{ $actionHref }}" @if ($actionId) id="{{ $actionId }}" @endif class="inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold text-primary-700 transition-colors hover:text-primary-900">
+            <span data-action-label>{{ $actionLabel }}</span>
+            <i data-action-icon class="ti ti-arrow-right" aria-hidden="true"></i>
         </a>
     @endif
 </div>

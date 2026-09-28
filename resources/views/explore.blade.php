@@ -87,11 +87,22 @@
             </div>
 
             <div id="explore-map" class="hidden">
-                <p class="mb-3 text-xs text-sand-500">Illustrative province map — not to scale. Pins mark the
-                    municipality of each filtered listing.</p>
+                <p id="explore-map-caption" class="mb-3 text-xs text-sand-500">Pins mark every filtered listing —
+                    click one for details.</p>
                 <div
                     class="relative h-[520px] overflow-hidden rounded-md border border-sand-200 bg-gradient-to-b from-primary-100 to-sand-100">
-                    <div id="explore-map-canvas" class="absolute inset-0"></div>
+                    {{-- The wrapper owns the absolute positioning: mapbox-gl.css sets
+                         .mapboxgl-map { position: relative } unlayered, which beats
+                         Tailwind v4's layered utilities. --}}
+                    <div class="absolute inset-0">
+                        <div
+                            id="explore-map-canvas"
+                            data-mapbox-token="{{ config('services.mapbox.token') }}"
+                            data-mapbox-center-lat="6.9214"
+                            data-mapbox-center-lng="126.2686"
+                            class="relative h-full w-full"
+                        ></div>
+                    </div>
                 </div>
             </div>
 

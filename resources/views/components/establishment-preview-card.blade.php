@@ -17,9 +17,9 @@
         <span class="text-sand-500">{{ $listing['municipality'] }}</span>
         <span class="inline-flex items-center gap-1 font-semibold text-sand-800">
             <i class="ti ti-star text-accent-500" aria-hidden="true"></i>
-            {{ number_format($listing['rating'], 1) }}
+            {{ $listing['rating'] !== null ? number_format($listing['rating'], 1) : 'New' }}
         </span>
     </div>
 
-    <a href="{{ $listing['href'] }}" class="absolute inset-0" aria-label="View {{ $listing['name'] }}"></a>
+    <button type="button" data-listing-details="{{ $listing['id'] }}" class="absolute inset-0 cursor-pointer" aria-label="View details for {{ $listing['name'] }}"></button>
 </article>

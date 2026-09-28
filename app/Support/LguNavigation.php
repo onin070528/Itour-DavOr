@@ -63,7 +63,7 @@ class LguNavigation
                 $item('reports', 'ti-file-report', 'Reports', 'lgu.reports'),
             ],
             'User Management' => [
-                $item('users', 'ti-users-group', 'Users', 'lgu.users'),
+                $item('users', 'ti-users-group', 'Establishments', 'lgu.users'),
             ],
         ];
     }

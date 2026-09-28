@@ -104,13 +104,13 @@ class DirectoryController extends PtoController
     }
 
     /**
-     * Map: placeholder for the future Mapbox-backed tourism map.
+     * Map: Mapbox tourism map (satellite/streets + 3D terrain) plotting every
+     * listing with coordinates.
      */
     public function map(Request $request): View
     {
         return $this->renderPto($request, 'pto.directory.map', 'directory.map', 'Tourism Map', [
             'listings' => TourismCatalog::listings(),
-            'municipalities' => TourismCatalog::municipalities(),
         ]);
     }
 }
