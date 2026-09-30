@@ -8,7 +8,145 @@ document.addEventListener('DOMContentLoaded', () => {
     initExperiencesExploreAll();
     initChatbot();
     initEstablishmentQrForm();
+    initNavScrollSpy();
+    initHeroCarousel();
 });
+
+/**
+ * Highlights "Home"/"Nearby"/"Reviews"/"About" in the topbar as the
+ * corresponding same-page section scrolls into view — the landing page's
+ * only nav items without their own route ("Explore" keeps its
+ * server-rendered, route-matched active state untouched; this never runs
+ * on pages that lack the #near-you/#reviews/#about sections, i.e.
+ * everywhere but the landing page).
+ */
+function initNavScrollSpy() {
+    const spyLabels = ['Home', 'Nearby', 'Reviews', 'About'];
+    const navLinks = Array.from(document.querySelectorAll('[data-nav-link]'))
+        .filter((link) => spyLabels.includes(link.dataset.navLink));
+
+    if (!navLinks.length) return;
+
+    const sections = ['Nearby', 'Reviews', 'About']
+        .map((label) => ({ label, el: document.getElementById({ Nearby: 'near-you', Reviews: 'reviews', About: 'about' }[label]) }))
+        .filter((s) => s.el);
+
+    if (!sections.length) return;
+
+    function paint(activeLabel) {
+        navLinks.forEach((link) => {
+            const active = link.dataset.navLink === activeLabel;
+
+            if (link.dataset.navVariant === 'underline') {
+                link.classList.toggle('border-accent-500', active);
+                link.classList.toggle('text-primary-700', active);
+                link.classList.toggle('font-semibold', active);
+                link.classList.toggle('border-transparent', !active);
+                link.classList.toggle('text-sand-700', !active);
+            } else {
+                link.classList.toggle('bg-sand-100', active);
+                link.classList.toggle('text-primary-700', active);
+                link.classList.toggle('font-semibold', active);
+            }
+        });
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+        const visible = entries
+            .filter((entry) => entry.isIntersecting)
+            .map((entry) => sections.find((s) => s.el === entry.target)?.label)
+            .filter(Boolean);
+
+        if (visible.length) {
+            // Lowest section currently in view wins when two overlap.
+            paint(visible[visible.length - 1]);
+            return;
+        }
+
+        // Nothing observed is intersecting: above the first section means
+        // Home is still the active "section"; below it (past the last
+        // section's bottom) leaves About as the closest match, since
+        // there's nothing further down the page to hand off to.
+        const aboveEverything = sections[0].el.getBoundingClientRect().top > 0;
+        paint(aboveEverything ? 'Home' : 'About');
+    }, { rootMargin: '-100px 0px -55% 0px', threshold: 0 });
+
+    sections.forEach((s) => observer.observe(s.el));
+}
+
+/**
+ * Landing page hero background carousel: cross-fades between
+ * [data-hero-slide] images every 6s (opacity-only, no layout shift —
+ * transition-opacity/duration-1000 already set on each slide in the
+ * Blade markup), updates the [data-hero-caption-text] caption and
+ * [data-hero-indicator] pagination to match, and pauses autoplay while the
+ * hero search input has focus so the background doesn't change mid-type.
+ * No-ops entirely on pages without a [data-hero-carousel] section.
+ */
+function initHeroCarousel() {
+    const root = document.querySelector('[data-hero-carousel]');
+    if (!root) return;
+
+    const slides = Array.from(root.querySelectorAll('[data-hero-slide]'));
+    const indicators = Array.from(root.querySelectorAll('[data-hero-indicator]'));
+    const captionText = root.querySelector('[data-hero-caption-text]');
+    const searchInput = document.getElementById('hero-search');
+
+    if (!slides.length) return;
+
+    const AUTOPLAY_MS = 6000;
+    let current = 0;
+    let timer = null;
+
+    function goToSlide(index) {
+        current = (index + slides.length) % slides.length;
+
+        slides.forEach((slide, i) => {
+            slide.classList.toggle('opacity-100', i === current);
+            slide.classList.toggle('opacity-0', i !== current);
+        });
+
+        indicators.forEach((indicator, i) => {
+            const active = i === current;
+            indicator.setAttribute('aria-selected', String(active));
+            indicator.classList.toggle('w-6', active);
+            indicator.classList.toggle('bg-white', active);
+            indicator.classList.toggle('w-2', !active);
+            indicator.classList.toggle('bg-white/40', !active);
+        });
+
+        if (captionText) {
+            captionText.textContent = slides[current].dataset.heroCaption;
+        }
+    }
+
+    // Always clearing any existing interval before starting a new one, so a
+    // stray extra call (e.g. focus/blur firing in quick succession) can
+    // never leave two autoplay timers running at once.
+    function startAutoplay() {
+        stopAutoplay();
+        timer = setInterval(() => goToSlide(current + 1), AUTOPLAY_MS);
+    }
+
+    function stopAutoplay() {
+        if (timer) clearInterval(timer);
+        timer = null;
+    }
+
+    indicators.forEach((indicator, i) => {
+        indicator.addEventListener('click', () => {
+            goToSlide(i);
+            // Manual navigation restarts the 6s window from here, rather
+            // than changing slides again almost immediately.
+            startAutoplay();
+        });
+    });
+
+    searchInput?.addEventListener('focus', stopAutoplay);
+    searchInput?.addEventListener('blur', startAutoplay);
+
+    startAutoplay();
+}
 
 function initMobileMenu() {
     const menuButton = document.getElementById('mobile-menu-button');
@@ -156,6 +294,11 @@ function initExplorePage() {
 
     const searchInput = document.getElementById('explore-search');
     const municipalitySelect = document.getElementById('explore-municipality');
+    // Multiple "All"/category elements can exist at once now (the desktop
+    // sidebar list and the mobile horizontally-scrollable chips render the
+    // same slugs twice) — querySelectorAll + the shared syncChipStates()
+    // below keeps every copy of a given control in sync.
+    const allChips = Array.from(document.querySelectorAll('[data-category-all]'));
     const chipButtons = Array.from(document.querySelectorAll('[data-category-chip]'));
     const viewButtons = Array.from(document.querySelectorAll('[data-view-option]'));
     const countEl = document.getElementById('explore-count');
@@ -172,14 +315,31 @@ function initExplorePage() {
     // --- Sync controls to the initial state -------------------------------
     searchInput.value = state.q;
     municipalitySelect.value = state.municipality;
-    chipButtons.forEach((chip) => {
-        const active = state.categories.has(chip.dataset.categoryChip);
-        chip.setAttribute('aria-pressed', String(active));
-        chip.classList.toggle('bg-primary-100', active);
-        chip.classList.toggle('border-primary-300', active);
-        chip.classList.toggle('text-primary-700', active);
-    });
+    syncChipStates();
     setActiveView(state.view);
+
+    // "All" and the per-category chips share one active-state paint, so
+    // there's exactly one place that decides which chip looks selected —
+    // "All" reads as active whenever no category chip is (an empty Set),
+    // never as a chip of its own kind.
+    function syncChipStates() {
+        const noneActive = state.categories.size === 0;
+
+        allChips.forEach((chip) => {
+            chip.setAttribute('aria-pressed', String(noneActive));
+            chip.classList.toggle('bg-primary-100', noneActive);
+            chip.classList.toggle('border-primary-300', noneActive);
+            chip.classList.toggle('text-primary-700', noneActive);
+        });
+
+        chipButtons.forEach((chip) => {
+            const active = state.categories.has(chip.dataset.categoryChip);
+            chip.setAttribute('aria-pressed', String(active));
+            chip.classList.toggle('bg-primary-100', active);
+            chip.classList.toggle('border-primary-300', active);
+            chip.classList.toggle('text-primary-700', active);
+        });
+    }
 
     // --- Wire up controls ---------------------------------------------------
     let searchDebounce;
@@ -196,17 +356,21 @@ function initExplorePage() {
         render();
     });
 
+    allChips.forEach((chip) => {
+        chip.addEventListener('click', () => {
+            state.categories.clear();
+            syncChipStates();
+            render();
+        });
+    });
+
     chipButtons.forEach((chip) => {
         chip.addEventListener('click', () => {
             const slug = chip.dataset.categoryChip;
             const active = state.categories.has(slug);
 
             active ? state.categories.delete(slug) : state.categories.add(slug);
-            chip.setAttribute('aria-pressed', String(!active));
-            chip.classList.toggle('bg-primary-100', !active);
-            chip.classList.toggle('border-primary-300', !active);
-            chip.classList.toggle('text-primary-700', !active);
-
+            syncChipStates();
             render();
         });
     });
@@ -226,10 +390,7 @@ function initExplorePage() {
 
         searchInput.value = '';
         municipalitySelect.value = '';
-        chipButtons.forEach((chip) => {
-            chip.setAttribute('aria-pressed', 'false');
-            chip.classList.remove('bg-primary-100', 'border-primary-300', 'text-primary-700');
-        });
+        syncChipStates();
 
         render();
     });

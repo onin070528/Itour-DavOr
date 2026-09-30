@@ -77,6 +77,21 @@ class User extends Authenticatable
         return $this->belongsTo(self::class, 'created_by');
     }
 
+    public function isPto(): bool
+    {
+        return $this->role === UserRole::PtoAdministrator;
+    }
+
+    public function isLgu(): bool
+    {
+        return $this->role === UserRole::Lgu;
+    }
+
+    public function isEstablishment(): bool
+    {
+        return $this->role === UserRole::Establishment;
+    }
+
     /**
      * PTO sees every user; LGU sees only Establishment-role users in its
      * own municipality; Establishment sees only itself.

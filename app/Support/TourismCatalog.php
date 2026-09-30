@@ -10,6 +10,8 @@
 
 namespace App\Support;
 
+use App\Models\Listing;
+
 /**
  * Shared mock tourism data for the public site.
  *
@@ -43,6 +45,36 @@ class TourismCatalog
     public static function categoryLabel(string $slug): string
     {
         return collect(self::categories())->firstWhere('slug', $slug)['label'] ?? $slug;
+    }
+
+    /**
+     * Explore-hub-only category chips — a relabeling of the same underlying
+     * `category` slugs used everywhere else (categories() above, still used
+     * by directory pages and the establishment registration forms; slugs
+     * and the `listings` data are untouched). Four of these ten have no
+     * matching slug at all yet (farm-agri-tourism, wellness-spa,
+     * recreation-activities, mice-events) — real establishment types this
+     * app has no data or field for, so those chips will show zero results
+     * until such listings exist. "Destinations" is kept as its own chip
+     * even though it's outside the establishment grouping the other nine
+     * belong to, since destinations are most of today's dataset.
+     *
+     * @return array<int, array{slug: string, label: string, icon: string}>
+     */
+    public static function exploreCategories(): array
+    {
+        return [
+            ['slug' => 'destinations', 'label' => 'Tourist Destinations', 'icon' => 'ti-map-pin'],
+            ['slug' => 'accommodation', 'label' => 'Accommodation', 'icon' => 'ti-bed'],
+            ['slug' => 'restaurants', 'label' => 'Food & Dining', 'icon' => 'ti-tools-kitchen-2'],
+            ['slug' => 'farm-agri-tourism', 'label' => 'Farm & Agri-Tourism', 'icon' => 'ti-plant-2'],
+            ['slug' => 'wellness-spa', 'label' => 'Wellness & Spa', 'icon' => 'ti-flower'],
+            ['slug' => 'tour-guides', 'label' => 'Travel & Tours', 'icon' => 'ti-compass'],
+            ['slug' => 'transportation', 'label' => 'Tourist Transport', 'icon' => 'ti-bus'],
+            ['slug' => 'recreation-activities', 'label' => 'Recreation & Activities', 'icon' => 'ti-ball-basketball'],
+            ['slug' => 'mice-events', 'label' => 'MICE & Events', 'icon' => 'ti-presentation'],
+            ['slug' => 'local-delicacies', 'label' => 'Others', 'icon' => 'ti-gift'],
+        ];
     }
 
     /**
@@ -85,7 +117,7 @@ class TourismCatalog
      */
     public static function listings(): array
     {
-        return \App\Models\Listing::query()
+        return Listing::query()
             ->orderBy('id')
             ->get()
             ->map(fn ($listing) => [

@@ -55,17 +55,66 @@
             data-sidebar
             class="fixed inset-y-0 left-0 z-50 flex h-full w-64 max-w-[85vw] -translate-x-full flex-col overflow-hidden bg-primary-900 text-sand-0 transition-transform duration-200 standard:static standard:z-auto standard:max-w-none standard:min-w-64 standard:translate-x-0 standard:shrink-0 standard:transition-none"
         >
-            <div class="flex items-center justify-between px-5 pt-6 pb-4">
+            <div class="flex items-center px-5 pt-6 pb-4">
                 <a href="{{ url('/') }}" class="flex items-center gap-2">
                     <x-logo :dark="true" class="text-lg" />
                 </a>
-                <span class="rounded-sm bg-white/10 px-2 py-1 text-[10px] font-bold tracking-widest">{{ $user->role->badge() }}</span>
             </div>
 
-            <div class="mx-4 mb-5 rounded-md bg-white/10 px-3.5 py-3">
-                <p class="text-sm font-semibold text-sand-0">{{ $user->organization_name }}</p>
-                <p class="text-xs text-white/65">{{ $user->organization_subtitle }}</p>
-            </div>
+            {{-- Role-based sidebar identity — one seal (the Provincial
+                 Tourism Office's own artwork, clipped into a circle on a
+                 white disc so it doesn't clash as a white square against
+                 the navy sidebar), but the title/subtitle and card treatment
+                 differ per role so PTO/LGU/Establishment each see their own
+                 identity instead of a generic province-wide label.
+                 bg-white/10 + border-white/10 is this app's own "card on the
+                 dark sidebar" idiom (already used by the nav's active-item
+                 state below) — used here in place of the slate/rounded-xl
+                 classes originally specified, since this codebase has no
+                 slate token and doesn't use rounded-xl anywhere. --}}
+            @if ($user->isPto())
+                <div class="flex items-center gap-3 px-5 pb-5">
+                    <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white p-0.5 shadow-sm">
+                        <img
+                            src="{{ asset('storage/itour-images/davor-tourism.jpg') }}"
+                            alt="Provincial Government of Davao Oriental — Tourism Office seal"
+                            class="h-full w-full rounded-full object-cover"
+                        >
+                    </span>
+                    <div class="min-w-0">
+                        <p class="truncate text-xs leading-tight font-semibold text-sand-0">Provincial Tourism Office</p>
+                        <p class="truncate text-[11px] leading-tight text-white/60">Davao Oriental</p>
+                    </div>
+                </div>
+            @elseif ($user->isLgu())
+                <div class="mx-4 mb-5 flex items-center gap-3 rounded-md border border-white/10 bg-white/10 p-3.5">
+                    <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white p-0.5 shadow-sm">
+                        <img
+                            src="{{ asset('storage/itour-images/davor-tourism.jpg') }}"
+                            alt="Provincial Government of Davao Oriental — Tourism Office seal"
+                            class="h-full w-full rounded-full object-cover"
+                        >
+                    </span>
+                    <div class="min-w-0">
+                        <p class="truncate text-sm leading-tight font-semibold text-sand-0">{{ $user->organization_subtitle }} Tourism Office</p>
+                        <p class="truncate text-xs leading-tight text-white/65">Davao Oriental</p>
+                    </div>
+                </div>
+            @else
+                <div class="mx-4 mb-5 flex items-center gap-3 rounded-md border border-white/10 bg-white/10 p-3.5">
+                    <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white p-0.5 shadow-sm">
+                        <img
+                            src="{{ asset('storage/itour-images/davor-tourism.jpg') }}"
+                            alt="Provincial Government of Davao Oriental — Tourism Office seal"
+                            class="h-full w-full rounded-full object-cover"
+                        >
+                    </span>
+                    <div class="min-w-0">
+                        <p class="truncate text-sm leading-tight font-semibold text-sand-0">{{ $user->organization_name }}</p>
+                        <p class="truncate text-xs leading-tight text-white/65">{{ $user->organization_subtitle }}</p>
+                    </div>
+                </div>
+            @endif
 
             <nav class="flex-1 overflow-y-auto px-3 pb-4 [scrollbar-gutter:stable]" aria-label="Dashboard" data-nav>
                 @foreach ($navSections as $heading => $items)

@@ -1,11 +1,65 @@
-<section class="relative overflow-hidden">
-    <img
-        src="{{ asset('storage/itour-images/hero-dahican-sunrise.jpg') }}"
-        alt="Aerial view of Dahican Beach's coastline at sunrise, Davao Oriental"
-        class="absolute inset-0 h-full w-full object-cover"
-    >
+<section class="relative overflow-hidden" data-hero-carousel>
+    @php
+        // object-position tuned per photo after actually looking at each
+        // one — they're wildly different aspect ratios/compositions, so a
+        // single shared crop point would cut off the actual subject in at
+        // least two of these (Hamiguitan's trees sit left-and-low against a
+        // mostly-empty sky; Pujada Bay's viewing deck eats the bottom
+        // third). Reuses existing itour-images assets only — no new/
+        // duplicate images.
+        $heroSlides = [
+            ['file' => 'hero-dahican-sunrise.jpg', 'alt' => "Aerial view of Dahican Beach's coastline at sunrise, Davao Oriental", 'caption' => '📍 Dahican Beach, Mati City', 'position' => '50% 50%'],
+            ['file' => 'Aliwagwag-Falls-6.jpg', 'alt' => 'Aliwagwag Falls cascading through the rainforest, Cateel', 'caption' => '📍 Aliwagwag Falls, Cateel', 'position' => '50% 20%'],
+            ['file' => 'hamiguitan.jpg', 'alt' => 'Mount Hamiguitan Range Wildlife Sanctuary, a UNESCO World Heritage Site in Governor Generoso', 'caption' => '📍 Mount Hamiguitan, Governor Generoso', 'position' => '25% 65%'],
+            ['file' => 'pujada-bay.jpg', 'alt' => "Pujada Bay's mountains and turquoise water, Mati City", 'caption' => '📍 Pujada Bay, Mati City', 'position' => '50% 25%'],
+            ['file' => 'Cape-San-Agustin.jpg', 'alt' => "Cape San Agustin's coastline and lighthouse point, Governor Generoso", 'caption' => '📍 Cape San Agustin, Governor Generoso', 'position' => '50% 35%'],
+        ];
+    @endphp
+
+    {{-- Background carousel: stacked, absolutely-positioned slides
+         cross-fading via opacity only (transition-opacity duration-1000),
+         so nothing in the foreground column below ever re-renders or
+         shifts. The first slide starts visible (opacity-100) so there's no
+         flash before resources/js/app.js's initHeroCarousel() runs. --}}
+    @foreach ($heroSlides as $index => $slide)
+        <img
+            data-hero-slide="{{ $index }}"
+            data-hero-caption="{{ $slide['caption'] }}"
+            src="{{ asset('storage/itour-images/'.$slide['file']) }}"
+            alt="{{ $slide['alt'] }}"
+            style="object-position: {{ $slide['position'] }}"
+            @class(['absolute inset-0 h-full w-full object-cover transition-opacity duration-1000', 'opacity-100' => $index === 0, 'opacity-0' => $index !== 0])
+        >
+    @endforeach
+
+    {{-- Darkens the left (where the headline/search/CTA sit) and fades to
+         nearly clear on the right so the destination photo stays visible;
+         a light top/bottom vignette keeps the badge, caption, and
+         indicators readable against any of the five images without
+         darkening the hero as a whole. --}}
     <div class="absolute inset-0 bg-gradient-to-r from-primary-900/85 via-primary-900/45 to-primary-900/5"></div>
-    <div class="absolute inset-0 bg-gradient-to-b from-primary-900/35 via-transparent to-primary-900/25"></div>
+    <div class="absolute inset-0 bg-gradient-to-b from-primary-900/35 via-transparent to-primary-900/30"></div>
+
+    {{-- Location caption (bottom-left) — a fixed-height wrapper keeps the
+         changing text from ever shifting layout, matching the pill styling
+         already used for the badge above the headline. --}}
+    <p class="absolute bottom-5 left-4 inline-flex h-7 items-center rounded-full border border-white/30 bg-white/10 px-3.5 text-xs font-semibold text-sand-0 backdrop-blur-sm sm:left-6 lg:left-8">
+        <span data-hero-caption-text>📍 Dahican Beach, Mati City</span>
+    </p>
+
+    {{-- Slide indicators (bottom-center) --}}
+    <div class="absolute bottom-5 left-1/2 flex -translate-x-1/2 items-center gap-1.5" role="tablist" aria-label="Hero background slides">
+        @foreach ($heroSlides as $i => $slide)
+            <button
+                type="button"
+                data-hero-indicator="{{ $i }}"
+                role="tab"
+                aria-label="Show slide {{ $i + 1 }}"
+                aria-selected="{{ $i === 0 ? 'true' : 'false' }}"
+                @class(['h-2 rounded-full transition-all duration-300', 'w-6 bg-white' => $i === 0, 'w-2 bg-white/40' => $i !== 0])
+            ></button>
+        @endforeach
+    </div>
 
     {{-- The photo bleeds full-width edge to edge; only this inner content
          column is constrained, so the headline/search/pills line up with

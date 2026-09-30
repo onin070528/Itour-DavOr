@@ -38,7 +38,7 @@ class ExploreController extends Controller
             // tables — so the filter lives here, not in
             // TourismCatalog::listings() itself.
             'listings' => collect(TourismCatalog::listings())->where('status', 'Active')->values()->all(),
-            'categories' => TourismCatalog::categories(),
+            'categories' => TourismCatalog::exploreCategories(),
             'municipalities' => TourismCatalog::municipalities(),
         ]);
     }
