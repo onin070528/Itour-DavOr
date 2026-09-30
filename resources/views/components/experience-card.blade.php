@@ -3,7 +3,7 @@
 {{-- Used by the landing page's "Signature Experiences" showcase — one card
      style for both destinations and establishments, since both are rows of
      the same listing shape (see App\Support\TourismCatalog::listings()). --}}
-<article class="group flex flex-col overflow-hidden rounded-md border border-sand-200 bg-sand-0 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
+<article {{ $attributes->merge(['class' => 'group flex flex-col overflow-hidden rounded-md border border-sand-200 bg-sand-0 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md']) }}>
     <div class="relative flex h-44 items-end overflow-hidden bg-sand-200">
         <img
             src="{{ asset('storage/itour-images/'.$listing['image']) }}"
@@ -23,7 +23,7 @@
             <h3 class="font-display text-lg font-bold text-sand-900">{{ $listing['name'] }}</h3>
             <span class="mt-0.5 inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-sand-800">
                 <i class="ti ti-star text-accent-500" aria-hidden="true"></i>
-                {{ number_format($listing['rating'], 1) }}
+                {{ $listing['rating'] !== null ? number_format($listing['rating'], 1) : 'New' }}
             </span>
         </div>
 
@@ -35,9 +35,9 @@
             @endforeach
         </div>
 
-        <a href="{{ $listing['href'] }}" class="mt-auto inline-flex items-center gap-1.5 pt-2 text-sm font-semibold text-primary-700 transition-colors group-hover:text-primary-900">
+        <button type="button" data-listing-details="{{ $listing['id'] }}" class="mt-auto inline-flex cursor-pointer items-center gap-1.5 self-start pt-2 text-sm font-semibold text-primary-700 transition-colors group-hover:text-primary-900">
             View Details
             <i class="ti ti-arrow-right transition-transform group-hover:translate-x-0.5" aria-hidden="true"></i>
-        </a>
+        </button>
     </div>
 </article>

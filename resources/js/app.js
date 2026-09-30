@@ -4,6 +4,8 @@ document.addEventListener('DOMContentLoaded', () => {
     initLoginForm();
     initExplorePage();
     initNearbyMap();
+    initListingDetailsModal();
+    initExperiencesExploreAll();
     initChatbot();
     initEstablishmentQrForm();
 });
@@ -292,7 +294,7 @@ function initExplorePage() {
                 <div class="flex flex-1 flex-col gap-2 p-5">
                     <div class="flex items-start justify-between gap-2">
                         <h3 class="font-display text-lg font-bold text-sand-900">${item.name}</h3>
-                        <span class="mt-0.5 inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-sand-800"><i class="ti ti-star text-accent-500"></i>${item.rating.toFixed(1)}</span>
+                        <span class="mt-0.5 inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-sand-800"><i class="ti ti-star text-accent-500"></i>${item.rating !== null ? item.rating.toFixed(1) : 'New'}</span>
                     </div>
                     <p class="flex items-center gap-1 text-xs font-medium text-sand-500"><i class="ti ti-map-pin"></i>${item.barangay}, ${item.municipality}</p>
                     <p class="text-sm leading-relaxed text-sand-600">${item.description}</p>
@@ -313,13 +315,79 @@ function initExplorePage() {
                 <td class="px-4 py-3 text-sand-700">${item.barangay}, ${item.municipality}</td>
                 <td class="px-4 py-3 text-sand-700">${item.contactOffice}<br><span class="text-xs text-sand-500">${item.contactPhone}</span></td>
                 <td class="px-4 py-3 text-sand-700">${item.hours}</td>
-                <td class="px-4 py-3 whitespace-nowrap text-sand-700"><i class="ti ti-star text-accent-500"></i> ${item.rating.toFixed(1)}</td>
+                <td class="px-4 py-3 whitespace-nowrap text-sand-700"><i class="ti ti-star text-accent-500"></i> ${item.rating !== null ? item.rating.toFixed(1) : 'New'}</td>
                 <td class="px-4 py-3 text-right"><a href="${item.href}" class="inline-flex items-center rounded-sm border border-sand-300 px-3 py-1.5 text-xs font-semibold text-sand-800 hover:border-primary-300 hover:text-primary-700">View</a></td>
             </tr>
         `).join('');
     }
 
+    // Mapbox is created lazily the first time the Map view is shown — a map
+    // built inside a display:none container measures 0x0 and renders blank.
+    const mapboxToken = mapCanvas.dataset.mapboxToken;
+    const canUseMapbox = Boolean(window.mapboxgl && mapboxToken && mapboxgl.supported());
+    let mapboxMap = null;
+    let mapboxMarkers = [];
+
+    if (!canUseMapbox) {
+        console.error('[explore-map] mapbox-gl unavailable, no token, or no WebGL — using the illustrative map.');
+        document.getElementById('explore-map-caption').textContent =
+            'Illustrative province map — not to scale. Pins mark the municipality of each filtered listing.';
+    }
+
     function renderMap(items) {
+        if (canUseMapbox) {
+            renderMapboxMap(items);
+        } else {
+            renderIllustrativeMap(items);
+        }
+    }
+
+    function renderMapboxMap(items) {
+        if (!mapboxMap) {
+            mapboxgl.accessToken = mapboxToken;
+            mapboxMap = new mapboxgl.Map({
+                container: mapCanvas,
+                style: MAP_STYLES.satellite,
+                center: [Number(mapCanvas.dataset.mapboxCenterLng), Number(mapCanvas.dataset.mapboxCenterLat)],
+                zoom: 8.4,
+            });
+            mapboxMap.addControl(new MapStyleToggleControl(), 'top-left');
+            mapboxMap.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+            mapboxMap.on('error', (event) => console.error('[explore-map] map error:', event?.error ?? event));
+        } else {
+            // The container may have just been un-hidden by a view switch.
+            mapboxMap.resize();
+        }
+
+        mapboxMarkers.forEach((marker) => marker.remove());
+
+        const plotted = items.filter((item) => item.lat !== null && item.lng !== null);
+
+        mapboxMarkers = plotted.map((item) => new mapboxgl.Marker({ color: '#125d5a' })
+            .setLngLat([item.lng, item.lat])
+            .setPopup(new mapboxgl.Popup({ offset: 24, maxWidth: '260px' }).setHTML(`
+                <img src="/storage/itour-images/${escapeHtml(item.image)}" alt="" class="mb-2 h-24 w-full rounded-sm object-cover">
+                <p class="font-semibold text-sand-900">${escapeHtml(item.name)}</p>
+                <p class="text-xs text-sand-600">${escapeHtml(categoryLabel(item.category))} · ${escapeHtml(item.barangay)}, ${escapeHtml(item.municipality)}</p>
+                <a href="${escapeHtml(item.href)}" class="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary-700 hover:text-primary-900">View Details<i class="ti ti-arrow-right"></i></a>
+            `))
+            .addTo(mapboxMap));
+
+        const unplotted = items.length - plotted.length;
+        document.getElementById('explore-map-caption').textContent = unplotted > 0
+            ? `Pins mark ${plotted.length} of ${items.length} filtered listings — ${unplotted} ${unplotted === 1 ? "doesn't" : "don't"} have coordinates yet.`
+            : 'Pins mark every filtered listing — click one for details.';
+
+        if (plotted.length === 1) {
+            mapboxMap.flyTo({ center: [plotted[0].lng, plotted[0].lat], zoom: 13 });
+        } else if (plotted.length > 1) {
+            const bounds = new mapboxgl.LngLatBounds();
+            plotted.forEach((item) => bounds.extend([item.lng, item.lat]));
+            mapboxMap.fitBounds(bounds, { padding: 60, maxZoom: 13 });
+        }
+    }
+
+    function renderIllustrativeMap(items) {
         const municipalityLabels = municipalities.map((m) => `
             <div class="absolute flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 text-[10px] font-medium text-sand-500" style="top:${m.top}%; left:${m.left}%;">
                 <span class="h-1.5 w-1.5 rounded-full bg-sand-400"></span>${m.name}
@@ -388,10 +456,11 @@ function initNearbyMap() {
     try {
         map = new mapboxgl.Map({
             container,
-            style: 'mapbox://styles/mapbox/light-v11',
+            style: MAP_STYLES.satellite,
             center: [centerLng, centerLat],
             zoom: 8.4,
         });
+        map.addControl(new MapStyleToggleControl(), 'top-left');
     } catch (error) {
         if (statusText) statusText.textContent = 'Map failed to start — see console for details';
         console.error('[nearby-map] mapboxgl.Map() threw:', error);
@@ -470,6 +539,68 @@ function initNearbyMap() {
             { enableHighAccuracy: true, timeout: 10000 }
         );
     });
+}
+
+/**
+ * Base styles shared by every public Mapbox map: Satellite (real aerial
+ * imagery with road/place labels) is the default, Streets the alternative.
+ */
+const MAP_STYLES = {
+    satellite: 'mapbox://styles/mapbox/satellite-streets-v12',
+    streets: 'mapbox://styles/mapbox/streets-v12',
+};
+
+/**
+ * Mapbox control with "Satellite" / "Streets" buttons that swap the map's
+ * base style. Markers are DOM elements and survive the swap; custom
+ * sources/layers do not, so maps that add them must re-add them on
+ * 'style.load'. Inline styles are used because mapbox-gl.css (unlayered)
+ * overrides Tailwind utilities on .mapboxgl-ctrl-group buttons.
+ */
+class MapStyleToggleControl {
+    onAdd(map) {
+        this.container = document.createElement('div');
+        this.container.className = 'mapboxgl-ctrl mapboxgl-ctrl-group';
+        this.container.style.display = 'flex';
+
+        const buttons = Object.entries({ satellite: 'Satellite', streets: 'Streets' }).map(([key, label], index) => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.textContent = label;
+            button.setAttribute('aria-pressed', String(index === 0));
+            Object.assign(button.style, {
+                width: 'auto',
+                padding: '0 10px',
+                fontSize: '12px',
+                fontWeight: '600',
+                borderTop: 'none',
+                borderLeft: index === 0 ? 'none' : '1px solid #ddd',
+            });
+            button.addEventListener('click', () => {
+                if (button.getAttribute('aria-pressed') === 'true') return;
+                buttons.forEach((other) => paint(other, other === button));
+                map.setStyle(MAP_STYLES[key]);
+            });
+            return button;
+        });
+
+        const paint = (button, active) => {
+            button.setAttribute('aria-pressed', String(active));
+            button.style.backgroundColor = active ? '#125d5a' : '';
+            button.style.color = active ? '#fff' : '#333';
+        };
+
+        buttons.forEach((button, index) => {
+            paint(button, index === 0);
+            this.container.appendChild(button);
+        });
+
+        return this.container;
+    }
+
+    onRemove() {
+        this.container.remove();
+    }
 }
 
 function haversineDistanceKm(lat1, lon1, lat2, lon2) {
@@ -672,4 +803,286 @@ function initEstablishmentQrForm() {
     });
 
     updateTotal();
+}
+
+/**
+ * Landing page "View Details" modal (resources/views/components/
+ * listing-details-modal.blade.php): any [data-listing-details="<id>"]
+ * button opens one shared <dialog> filled from the embedded listings JSON.
+ * Esc closes it natively; clicking the backdrop or a close button does too.
+ */
+function initListingDetailsModal() {
+    const modal = document.getElementById('listing-details-modal');
+    const dataEl = document.getElementById('listing-details-data');
+
+    if (!modal || !dataEl) {
+        return;
+    }
+
+    const listings = JSON.parse(dataEl.textContent);
+    const field = (id) => document.getElementById(`listing-details-${id}`);
+
+    function open(listing) {
+        field('image').src = `/storage/itour-images/${listing.image}`;
+        field('image').alt = `${listing.name}, ${listing.municipality}`;
+        field('category').textContent = listing.categoryLabel;
+        field('name').textContent = listing.name;
+        field('rating').textContent = listing.rating !== null ? listing.rating.toFixed(1) : 'No ratings yet';
+        field('location').textContent = `${listing.barangay}, ${listing.municipality}`;
+        field('description').textContent = listing.description ?? '';
+
+        field('tags').innerHTML = (listing.tags ?? []).map((tag) => `
+            <span class="rounded-sm bg-sand-100 px-2 py-1 text-xs font-medium text-sand-700">${escapeHtml(tag)}</span>
+        `).join('');
+
+        modal.querySelectorAll('[data-listing-details-row]').forEach((row) => {
+            const key = row.dataset.listingDetailsRow;
+            const value = listing[key];
+            const valueEl = row.querySelector('[data-listing-details-value]');
+
+            row.hidden = !value;
+            if (!value) return;
+
+            if (key === 'contactPhone') {
+                valueEl.innerHTML = `<a href="tel:${escapeHtml(value.replace(/[^\d+]/g, ''))}" class="hover:text-primary-700">${escapeHtml(value)}</a>`;
+            } else if (key === 'email') {
+                valueEl.innerHTML = `<a href="mailto:${escapeHtml(value)}" class="hover:text-primary-700">${escapeHtml(value)}</a>`;
+            } else if (key === 'website') {
+                const url = /^https?:\/\//i.test(value) ? value : `https://${value}`;
+                valueEl.innerHTML = `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" class="text-primary-700 hover:text-primary-900">${escapeHtml(value)}</a>`;
+            } else {
+                valueEl.textContent = value;
+            }
+        });
+
+        currentListing = listing;
+        field('directions').hidden = listing.lat === null || listing.lng === null;
+        showPhoto();
+
+        modal.showModal();
+        document.body.classList.add('overflow-hidden');
+    }
+
+    // "Get directions": swaps the hero photo for a Mapbox map, then routes
+    // from the visitor's location (browser geolocation) to the listing with
+    // the Mapbox Directions API. Without a location it shows the destination.
+    const directionsButton = field('directions');
+    const directionsLabel = directionsButton.querySelector('[data-directions-label]');
+    const directionsStatus = field('directions-status');
+    const mapWrapper = document.getElementById('listing-details-map-wrapper');
+    const mapContainer = document.getElementById('listing-details-map');
+    const mapboxToken = mapContainer?.dataset.mapboxToken;
+    const emptyRoute = { type: 'FeatureCollection', features: [] };
+
+    let currentListing = null;
+    let directionsMap = null;
+    let directionsMapReady = null;
+    let directionsMarkers = [];
+    let directionsRequestId = 0;
+    let currentRoute = emptyRoute;
+
+    function setRoute(data) {
+        currentRoute = data;
+        directionsMapReady?.then(() => directionsMap.getSource('route')?.setData(data));
+    }
+
+    function setDirectionsStatus(message, icon = 'ti-info-circle') {
+        directionsStatus.hidden = !message;
+        directionsStatus.innerHTML = message
+            ? `<i class="ti ${icon}" aria-hidden="true"></i><span>${escapeHtml(message)}</span>`
+            : '';
+    }
+
+    function showPhoto() {
+        directionsRequestId++;
+        mapWrapper.hidden = true;
+        modal.querySelectorAll('[data-listing-details-photo]').forEach((el) => { el.hidden = false; });
+        directionsLabel.textContent = 'Get directions';
+        setDirectionsStatus('');
+    }
+
+    function showDirections(listing) {
+        if (!window.mapboxgl || !mapboxToken || !mapboxgl.supported()) {
+            setDirectionsStatus('The map is currently unavailable.', 'ti-alert-circle');
+            return;
+        }
+
+        const requestId = ++directionsRequestId;
+        const destination = [listing.lng, listing.lat];
+
+        modal.querySelectorAll('[data-listing-details-photo]').forEach((el) => { el.hidden = true; });
+        mapWrapper.hidden = false;
+        directionsLabel.textContent = 'Show photo';
+
+        if (!directionsMap) {
+            mapboxgl.accessToken = mapboxToken;
+            directionsMap = new mapboxgl.Map({
+                container: mapContainer,
+                style: MAP_STYLES.satellite,
+                center: destination,
+                zoom: 13,
+            });
+            directionsMap.addControl(new MapStyleToggleControl(), 'top-left');
+            directionsMap.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'bottom-right');
+            directionsMap.on('error', (event) => console.error('[directions-map] map error:', event?.error ?? event));
+
+            // The route layer is dropped on every Satellite/Streets swap, so
+            // it is (re-)added with the current route on each style load.
+            directionsMapReady = new Promise((resolve) => directionsMap.on('style.load', () => {
+                directionsMap.addSource('route', { type: 'geojson', data: currentRoute });
+                directionsMap.addLayer({
+                    id: 'route',
+                    type: 'line',
+                    source: 'route',
+                    layout: { 'line-join': 'round', 'line-cap': 'round' },
+                    paint: { 'line-color': '#1d9bf0', 'line-width': 6, 'line-opacity': 0.9 },
+                });
+                resolve();
+            }));
+        } else {
+            directionsMap.resize();
+            directionsMap.jumpTo({ center: destination, zoom: 13 });
+        }
+
+        directionsMarkers.forEach((marker) => marker.remove());
+        directionsMarkers = [
+            new mapboxgl.Marker({ color: '#125d5a' })
+                .setLngLat(destination)
+                .setPopup(new mapboxgl.Popup({ offset: 24 }).setText(listing.name))
+                .addTo(directionsMap),
+        ];
+        setRoute(emptyRoute);
+
+        if (!navigator.geolocation) {
+            setDirectionsStatus("Your browser doesn't support location — showing the destination only.", 'ti-alert-circle');
+            return;
+        }
+
+        setDirectionsStatus('Finding your location…', 'ti-loader-2 animate-spin');
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                if (requestId !== directionsRequestId) return;
+                routeFrom([position.coords.longitude, position.coords.latitude], destination, requestId);
+            },
+            () => {
+                if (requestId !== directionsRequestId) return;
+                setDirectionsStatus("Couldn't get your location — check your browser's location permission. Showing the destination only.", 'ti-alert-circle');
+            },
+            { enableHighAccuracy: true, timeout: 10000 }
+        );
+    }
+
+    async function routeFrom(origin, destination, requestId) {
+        directionsMarkers.push(
+            new mapboxgl.Marker({ color: '#cb6e30' })
+                .setLngLat(origin)
+                .setPopup(new mapboxgl.Popup({ offset: 24 }).setText('You are here'))
+                .addTo(directionsMap)
+        );
+        setDirectionsStatus('Calculating route…', 'ti-loader-2 animate-spin');
+
+        try {
+            const coordinates = `${origin.join(',')};${destination.join(',')}`;
+            const response = await fetch(`https://api.mapbox.com/directions/v5/mapbox/driving/${coordinates}?geometries=geojson&overview=full&access_token=${encodeURIComponent(mapboxToken)}`);
+            const data = await response.json();
+            await directionsMapReady;
+
+            if (requestId !== directionsRequestId) return;
+
+            const route = data.routes?.[0];
+            const bounds = new mapboxgl.LngLatBounds(origin, origin).extend(destination);
+
+            if (!response.ok || !route) {
+                directionsMap.fitBounds(bounds, { padding: 50, maxZoom: 14 });
+                setDirectionsStatus('No driving route found from your location.', 'ti-alert-circle');
+                return;
+            }
+
+            setRoute({ type: 'Feature', geometry: route.geometry });
+            route.geometry.coordinates.forEach((point) => bounds.extend(point));
+            directionsMap.fitBounds(bounds, { padding: 50, maxZoom: 15 });
+
+            const km = (route.distance / 1000).toFixed(1);
+            const minutes = Math.round(route.duration / 60);
+            const duration = minutes >= 60 ? `${Math.floor(minutes / 60)} hr ${minutes % 60} min` : `${minutes} min`;
+            setDirectionsStatus(`${km} km · about ${duration} by car`, 'ti-car');
+        } catch (error) {
+            if (requestId !== directionsRequestId) return;
+            console.error('[directions-map] directions request failed:', error);
+            setDirectionsStatus("Couldn't load the route — check your connection.", 'ti-alert-circle');
+        }
+    }
+
+    directionsButton.addEventListener('click', () => {
+        if (!currentListing) return;
+
+        if (mapWrapper.hidden) {
+            showDirections(currentListing);
+        } else {
+            showPhoto();
+        }
+    });
+
+    document.addEventListener('click', (event) => {
+        const trigger = event.target.closest('[data-listing-details]');
+        if (!trigger) return;
+
+        const listing = listings[trigger.dataset.listingDetails];
+        if (listing) open(listing);
+    });
+
+    modal.querySelectorAll('[data-listing-details-close]').forEach((button) => {
+        button.addEventListener('click', () => modal.close());
+    });
+
+    // A click landing on the <dialog> element itself (not its content) is a
+    // click on the backdrop.
+    modal.addEventListener('click', (event) => {
+        if (event.target === modal) modal.close();
+    });
+
+    modal.addEventListener('close', () => document.body.classList.remove('overflow-hidden'));
+}
+
+/**
+ * Landing page Signature Experiences "Explore all": reveals every other
+ * Active listing (rendered hidden server-side) in place instead of leaving
+ * the page, and toggles back to the curated six with "Show less". Without
+ * JS the link still goes to /explore.
+ */
+function initExperiencesExploreAll() {
+    const toggle = document.getElementById('experiences-explore-all');
+    const extraCards = Array.from(document.querySelectorAll('[data-more-experience]'));
+
+    if (!toggle || extraCards.length === 0) {
+        return;
+    }
+
+    const label = toggle.querySelector('[data-action-label]');
+    const icon = toggle.querySelector('[data-action-icon]');
+    let expanded = false;
+
+    toggle.setAttribute('role', 'button');
+    toggle.setAttribute('aria-expanded', 'false');
+
+    toggle.addEventListener('click', (event) => {
+        event.preventDefault();
+        expanded = !expanded;
+
+        extraCards.forEach((card) => {
+            card.hidden = !expanded;
+        });
+
+        toggle.setAttribute('aria-expanded', String(expanded));
+        label.textContent = expanded ? 'Show less' : 'Explore all';
+        icon.classList.toggle('ti-arrow-right', !expanded);
+        icon.classList.toggle('ti-arrow-up', expanded);
+
+        if (expanded) {
+            extraCards[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } else {
+            document.getElementById('destinations').scrollIntoView({ behavior: 'smooth' });
+        }
+    });
 }

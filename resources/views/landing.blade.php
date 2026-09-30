@@ -13,6 +13,7 @@
                 description="Curated places that capture the nature, culture and spirit of the Philippine sunrise capital."
                 action-label="Explore all"
                 :action-href="route('explore')"
+                action-id="experiences-explore-all"
             >
                 Signature experiences of Davao Oriental
             </x-section-heading>
@@ -20,6 +21,12 @@
             <div class="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 @foreach ($signatureExperiences as $listing)
                     <x-experience-card :listing="$listing" />
+                @endforeach
+
+                {{-- Revealed in place by "Explore all" (initExperiencesExploreAll
+                     in resources/js/app.js). --}}
+                @foreach ($moreExperiences as $listing)
+                    <x-experience-card :listing="$listing" data-more-experience hidden />
                 @endforeach
             </div>
         </div>
@@ -150,4 +157,6 @@
     </section>
 
     <x-cta-section />
+
+    <x-listing-details-modal :listings="$listingDetails" />
 </x-layouts.public>

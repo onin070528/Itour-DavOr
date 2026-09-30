@@ -23,11 +23,25 @@ class LandingController extends Controller
      * establishments) comes from TourismCatalog, the single source of truth
      * shared with the /explore hub. Reviews are static frontend mock data —
      * shaped to match what an API resource will eventually return.
+     *
+     * `moreExperiences` holds every other Active listing, rendered hidden
+     * and revealed in place by the showcase's "Explore all" toggle.
+     * `listingDetails` feeds the shared "View Details" modal, keyed by
+     * listing id so any card on the page can open it.
      */
     public function index(): View
     {
+        $signatureExperiences = TourismCatalog::signatureExperiences();
+        $activeListings = collect(TourismCatalog::listings())->where('status', 'Active');
+        $signatureIds = array_column($signatureExperiences, 'id');
+
         return view('landing', [
-            'signatureExperiences' => TourismCatalog::signatureExperiences(),
+            'signatureExperiences' => $signatureExperiences,
+            'moreExperiences' => $activeListings->whereNotIn('id', $signatureIds)->values()->all(),
+            'listingDetails' => $activeListings
+                ->map(fn (array $listing) => [...$listing, 'categoryLabel' => TourismCatalog::categoryLabel($listing['category'])])
+                ->keyBy('id')
+                ->all(),
             'featuredEstablishments' => TourismCatalog::featuredEstablishments(4),
             'municipalities' => TourismCatalog::municipalities(),
             'reviews' => $this->reviews(),

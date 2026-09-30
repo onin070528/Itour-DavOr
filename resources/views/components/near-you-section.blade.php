@@ -26,13 +26,19 @@
         </div>
 
         <div class="relative h-80 overflow-hidden rounded-lg border border-white/10 shadow-sm sm:h-96">
-            <div
-                id="nearby-map"
-                data-mapbox-token="{{ config('services.mapbox.token') }}"
-                data-mapbox-center-lat="6.9214"
-                data-mapbox-center-lng="126.2686"
-                class="absolute inset-0 bg-gradient-to-br from-sand-200 to-primary-100"
-            ></div>
+            {{-- The wrapper owns the absolute positioning: mapbox-gl.css sets
+                 .mapboxgl-map { position: relative } unlayered, which beats
+                 Tailwind v4's layered utilities, so #nearby-map itself must
+                 size with h-full/w-full rather than absolute/inset-0. --}}
+            <div class="absolute inset-0 bg-gradient-to-br from-sand-200 to-primary-100">
+                <div
+                    id="nearby-map"
+                    data-mapbox-token="{{ config('services.mapbox.token') }}"
+                    data-mapbox-center-lat="6.9214"
+                    data-mapbox-center-lng="126.2686"
+                    class="h-full w-full"
+                ></div>
+            </div>
 
             <span id="nearby-map-status" class="pointer-events-none absolute bottom-3 left-3 inline-flex max-w-[calc(100%-1.5rem)] items-center gap-1.5 rounded-sm bg-sand-0 px-2.5 py-1.5 text-xs font-semibold text-sand-700 shadow-sm">
                 <i class="ti ti-map-2" aria-hidden="true"></i>
