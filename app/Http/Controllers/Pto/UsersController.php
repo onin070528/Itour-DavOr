@@ -15,10 +15,12 @@
 namespace App\Http\Controllers\Pto;
 
 use App\Enums\UserRole;
+use App\Events\UserAccountCreated;
+use App\Events\UserAccountStatusChanged;
+use App\Events\UserRoleChanged;
 use App\Models\Listing;
 use App\Models\Municipality;
 use App\Models\User;
-use App\Support\AuditLogger;
 use App\Support\PtoMockData;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -59,6 +61,7 @@ class UsersController extends PtoController
                 'municipality_id' => $data['municipality_id'],
                 'establishment_id' => $data['establishment_id'],
                 'status' => 'Active',
+                'created_by' => $request->user()->id,
             ]);
         } catch (\Throwable $e) {
             Log::error('Failed to create user account.', ['exception' => $e]);
@@ -66,11 +69,7 @@ class UsersController extends PtoController
             return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
 
-        AuditLogger::record($request->user(), 'user.created', $user, [
-            'role' => $user->role?->value,
-            'municipality_id' => $user->municipality_id,
-            'establishment_id' => $user->establishment_id,
-        ]);
+        event(new UserAccountCreated($request->user(), $user));
 
         return back()->with('toast', 'User account saved.');
     }
@@ -78,8 +77,7 @@ class UsersController extends PtoController
     public function update(Request $request, User $user): RedirectResponse
     {
         $data = $this->validated($request, $user);
-        $before = $user->only(['role', 'municipality_id', 'establishment_id', 'status']);
-        $before['role'] = $before['role']?->value;
+        $fromRole = $user->role;
 
         try {
             $user->update([
@@ -97,7 +95,9 @@ class UsersController extends PtoController
             return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
 
-        AuditLogger::recordUserScopeChange($request->user(), $user, $before);
+        if ($fromRole !== $user->role) {
+            event(new UserRoleChanged($request->user(), $user, $fromRole, $user->role));
+        }
 
         return back()->with('toast', 'User account saved.');
     }
@@ -106,9 +106,6 @@ class UsersController extends PtoController
     {
         // Nobody — including a PTO administrator — can change their own status.
         abort_if($user->id === $request->user()->id, 403, 'You cannot change the status of your own account.');
-
-        $before = $user->only(['role', 'municipality_id', 'establishment_id', 'status']);
-        $before['role'] = $before['role']?->value;
 
         $next = $user->status === 'Active' ? 'Inactive' : 'Active';
 
@@ -120,7 +117,7 @@ class UsersController extends PtoController
             return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
 
-        AuditLogger::recordUserScopeChange($request->user(), $user, $before);
+        event(new UserAccountStatusChanged($request->user(), $user, $next));
 
         $verb = $next === 'Active' ? 'enabled' : 'disabled';
 

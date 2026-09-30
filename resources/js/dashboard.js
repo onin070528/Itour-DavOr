@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initTabs();
     initModals();
     initEditTriggers();
+    initDetailsTriggers();
     initDropdowns();
     initTrendCharts();
     initConfirmActions();
@@ -322,6 +323,67 @@ function initEditTriggers() {
             form.querySelector('input[name="_method"]')?.remove();
         });
     });
+}
+
+/**
+ * Read-only counterpart to initEditTriggers() above, for the Audit Logs
+ * details modal: `[data-details-trigger="modalId"]` with a `data-details`
+ * JSON blob fills `[data-field="key"]` text content inside that modal (its
+ * row is hidden via `[data-field-row]` when the key is absent/empty), plus
+ * a `[data-diff-container]` "Before/After" list built from `old_values`/
+ * `new_values` (operation logs only). All dynamic text goes through
+ * escapeHtml() before any innerHTML use — log content can contain anything
+ * a user typed, including HTML/script, and must render as inert text.
+ */
+function initDetailsTriggers() {
+    document.querySelectorAll('[data-details-trigger]').forEach((trigger) => {
+        trigger.addEventListener('click', () => {
+            const modal = document.getElementById(trigger.dataset.detailsTrigger);
+            if (!modal) return;
+
+            const values = JSON.parse(trigger.dataset.details || '{}');
+
+            modal.querySelectorAll('[data-field]').forEach((el) => {
+                const key = el.dataset.field;
+                const value = values[key];
+                el.textContent = value === undefined || value === null || value === '' ? '—' : value;
+                const row = el.closest('[data-field-row]');
+                if (row) row.classList.toggle('hidden', value === undefined || value === null || value === '');
+            });
+
+            const diffSection = modal.querySelector('[data-diff-section]');
+            const diffContainer = modal.querySelector('[data-diff-container]');
+            const isOperationLog = 'old_values' in values || 'new_values' in values;
+            if (diffSection) diffSection.classList.toggle('hidden', ! isOperationLog);
+
+            if (diffContainer && isOperationLog) {
+                const oldValues = values.old_values || {};
+                const newValues = values.new_values || {};
+                const keys = Array.from(new Set([...Object.keys(oldValues), ...Object.keys(newValues)]));
+
+                diffContainer.innerHTML = keys.length
+                    ? keys.map((key) => `
+                        <div class="grid grid-cols-2 gap-3 border-b border-sand-100 py-2 text-sm last:border-0">
+                            <div>
+                                <span class="block text-[10px] font-semibold tracking-wide text-sand-500 uppercase">${escapeHtml(key)} (before)</span>
+                                <span class="text-sand-700">${escapeHtml(oldValues[key])}</span>
+                            </div>
+                            <div>
+                                <span class="block text-[10px] font-semibold tracking-wide text-sand-500 uppercase">${escapeHtml(key)} (after)</span>
+                                <span class="font-semibold text-primary-700">${escapeHtml(newValues[key])}</span>
+                            </div>
+                        </div>
+                    `).join('')
+                    : '<p class="text-sm text-sand-500">No field changes recorded.</p>';
+            }
+        });
+    });
+}
+
+function escapeHtml(value) {
+    return String(value === undefined || value === null || value === '' ? '—' : value).replace(/[&<>"']/g, (c) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[c]));
 }
 
 /**

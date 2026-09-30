@@ -59,6 +59,7 @@ class EstablishmentNavigation
                     $item('feedback.analytics', 'ti-heart-handshake', 'Experience Analytics', 'establishment.feedback.analytics'),
                 ]),
                 $item('reports', 'ti-file-report', 'Reports', 'establishment.reports'),
+                $item('activityLog', 'ti-shield-check', 'Activity Log', 'establishment.activityLog'),
             ],
         ];
     }

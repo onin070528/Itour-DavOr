@@ -17,7 +17,9 @@
 
 namespace App\Http\Controllers\Pto;
 
+use App\Models\Municipality;
 use App\Models\MunicipalReport;
+use App\Support\OperationLogger;
 use App\Support\TourismCatalog;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -66,11 +68,15 @@ class MunicipalReportsController extends PtoController
     {
         abort_if($municipalReport->status === MunicipalReport::STATUS_APPROVED, 403, 'This report has already been approved.');
 
+        $before = $municipalReport->getOriginal();
+
         $municipalReport->update([
             'status' => MunicipalReport::STATUS_APPROVED,
             'reviewed_by' => $request->user()->id,
             'reviewed_at' => now(),
         ]);
+
+        OperationLogger::approved($request->user(), 'municipal_report', $municipalReport->id, $this->municipalityIdByName($municipalReport->municipality), OperationLogger::diff($before, $municipalReport));
 
         return back()->with('toast', "{$municipalReport->municipality}'s report was approved.");
     }
@@ -83,6 +89,8 @@ class MunicipalReportsController extends PtoController
             'remarks' => ['required', 'string', 'max:2000'],
         ]);
 
+        $before = $municipalReport->getOriginal();
+
         $municipalReport->update([
             'status' => MunicipalReport::STATUS_RETURNED,
             'reviewed_by' => $request->user()->id,
@@ -90,6 +98,13 @@ class MunicipalReportsController extends PtoController
             'remarks' => $data['remarks'],
         ]);
 
+        OperationLogger::returned($request->user(), 'municipal_report', $municipalReport->id, $data['remarks'], $this->municipalityIdByName($municipalReport->municipality), OperationLogger::diff($before, $municipalReport));
+
         return back()->with('toast', "{$municipalReport->municipality}'s report was returned for revision.");
+    }
+
+    private function municipalityIdByName(string $municipality): ?int
+    {
+        return Municipality::query()->where('name', $municipality)->value('id');
     }
 }

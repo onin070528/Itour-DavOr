@@ -15,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rules\Password;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -40,5 +41,12 @@ class AppServiceProvider extends ServiceProvider
 
             return Limit::perMinute(5)->by($key);
         });
+
+        // Single source of truth for password strength — every path that
+        // sets a password (change, reset) validates with Password::default()
+        // instead of redeclaring the rule. Deliberately no uncompromised():
+        // that check calls an external API (Have I Been Pwned) on every
+        // password submission.
+        Password::defaults(fn () => Password::min(12)->letters()->numbers());
     }
 }

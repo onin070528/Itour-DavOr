@@ -1,7 +1,7 @@
 <?php
 
 use App\Enums\UserRole;
-use App\Models\AuditLog;
+use App\Models\SecurityLog;
 use App\Models\User;
 use Illuminate\Support\Facades\RateLimiter;
 
@@ -17,7 +17,32 @@ test('a suspended (Inactive) user is blocked from logging in', function () {
     test()->assertGuest();
 });
 
-test('a successful login updates last_login_at and records an audit log entry', function () {
+test('a suspended account and a wrong password show the identical error message', function () {
+    $suspended = User::factory()->create(['role' => UserRole::PtoAdministrator, 'status' => 'Inactive']);
+    $active = User::factory()->create(['role' => UserRole::PtoAdministrator]);
+    $message = 'These credentials do not match our records.';
+
+    // Same wording in both cases — a suspended/disabled account must not be
+    // distinguishable from a plain wrong password.
+    test()->post('/login', ['email' => $suspended->email, 'password' => 'password'])
+        ->assertInvalid(['email' => $message]);
+
+    test()->post('/login', ['email' => $active->email, 'password' => 'not-the-right-password'])
+        ->assertInvalid(['email' => $message]);
+});
+
+test('a suspended account is still blocked even with the correct password, and it is security-logged', function () {
+    $user = User::factory()->create(['role' => UserRole::PtoAdministrator, 'status' => 'Inactive']);
+
+    test()->post('/login', ['email' => $user->email, 'password' => 'password'])
+        ->assertInvalid(['email' => 'These credentials do not match our records.']);
+
+    $log = SecurityLog::where('user_id', $user->id)->where('event_type', 'login_failed')->first();
+    expect($log)->not->toBeNull();
+    expect($log->details)->toBe(['reason' => 'account_suspended']);
+});
+
+test('a successful login updates last_login_at and records a security log entry', function () {
     $user = User::factory()->create(['role' => UserRole::PtoAdministrator, 'last_login_at' => null]);
 
     test()->post('/login', [
@@ -26,10 +51,10 @@ test('a successful login updates last_login_at and records an audit log entry', 
     ])->assertRedirect(route('pto.dashboard'));
 
     expect($user->fresh()->last_login_at)->not->toBeNull();
-    expect(AuditLog::where('user_id', $user->id)->where('action', 'login.success')->exists())->toBeTrue();
+    expect(SecurityLog::where('user_id', $user->id)->where('event_type', 'login_success')->exists())->toBeTrue();
 });
 
-test('a failed login attempt records an audit log entry without ever logging the password', function () {
+test('a failed login attempt records a security log entry without ever logging the password', function () {
     $user = User::factory()->create(['role' => UserRole::PtoAdministrator]);
 
     test()->post('/login', [
@@ -37,18 +62,31 @@ test('a failed login attempt records an audit log entry without ever logging the
         'password' => 'definitely-wrong',
     ])->assertSessionHasErrors('email');
 
-    $log = AuditLog::where('user_id', $user->id)->where('action', 'login.failed')->first();
+    $log = SecurityLog::where('user_id', $user->id)->where('event_type', 'login_failed')->first();
     expect($log)->not->toBeNull();
-    expect(json_encode($log->metadata ?? []))->not->toContain('definitely-wrong');
+    expect($log->attempted_email)->toBeNull();
+    expect(json_encode($log->details ?? []))->not->toContain('definitely-wrong');
 });
 
-test('logout invalidates the session and records an audit log entry', function () {
+test('a failed login for an unknown email creates a security log with user_id null and attempted_email set', function () {
+    test()->post('/login', [
+        'email' => 'nobody-registered@example.test',
+        'password' => 'whatever-they-typed',
+    ])->assertSessionHasErrors('email');
+
+    $log = SecurityLog::where('event_type', 'login_failed')->where('attempted_email', 'nobody-registered@example.test')->first();
+    expect($log)->not->toBeNull();
+    expect($log->user_id)->toBeNull();
+    expect(json_encode($log->toArray()))->not->toContain('whatever-they-typed');
+});
+
+test('logout invalidates the session and records a security log entry', function () {
     $user = User::factory()->create(['role' => UserRole::PtoAdministrator]);
 
     test()->actingAs($user)->post('/logout')->assertRedirect('/');
 
     test()->assertGuest();
-    expect(AuditLog::where('user_id', $user->id)->where('action', 'logout')->exists())->toBeTrue();
+    expect(SecurityLog::where('user_id', $user->id)->where('event_type', 'logout')->exists())->toBeTrue();
 });
 
 test('login is throttled after repeated failed attempts', function () {

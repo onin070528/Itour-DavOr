@@ -12,11 +12,14 @@
 
 namespace App\Http\Controllers\Concerns;
 
+use App\Events\UserPasswordChanged;
 use App\Models\NotificationPreference;
+use App\Support\SessionSecurity;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
 
 /**
  * "Account Profile" (name/email), "Change Password", and "Notifications"
@@ -79,16 +82,22 @@ trait UpdatesAccountSettings
     {
         $data = $request->validate([
             'current_password' => ['required', 'current_password'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'password' => ['required', 'confirmed', Password::default()],
         ]);
 
+        $user = $request->user();
+
         try {
-            $request->user()->update(['password' => $data['password']]);
+            $user->update(['password' => $data['password']]);
         } catch (\Throwable $e) {
-            Log::error('Failed to update account password.', ['exception' => $e, 'user_id' => $request->user()->id]);
+            Log::error('Failed to update account password.', ['exception' => $e, 'user_id' => $user->id]);
 
             return back()->with('toast', 'Something went wrong while updating your password. Please try again.')->with('toast_tone', 'danger');
         }
+
+        SessionSecurity::invalidateOtherSessionsFor($user, $request->session()->getId());
+
+        event(new UserPasswordChanged($user));
 
         return back()->with('toast', 'Password updated.');
     }

@@ -13,6 +13,8 @@ namespace App\Http\Controllers\Pto;
 
 use App\Http\Controllers\Concerns\ManagesDestinationListings;
 use App\Models\Listing;
+use App\Models\Municipality;
+use App\Support\OperationLogger;
 use App\Support\TourismCatalog;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -40,13 +42,24 @@ class DirectoryController extends PtoController
         $fields = $this->validatedDestinationFields($request);
         $municipality = $this->validatedMunicipality($request);
 
+        $municipalityId = $this->municipalityIdByName($municipality);
+
         try {
-            $listing = $this->createDestination($fields, $municipality);
+            $listing = $this->createDestination($fields, $municipality, $municipalityId);
         } catch (\Throwable $e) {
             Log::error('Failed to create PTO destination.', ['exception' => $e]);
 
             return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
+
+        // createDestination() doesn't set municipality_id (see
+        // ManagesDestinationListings) — resolved here by name instead of
+        // trusting the just-created row's (currently always-null) FK.
+        OperationLogger::created($request->user(), 'destination', $listing->id, $this->municipalityIdByName($municipality), null, [
+            'name' => $listing->name,
+            'barangay' => $listing->barangay,
+            'municipality' => $listing->municipality,
+        ]);
 
         return back()->with('toast', "{$listing->name} was added.");
     }
@@ -57,21 +70,26 @@ class DirectoryController extends PtoController
 
         $fields = $this->validatedDestinationFields($request);
         $municipality = $this->validatedMunicipality($request);
+        $before = $listing->getOriginal();
 
         try {
-            $listing->update([...$fields, 'municipality' => $municipality]);
+            $listing->update([...$fields, 'municipality' => $municipality, 'municipality_id' => $this->municipalityIdByName($municipality)]);
         } catch (\Throwable $e) {
             Log::error('Failed to update PTO destination.', ['exception' => $e, 'listing_id' => $listing->id]);
 
             return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
 
+        OperationLogger::updated($request->user(), 'destination', $listing->id, $this->municipalityIdByName($municipality), null, OperationLogger::diff($before, $listing));
+
         return back()->with('toast', 'Destination saved.');
     }
 
-    public function archiveDestination(Listing $listing): RedirectResponse
+    public function archiveDestination(Request $request, Listing $listing): RedirectResponse
     {
         abort_if($listing->category !== 'destinations', 404);
+
+        $before = $listing->getOriginal();
 
         try {
             $listing->update(['status' => 'Archived']);
@@ -81,7 +99,14 @@ class DirectoryController extends PtoController
             return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
 
+        OperationLogger::updated($request->user(), 'destination', $listing->id, $this->municipalityIdByName($listing->municipality), null, OperationLogger::diff($before, $listing));
+
         return back()->with('toast', "{$listing->name} was archived.");
+    }
+
+    private function municipalityIdByName(string $municipality): ?int
+    {
+        return Municipality::query()->where('name', $municipality)->value('id');
     }
 
     /**

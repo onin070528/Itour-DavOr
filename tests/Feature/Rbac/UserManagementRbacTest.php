@@ -3,6 +3,7 @@
 use App\Enums\UserRole;
 use App\Models\Listing;
 use App\Models\Municipality;
+use App\Models\SecurityLog;
 use App\Models\User;
 use App\Support\BusinessHours;
 use Illuminate\Support\Str;
@@ -46,6 +47,130 @@ test('PTO can create an LGU account', function () {
     expect($created)->not->toBeNull();
     expect($created->role)->toBe(UserRole::Lgu);
     expect($created->municipality_id)->not->toBeNull();
+});
+
+test('created_by records which account created a new LGU account', function () {
+    makeMunicipalityFixture('Cateel', 'CAT');
+    $pto = makePtoAdmin();
+
+    test()->actingAs($pto)->post(route('pto.users.store'), [
+        'name' => 'New LGU Officer',
+        'email' => 'created-by.lgu@example.test',
+        'role' => 'LGU Tourism Personnel',
+        'assignment' => 'Cateel',
+    ]);
+
+    $created = User::query()->where('email', 'created-by.lgu@example.test')->first();
+    expect($created->created_by)->toBe($pto->id);
+});
+
+test('created_by records which account registered a new establishment', function () {
+    $mati = makeMunicipalityFixture('City of Mati', 'MATI');
+    $lgu = User::factory()->create([
+        'role' => UserRole::Lgu,
+        'organization_subtitle' => 'City of Mati',
+        'municipality_id' => $mati->id,
+    ]);
+
+    test()->actingAs($lgu)->post(route('lgu.users.store'), establishmentFormPayload());
+
+    $created = User::query()->where('email', 'frontdesk@matifixtureinn.test')->first();
+    expect($created->created_by)->toBe($lgu->id);
+});
+
+test('self-service settings cannot forge created_by', function () {
+    $mati = makeMunicipalityFixture('City of Mati', 'MATI');
+    $listing = makeEstablishmentListingFixture($mati, 'Mati Fixture Inn 4');
+    $creator = User::factory()->create(['role' => UserRole::PtoAdministrator]);
+    $user = User::factory()->create([
+        'role' => UserRole::Establishment,
+        'organization_subtitle' => 'Poblacion, City of Mati',
+        'municipality_id' => $mati->id,
+        'establishment_id' => $listing->id,
+        'created_by' => $creator->id,
+    ]);
+
+    test()->actingAs($user)->post(route('establishment.settings.profile'), [
+        'name' => $user->name,
+        'email' => $user->email,
+        'created_by' => 999,
+    ])->assertRedirect();
+
+    expect($user->fresh()->created_by)->toBe($creator->id);
+});
+
+test('creating a new account records an account_created security log entry', function () {
+    makeMunicipalityFixture('Cateel', 'CAT');
+    $pto = makePtoAdmin();
+
+    test()->actingAs($pto)->post(route('pto.users.store'), [
+        'name' => 'New LGU Officer',
+        'email' => 'security-log.lgu@example.test',
+        'role' => 'LGU Tourism Personnel',
+        'assignment' => 'Cateel',
+    ]);
+
+    $created = User::query()->where('email', 'security-log.lgu@example.test')->first();
+    $log = SecurityLog::where('event_type', 'account_created')->where('target_user_id', $created->id)->first();
+    expect($log)->not->toBeNull();
+    expect($log->user_id)->toBe($pto->id);
+});
+
+test('suspending and reactivating an account records account_suspended/account_reactivated security log entries', function () {
+    $pto = makePtoAdmin();
+    $target = User::factory()->create(['role' => UserRole::PtoAdministrator]);
+
+    test()->actingAs($pto)->patch(route('pto.users.toggleStatus', $target));
+    expect($target->fresh()->status)->toBe('Inactive');
+    $suspendLog = SecurityLog::where('event_type', 'account_suspended')->where('target_user_id', $target->id)->first();
+    expect($suspendLog)->not->toBeNull();
+    expect($suspendLog->user_id)->toBe($pto->id);
+
+    test()->actingAs($pto)->patch(route('pto.users.toggleStatus', $target));
+    expect($target->fresh()->status)->toBe('Active');
+    expect(SecurityLog::where('event_type', 'account_reactivated')->where('target_user_id', $target->id)->exists())->toBeTrue();
+});
+
+test('changing an account\'s role records a role_changed security log entry', function () {
+    $mati = makeMunicipalityFixture('City of Mati', 'MATI');
+    $listing = makeEstablishmentListingFixture($mati, 'Role Change Fixture Inn');
+    $pto = makePtoAdmin();
+    $lgu = User::factory()->create([
+        'role' => UserRole::Lgu,
+        'organization_subtitle' => 'City of Mati',
+        'municipality_id' => $mati->id,
+    ]);
+
+    test()->actingAs($pto)->put(route('pto.users.update', $lgu), [
+        'name' => $lgu->name,
+        'email' => $lgu->email,
+        'role' => 'Tourism Establishment',
+        'assignment' => 'Role Change Fixture Inn',
+    ])->assertSessionHasNoErrors();
+
+    expect($lgu->fresh()->role)->toBe(UserRole::Establishment);
+    $log = SecurityLog::where('event_type', 'role_changed')->where('target_user_id', $lgu->id)->first();
+    expect($log)->not->toBeNull();
+    expect($log->details)->toBe(['from' => 'lgu', 'to' => 'establishment']);
+});
+
+test('editing an account without changing its role does not record a role_changed security log entry', function () {
+    $mati = makeMunicipalityFixture('City of Mati', 'MATI');
+    $pto = makePtoAdmin();
+    $lgu = User::factory()->create([
+        'role' => UserRole::Lgu,
+        'organization_subtitle' => 'City of Mati',
+        'municipality_id' => $mati->id,
+    ]);
+
+    test()->actingAs($pto)->put(route('pto.users.update', $lgu), [
+        'name' => 'Renamed Officer',
+        'email' => $lgu->email,
+        'role' => 'LGU Tourism Personnel',
+        'assignment' => 'City of Mati',
+    ])->assertSessionHasNoErrors();
+
+    expect(SecurityLog::where('event_type', 'role_changed')->where('target_user_id', $lgu->id)->exists())->toBeFalse();
 });
 
 test('PTO cannot create a new PTO account through the Users page', function () {

@@ -22,15 +22,16 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
 /**
- * `municipality_id`/`establishment_id` stay in #[Fillable] for legitimate
- * admin-initiated create/update calls (Pto\UsersController,
+ * `municipality_id`/`establishment_id`/`created_by` stay in #[Fillable] for
+ * legitimate admin-initiated create/update calls (Pto\UsersController,
  * Lgu\UsersController), but no controller ever mass-assigns them from raw
  * request input — every write path is an explicit, role-checked field
  * assignment. Self-service settings (Concerns\UpdatesAccountSettings)
  * validate by an allow-list that excludes role/status/municipality_id/
- * establishment_id entirely, so a user can never change their own scope.
+ * establishment_id/created_by entirely, so a user can never change their
+ * own scope or forge who created them.
  */
-#[Fillable(['name', 'email', 'password', 'role', 'organization_name', 'organization_subtitle', 'status', 'municipality_id', 'establishment_id'])]
+#[Fillable(['name', 'email', 'password', 'role', 'organization_name', 'organization_subtitle', 'status', 'municipality_id', 'establishment_id', 'created_by'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -65,6 +66,15 @@ class User extends Authenticatable
     public function establishment(): BelongsTo
     {
         return $this->belongsTo(Listing::class, 'establishment_id');
+    }
+
+    /**
+     * The account that created this one (PTO creates LGU accounts, LGU
+     * creates Establishment accounts). Null for pre-existing seeded rows.
+     */
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'created_by');
     }
 
     /**

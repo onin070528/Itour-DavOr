@@ -65,6 +65,9 @@ class LguNavigation
             'User Management' => [
                 $item('users', 'ti-users-group', 'Users', 'lgu.users'),
             ],
+            'Administration' => [
+                $item('auditLogs', 'ti-shield-check', 'Audit Logs', 'lgu.auditLogs'),
+            ],
         ];
     }
 }

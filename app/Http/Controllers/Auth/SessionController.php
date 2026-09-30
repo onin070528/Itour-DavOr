@@ -13,10 +13,12 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use App\Support\AuditLogger;
+use App\Support\SecurityLogger;
+use Illuminate\Auth\Events\Failed;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
@@ -34,6 +36,15 @@ class SessionController extends Controller
      * Authenticate the user and redirect to their role's dashboard.
      * Rate-limited via the 'login' limiter (routes/web.php, 'throttle:login')
      * — see AppServiceProvider::boot().
+     *
+     * Deliberately doesn't use Auth::attempt(): that fires Illuminate\Auth\
+     * Events\Login on any correct password, before the account-status check
+     * below runs — which would log a false login_success for a suspended
+     * account we're about to reject. Checking credentials manually and
+     * calling Auth::login() only once both checks pass keeps Login/Failed
+     * firing exactly when they mean "this session is now authenticated" /
+     * "these credentials were rejected" (App\Listeners\LogSuccessfulLogin,
+     * LogFailedLogin — see App\Support\SecurityLogger).
      */
     public function store(Request $request): RedirectResponse
     {
@@ -42,36 +53,33 @@ class SessionController extends Controller
             'password' => ['required', 'string'],
         ]);
 
-        if (! Auth::attempt($credentials, $request->boolean('remember'))) {
-            AuditLogger::record(
-                User::query()->where('email', $credentials['email'])->first(),
-                'login.failed'
-            );
+        $user = User::query()->where('email', $credentials['email'])->first();
+
+        if (! $user || ! Hash::check($credentials['password'], $user->password)) {
+            event(new Failed('web', $user, $credentials));
 
             throw ValidationException::withMessages([
                 'email' => __('These credentials do not match our records.'),
             ]);
         }
 
-        /** @var User $user */
-        $user = Auth::user();
-
         // PTO's "Disable Account" action (Pto\UsersController::toggleStatus)
         // is documented as immediate loss of access — enforce that here.
+        // Deliberately the *same* message as a bad password above: telling
+        // the requester their account is disabled would let anyone probing
+        // an email address learn it belongs to a real, suspended account.
+        // The real reason is still recorded in security_logs, just not shown.
         if ($user->status === 'Inactive') {
-            Auth::guard('web')->logout();
-
-            AuditLogger::record($user, 'login.blocked_suspended');
+            SecurityLogger::loginFailed($user, null, 'account_suspended');
 
             throw ValidationException::withMessages([
-                'email' => __('This account has been disabled. Contact your Provincial Tourism Office administrator.'),
+                'email' => __('These credentials do not match our records.'),
             ]);
         }
 
+        Auth::login($user, $request->boolean('remember'));
         $request->session()->regenerate();
         $user->forceFill(['last_login_at' => now()])->save();
-
-        AuditLogger::record($user, 'login.success');
 
         return redirect()->intended(
             $user->role ? route($user->role->dashboardRouteName()) : route('home')
@@ -79,18 +87,15 @@ class SessionController extends Controller
     }
 
     /**
-     * Log the user out.
+     * Log the user out. Auth::guard('web')->logout() fires Illuminate\Auth\
+     * Events\Logout, which App\Listeners\LogLogout turns into a security_log row.
      */
     public function destroy(Request $request): RedirectResponse
     {
-        $user = $request->user();
-
         Auth::guard('web')->logout();
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();
-
-        AuditLogger::record($user, 'logout');
 
         return redirect()->route('home');
     }

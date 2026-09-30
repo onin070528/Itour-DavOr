@@ -15,11 +15,13 @@
 namespace App\Http\Controllers\Lgu;
 
 use App\Enums\UserRole;
+use App\Events\UserAccountCreated;
+use App\Events\UserAccountStatusChanged;
 use App\Http\Controllers\Concerns\ManagesDestinationListings;
 use App\Models\Listing;
 use App\Models\User;
-use App\Support\AuditLogger;
 use App\Support\BusinessHours;
+use App\Support\OperationLogger;
 use App\Support\TourismCatalog;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -86,6 +88,7 @@ class UsersController extends LguController
                     'municipality_id' => $lgu->municipality_id,
                     'establishment_id' => $listing->id,
                     'status' => 'Active',
+                    'created_by' => $lgu->id,
                 ]);
             });
         } catch (\Throwable $e) {
@@ -94,11 +97,7 @@ class UsersController extends LguController
             return back()->withInput()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
 
-        AuditLogger::record($lgu, 'user.created', $user, [
-            'role' => $user->role?->value,
-            'municipality_id' => $user->municipality_id,
-            'establishment_id' => $user->establishment_id,
-        ]);
+        event(new UserAccountCreated($lgu, $user));
 
         return back()->with('toast', "{$user->organization_name} was registered. They can set their password using \"Forgot password?\" on the sign-in page.");
     }
@@ -111,6 +110,7 @@ class UsersController extends LguController
         // accepted from this endpoint.
         $data = $this->validatedEstablishmentFields($request, Rule::unique('users', 'email')->ignore($user));
         $listing = $user->establishment;
+        $before = $listing?->getOriginal();
 
         try {
             DB::transaction(function () use ($data, $user, $listing): void {
@@ -130,6 +130,10 @@ class UsersController extends LguController
             return back()->withInput()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
 
+        if ($listing) {
+            OperationLogger::updated($request->user(), 'establishment', $listing->id, $listing->municipality_id, $listing->id, OperationLogger::diff($before, $listing));
+        }
+
         return back()->with('toast', 'Establishment information saved.');
     }
 
@@ -137,9 +141,6 @@ class UsersController extends LguController
     {
         $this->authorizeOwnEstablishmentUser($request, $user);
         abort_if($user->id === $request->user()->id, 403, 'You cannot change the status of your own account.');
-
-        $before = $user->only(['role', 'municipality_id', 'establishment_id', 'status']);
-        $before['role'] = $before['role']?->value;
 
         $next = $user->status === 'Active' ? 'Inactive' : 'Active';
 
@@ -151,7 +152,7 @@ class UsersController extends LguController
             return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
 
-        AuditLogger::recordUserScopeChange($request->user(), $user, $before);
+        event(new UserAccountStatusChanged($request->user(), $user, $next));
 
         $verb = $next === 'Active' ? 'enabled' : 'disabled';
 

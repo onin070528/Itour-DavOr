@@ -13,12 +13,13 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use App\Support\AuditLogger;
+use App\Support\SessionSecurity;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rules\Password as PasswordRule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
@@ -40,7 +41,7 @@ class NewPasswordController extends Controller
         $request->validate([
             'token' => ['required', 'string'],
             'email' => ['required', 'string', 'email'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'password' => ['required', 'confirmed', PasswordRule::default()],
         ]);
 
         $status = Password::reset(
@@ -51,9 +52,12 @@ class NewPasswordController extends Controller
                     'remember_token' => Str::random(60),
                 ])->save();
 
+                // Fires Illuminate\Auth\Events\PasswordReset, which
+                // App\Listeners\LogPasswordResetCompleted turns into a
+                // security_log row.
                 event(new PasswordReset($user));
 
-                AuditLogger::record($user, 'password.reset');
+                SessionSecurity::invalidateOtherSessionsFor($user);
             }
         );
 

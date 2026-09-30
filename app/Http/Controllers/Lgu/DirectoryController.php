@@ -14,6 +14,7 @@ namespace App\Http\Controllers\Lgu;
 use App\Http\Controllers\Concerns\ManagesDestinationListings;
 use App\Models\Listing;
 use App\Support\LguMockData;
+use App\Support\OperationLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -41,15 +42,22 @@ class DirectoryController extends LguController
     public function storeDestination(Request $request): RedirectResponse
     {
         $fields = $this->validatedDestinationFields($request);
-        $municipality = $request->user()->organization_subtitle;
+        $lgu = $request->user();
+        $municipality = $lgu->organization_subtitle;
 
         try {
-            $listing = $this->createDestination($fields, $municipality);
+            $listing = $this->createDestination($fields, $municipality, $lgu->municipality_id);
         } catch (\Throwable $e) {
             Log::error('Failed to create LGU destination.', ['exception' => $e]);
 
             return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
+
+        OperationLogger::created($lgu, 'destination', $listing->id, $lgu->municipality_id, null, [
+            'name' => $listing->name,
+            'barangay' => $listing->barangay,
+            'municipality' => $listing->municipality,
+        ]);
 
         return back()->with('toast', "{$listing->name} was added.");
     }
@@ -60,6 +68,7 @@ class DirectoryController extends LguController
         abort_if($listing->category !== 'destinations', 404);
 
         $fields = $this->validatedDestinationFields($request);
+        $before = $listing->getOriginal();
 
         try {
             $listing->update($fields);
@@ -69,6 +78,8 @@ class DirectoryController extends LguController
             return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
 
+        OperationLogger::updated($request->user(), 'destination', $listing->id, $request->user()->municipality_id, null, OperationLogger::diff($before, $listing));
+
         return back()->with('toast', 'Destination saved.');
     }
 
@@ -77,6 +88,8 @@ class DirectoryController extends LguController
         $this->authorizeOwnMunicipality($request, $listing);
         abort_if($listing->category !== 'destinations', 404);
 
+        $before = $listing->getOriginal();
+
         try {
             $listing->update(['status' => 'Archived']);
         } catch (\Throwable $e) {
@@ -84,6 +97,8 @@ class DirectoryController extends LguController
 
             return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
+
+        OperationLogger::updated($request->user(), 'destination', $listing->id, $request->user()->municipality_id, null, OperationLogger::diff($before, $listing));
 
         return back()->with('toast', "{$listing->name} was archived.");
     }
@@ -107,6 +122,8 @@ class DirectoryController extends LguController
 
         abort_if($listing->category === 'destinations', 404);
 
+        $before = $listing->getOriginal();
+
         try {
             $listing->update(['status' => 'Active']);
         } catch (\Throwable $e) {
@@ -114,6 +131,8 @@ class DirectoryController extends LguController
 
             return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
+
+        OperationLogger::validated($request->user(), 'establishment', $listing->id, $listing->municipality_id, $listing->id, OperationLogger::diff($before, $listing));
 
         return back()->with('toast', "{$listing->name} marked as verified.");
     }

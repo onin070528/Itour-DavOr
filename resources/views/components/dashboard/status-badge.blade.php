@@ -5,6 +5,7 @@
         'success' => 'bg-success-bg text-success',
         'warning' => 'bg-warning-bg text-warning',
         'danger' => 'bg-danger-bg text-danger',
+        'info' => 'bg-primary-100 text-primary-700',
         default => 'bg-sand-200 text-sand-700',
     };
 @endphp

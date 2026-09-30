@@ -12,9 +12,9 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Events\PasswordResetLinkRequested;
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use App\Support\AuditLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -63,7 +63,11 @@ class PasswordResetLinkController extends Controller
         }
 
         if ($status === Password::RESET_LINK_SENT) {
-            AuditLogger::record(User::query()->where('email', $request->input('email'))->first(), 'password.reset_link_sent');
+            $user = User::query()->where('email', $request->input('email'))->first();
+
+            if ($user) {
+                event(new PasswordResetLinkRequested($user));
+            }
         }
 
         return back()->withInput()->with('status', __('If an account exists for that email, a password reset link has been sent. Check your inbox.'));

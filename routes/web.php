@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\SessionController;
 use App\Http\Controllers\CheckinController;
+use App\Http\Controllers\Establishment\ActivityLogController as EstablishmentActivityLogController;
 use App\Http\Controllers\Establishment\ArrivalsController as EstablishmentArrivalsController;
 use App\Http\Controllers\Establishment\DashboardController as EstablishmentDashboardController;
 use App\Http\Controllers\Establishment\FeedbackController as EstablishmentFeedbackController;
@@ -13,6 +14,7 @@ use App\Http\Controllers\Establishment\SettingsController as EstablishmentSettin
 use App\Http\Controllers\Establishment\StatisticsController as EstablishmentStatisticsController;
 use App\Http\Controllers\ExploreController;
 use App\Http\Controllers\LandingController;
+use App\Http\Controllers\Lgu\AuditLogsController as LguAuditLogsController;
 use App\Http\Controllers\Lgu\DashboardController as LguDashboardController;
 use App\Http\Controllers\Lgu\DirectoryController as LguDirectoryController;
 use App\Http\Controllers\Lgu\FeedbackController as LguFeedbackController;
@@ -20,6 +22,7 @@ use App\Http\Controllers\Lgu\MonitoringController as LguMonitoringController;
 use App\Http\Controllers\Lgu\ReportsController as LguReportsController;
 use App\Http\Controllers\Lgu\SettingsController as LguSettingsController;
 use App\Http\Controllers\Lgu\UsersController as LguUsersController;
+use App\Http\Controllers\Pto\AuditLogsController as PtoAuditLogsController;
 use App\Http\Controllers\Pto\DashboardController as PtoDashboardController;
 use App\Http\Controllers\Pto\DirectoryController as PtoDirectoryController;
 use App\Http\Controllers\Pto\FeedbackController as PtoFeedbackController;
@@ -91,6 +94,9 @@ Route::middleware(['auth', 'role:pto_administrator'])->prefix('pto')->name('pto.
     Route::put('/users/{user}', [PtoUsersController::class, 'update'])->name('users.update');
     Route::patch('/users/{user}/toggle-status', [PtoUsersController::class, 'toggleStatus'])->name('users.toggleStatus');
 
+    Route::get('/audit-logs', [PtoAuditLogsController::class, 'index'])->name('auditLogs');
+    Route::get('/audit-logs/export', [PtoAuditLogsController::class, 'export'])->name('auditLogs.export');
+
     Route::get('/settings', [PtoSettingsController::class, 'index'])->name('settings');
     Route::post('/settings/profile', [PtoSettingsController::class, 'updateProfile'])->name('settings.profile');
     Route::post('/settings/password', [PtoSettingsController::class, 'updatePassword'])->name('settings.password');
@@ -127,6 +133,9 @@ Route::middleware(['auth', 'role:lgu', 'lgu.municipality'])->prefix('lgu')->name
     Route::put('/users/{user}', [LguUsersController::class, 'update'])->name('users.update');
     Route::patch('/users/{user}/toggle-status', [LguUsersController::class, 'toggleStatus'])->name('users.toggleStatus');
 
+    Route::get('/audit-logs', [LguAuditLogsController::class, 'index'])->name('auditLogs');
+    Route::get('/audit-logs/export', [LguAuditLogsController::class, 'export'])->name('auditLogs.export');
+
     Route::get('/settings', [LguSettingsController::class, 'index'])->name('settings');
     Route::post('/settings/profile', [LguSettingsController::class, 'updateProfile'])->name('settings.profile');
     Route::post('/settings/password', [LguSettingsController::class, 'updatePassword'])->name('settings.password');
@@ -157,6 +166,8 @@ Route::middleware(['auth', 'role:establishment'])->prefix('establishment')->name
     });
 
     Route::get('/reports', [EstablishmentReportsController::class, 'index'])->name('reports');
+
+    Route::get('/activity-log', [EstablishmentActivityLogController::class, 'index'])->name('activityLog');
 
     Route::get('/settings', [EstablishmentSettingsController::class, 'index'])->name('settings');
     Route::post('/settings/profile', [EstablishmentSettingsController::class, 'updateProfile'])->name('settings.profile');

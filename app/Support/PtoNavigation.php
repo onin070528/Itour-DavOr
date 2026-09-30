@@ -58,6 +58,9 @@ class PtoNavigation
             'User Management' => [
                 $item('users', 'ti-users-group', 'Users', 'pto.users'),
             ],
+            'Administration' => [
+                $item('auditLogs', 'ti-shield-check', 'Audit Logs', 'pto.auditLogs'),
+            ],
         ];
     }
 }

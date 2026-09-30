@@ -12,6 +12,7 @@
 namespace App\Http\Controllers\Concerns;
 
 use App\Models\Listing;
+use App\Support\TourismCatalog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -46,13 +47,23 @@ trait ManagesDestinationListings
         ];
     }
 
-    protected function createDestination(array $fields, string $municipality): Listing
+    /**
+     * $municipalityId is the real FK (App\Models\Municipality) — the caller
+     * resolves it (LGU: its own account's municipality_id, already a
+     * reliable FK; PTO: looked up from the submitted municipality name)
+     * since only the caller knows which is trustworthy for its form.
+     * Left null here, it's null on the row too, which then fails the
+     * municipality-scoped access checks (Lgu\DirectoryController::
+     * authorizeOwnMunicipality) — always pass it.
+     */
+    protected function createDestination(array $fields, string $municipality, ?int $municipalityId): Listing
     {
         return Listing::query()->create([
             ...$fields,
             'slug' => $this->uniqueDestinationSlug($fields['name']),
             'category' => 'destinations',
             'municipality' => $municipality,
+            'municipality_id' => $municipalityId,
             'status' => 'Active',
         ]);
     }
@@ -78,7 +89,7 @@ trait ManagesDestinationListings
     protected function validatedMunicipality(Request $request): string
     {
         return $request->validate([
-            'municipality' => ['required', 'string', Rule::in(collect(\App\Support\TourismCatalog::municipalities())->pluck('name'))],
+            'municipality' => ['required', 'string', Rule::in(collect(TourismCatalog::municipalities())->pluck('name'))],
         ])['municipality'];
     }
 }
