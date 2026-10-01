@@ -52,13 +52,12 @@ class EstablishmentNavigation
                 $group('arrivals', 'ti-users', 'Tourist Arrivals', [
                     $item('arrivals.record', 'ti-send', 'Record Arrival', 'establishment.arrivals.record'),
                     $item('arrivals.index', 'ti-list-details', 'Arrival Records', 'establishment.arrivals.index'),
+                    $item('arrivals.monthly', 'ti-calendar-event', 'Monthly Reports', 'establishment.arrivals.monthly'),
                 ]),
-                $item('statistics', 'ti-chart-bar', 'Tourism Statistics', 'establishment.statistics'),
                 $group('feedback', 'ti-message-2', 'Tourist Feedback', [
                     $item('feedback.index', 'ti-messages', 'All Feedback', 'establishment.feedback.index'),
                     $item('feedback.analytics', 'ti-heart-handshake', 'Experience Analytics', 'establishment.feedback.analytics'),
                 ]),
-                $item('reports', 'ti-file-report', 'Reports', 'establishment.reports'),
                 $item('activityLog', 'ti-shield-check', 'Activity Log', 'establishment.activityLog'),
             ],
         ];

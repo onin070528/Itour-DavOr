@@ -43,11 +43,8 @@ class PtoNavigation
         return [
             'Main' => [
                 $item('dashboard', 'ti-layout-dashboard', 'Dashboard', 'pto.dashboard'),
-                $group('monitoring', 'ti-chart-line', 'Tourism Monitoring', [
-                    $item('monitoring.arrivals', 'ti-users', 'Arrivals', 'pto.monitoring.arrivals'),
-                    $item('monitoring.reports', 'ti-file-report', 'Reports', 'pto.reports'),
-                ]),
-                $item('municipalReports', 'ti-clipboard-check', 'Municipal Reports', 'pto.municipalReports.index'),
+                $item('municipalReports', 'ti-clipboard-check', 'LGU Reports', 'pto.municipalReports.index'),
+                $item('monthlyReports', 'ti-calendar-event', 'Tourism Reports', 'pto.monthlyReports.index'),
                 $group('directory', 'ti-list-details', 'Tourism Directory', [
                     $item('directory.destinations', 'ti-map-pin', 'Destinations', 'pto.directory.destinations'),
                     $item('directory.establishments', 'ti-building-store', 'Establishments', 'pto.directory.establishments'),

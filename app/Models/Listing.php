@@ -65,6 +65,11 @@ class Listing extends Model
         return $this->hasMany(Arrival::class);
     }
 
+    public function monthlyArrivalReports(): HasMany
+    {
+        return $this->hasMany(MonthlyArrivalReport::class);
+    }
+
     public function municipalityRecord(): BelongsTo
     {
         return $this->belongsTo(Municipality::class, 'municipality_id');

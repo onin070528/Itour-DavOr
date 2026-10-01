@@ -14,9 +14,10 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
-    'municipality', 'submitted_by', 'period_start', 'period_end',
+    'municipality', 'municipality_id', 'submitted_by', 'period_start', 'period_end',
     'total_arrivals', 'status', 'reviewed_by', 'reviewed_at', 'remarks',
 ])]
 class MunicipalReport extends Model
@@ -55,5 +56,19 @@ class MunicipalReport extends Model
     public function reviewer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'reviewed_by');
+    }
+
+    public function municipalityRecord(): BelongsTo
+    {
+        return $this->belongsTo(Municipality::class, 'municipality_id');
+    }
+
+    /**
+     * The verified establishment-month reports consolidated into this one
+     * by Lgu\MonthlyReportsController::consolidate().
+     */
+    public function monthlyArrivalReports(): HasMany
+    {
+        return $this->hasMany(MonthlyArrivalReport::class);
     }
 }

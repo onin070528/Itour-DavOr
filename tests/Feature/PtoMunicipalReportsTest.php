@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\UserRole;
+use App\Models\Municipality;
 use App\Models\MunicipalReport;
 use App\Models\User;
 
@@ -93,6 +94,28 @@ test('an approved municipal report cannot be approved or returned again', functi
 
     test()->actingAs($pto)->patch(route('pto.municipalReports.approve', $report))->assertForbidden();
     test()->actingAs($pto)->patch(route('pto.municipalReports.return', $report), ['remarks' => 'x'])->assertForbidden();
+});
+
+test('the LGU Reports page uses the For Validation / Validated / For Clarification terminology', function () {
+    makeMunicipalReport(['status' => MunicipalReport::STATUS_SUBMITTED]);
+
+    $response = test()->actingAs(actingAsPtoAdministrator())->get(route('pto.municipalReports.index'));
+
+    $response->assertOk();
+    $response->assertSee('LGU Reports');
+    $response->assertSee('For Validation');
+});
+
+test('the LGU Reports page flags municipalities that have not submitted a current-month report', function () {
+    $mati = Municipality::query()->create(['name' => 'City of Mati', 'code' => 'PTOMATI']);
+    Municipality::query()->create(['name' => 'Baganga', 'code' => 'PTOBAG']);
+
+    $response = test()->actingAs(actingAsPtoAdministrator())->get(route('pto.municipalReports.index'));
+
+    $response->assertOk();
+    $response->assertSee('City of Mati');
+    $response->assertSee('Baganga');
+    $response->assertSee('not submitted a consolidated report', false);
 });
 
 test('a non-PTO user cannot access municipal reports routes', function () {

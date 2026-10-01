@@ -41,13 +41,25 @@
         </div>
 
         <div class="login-card-enter relative w-full max-w-md rounded-lg border border-sand-200 bg-sand-0 p-6 shadow-xl sm:p-8">
+            {{-- Official DAVOR Tourism seal alongside the iTOUR wordmark —
+                 the same lockup used in the public topbar (components/
+                 navbar.blade.php), so the brand reads consistently from
+                 the public site through to sign-in. --}}
             <a
                 href="{{ url('/') }}"
-                class="inline-flex items-center gap-2 rounded-sm transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-sand-0"
+                class="inline-flex items-center gap-2.5 rounded-sm transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-sand-0"
             >
-                <x-logo class="text-xl" />
+                <img
+                    src="{{ asset('storage/itour-images/davor-tourism.jpg') }}"
+                    alt="Provincial Government of Davao Oriental — Tourism Office seal"
+                    class="h-10 w-10 shrink-0 rounded-full"
+                >
+                <span class="h-9 w-px bg-sand-300" aria-hidden="true"></span>
+                <span class="flex flex-col justify-center">
+                    <x-logo class="text-xl leading-none" />
+                    <span class="mt-1 text-[10px] leading-none font-semibold tracking-widest text-sand-500 uppercase">Davao Oriental</span>
+                </span>
             </a>
-            <p class="mt-1 text-xs font-semibold tracking-widest text-sand-600 uppercase">Davao Oriental</p>
 
             {{ $slot }}
         </div>

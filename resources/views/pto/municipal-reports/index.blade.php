@@ -1,4 +1,7 @@
 @php
+    // PTO validates and accepts (or returns) an LGU's already-consolidated
+    // report — it never re-encodes establishment-level data itself, so the
+    // labels here read as "validation" of LGU work, not PTO's own report.
     $statusTone = fn ($status) => match ($status) {
         'APPROVED' => 'success',
         'SUBMITTED', 'REVIEWED' => 'warning',
@@ -6,19 +9,39 @@
         default => 'neutral',
     };
     $statusLabel = fn ($status) => match ($status) {
-        'SUBMITTED' => 'Submitted',
+        'SUBMITTED' => 'For Validation',
         'REVIEWED' => 'Reviewed',
-        'APPROVED' => 'Approved',
-        'RETURNED' => 'Returned',
+        'APPROVED' => 'Validated',
+        'RETURNED' => 'For Clarification',
         default => 'Draft',
     };
 @endphp
 
 <x-layouts.dashboard :user="$user" :nav-sections="$navSections" :page-title="$pageTitle" account-heading="System" :settings-href="route('pto.settings')">
     <x-dashboard.page-header
-        title="Municipal Reports"
-        description="Consolidated tourism reports submitted by LGU Tourism Admins, awaiting provincial review."
+        title="LGU Reports"
+        description="Consolidated monthly reports submitted by each LGU Tourism Office — review, validate, or return for clarification. PTO never re-encodes establishment-level data."
     />
+
+    @if ($notReportingMunicipalities->isNotEmpty())
+        <div class="mt-6 rounded-md border border-danger/20 bg-danger-bg p-4">
+            <p class="flex items-center gap-2 text-sm font-semibold text-danger">
+                <i class="ti ti-alert-triangle" aria-hidden="true"></i>
+                {{ $notReportingMunicipalities->count() }} municipalit{{ $notReportingMunicipalities->count() === 1 ? 'y has' : 'ies have' }} not submitted a consolidated report for {{ $currentMonth->format('F Y') }} yet
+            </p>
+            <div class="mt-2 flex flex-wrap gap-2">
+                @foreach ($notReportingMunicipalities as $municipality)
+                    <a
+                        href="{{ route('pto.monthlyReports.index', ['period' => $currentMonth->format('Y-m'), 'municipality_id' => $municipality->id]) }}"
+                        class="inline-flex items-center gap-1.5 rounded-full border border-danger/30 bg-sand-0 px-3 py-1.5 text-xs font-semibold text-danger hover:bg-danger-bg"
+                    >
+                        {{ $municipality->name }}
+                        <i class="ti ti-chevron-right" aria-hidden="true"></i>
+                    </a>
+                @endforeach
+            </div>
+        </div>
+    @endif
 
     <div data-filterable-table data-page-size="10" class="mt-6">
         <div class="flex flex-col gap-3 rounded-md border border-sand-200 bg-sand-0 p-4 lg:flex-row lg:items-center">
@@ -78,7 +101,7 @@
                             <td class="px-4 py-3 text-sand-700">{{ $report->created_at->format('M j, Y') }}</td>
                             <td class="px-4 py-3 text-right">
                                 <a href="{{ route('pto.municipalReports.show', $report) }}" class="rounded-sm border border-sand-300 px-3 py-1.5 text-xs font-semibold text-sand-800 hover:border-primary-300">
-                                    Review
+                                    View
                                 </a>
                             </td>
                         </tr>

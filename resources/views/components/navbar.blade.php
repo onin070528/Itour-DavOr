@@ -12,16 +12,20 @@
         : null;
 @endphp
 
-<header class="sticky top-0 z-40 border-b border-sand-200 bg-sand-0/95 backdrop-blur supports-[backdrop-filter]:bg-sand-0/80">
+{{-- sand-50 + sand-200 stand in for the spec's literal #faf6f0/stone-200 —
+     sand-50 (#f8f6ef) is this app's existing near-identical warm off-white
+     token, and sand-200 is its existing neutral border token; no new
+     bespoke color is introduced. Fully solid (no opacity or blur) so the
+     logo and nav links stay crisp regardless of what's behind it. sticky
+     so it stays in view while scrolling or navigating between the landing
+     page's in-page sections (Nearby/Reviews/About). --}}
+<header class="sticky top-0 z-30 w-full border-b border-sand-200 bg-sand-50 shadow-sm">
     <nav class="mx-auto flex max-w-[1200px] items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8" aria-label="Primary">
         <a href="{{ url('/') }}" class="inline-flex shrink-0 items-center gap-2.5">
             {{-- Official DAVOR Tourism seal, alongside a stacked iTOUR
-                 wordmark + "Davao Oriental" subtitle — the topbar is already
-                 light (bg-sand-0), so unlike the dashboard sidebar's dark
-                 background, the artwork's own white background blends in
-                 without needing a wrapper disc. sand-300 (this app's neutral
-                 border token) stands in for the slate-300 divider originally
-                 specified — this codebase has no slate token. --}}
+                 wordmark + "Davao Oriental" subtitle. sand-300 (this app's
+                 neutral border token) stands in for the slate-300 divider
+                 originally specified — this codebase has no slate token. --}}
             <img
                 src="{{ asset('storage/itour-images/davor-tourism.jpg') }}"
                 alt="Provincial Government of Davao Oriental — Tourism Office seal"
@@ -30,22 +34,23 @@
             <span class="h-9 w-px bg-sand-300" aria-hidden="true"></span>
             <span class="flex flex-col justify-center">
                 <x-logo class="text-lg leading-none" />
-                <span class="mt-1 text-[10px] leading-none font-semibold tracking-widest text-sand-500 uppercase">Davao Oriental</span>
+                <span class="mt-1 text-[10px] leading-none font-semibold tracking-widest uppercase text-sand-500">Davao Oriental</span>
             </span>
         </a>
 
         {{-- Active state: text-primary-700 (this app's existing teal) + a
              solid accent-500 underline (this app's existing orange accent
              color — already used for the notification dot elsewhere) below
-             the active link only. Inactive: sand-700 (this app's muted
-             neutral), no underline, hover fades to the same teal. Home/
-             Explore are real routes, so their initial active state is
-             server-rendered via request()->routeIs(). Nearby/Reviews/About
-             are same-page anchor links with no route of their own —
-             data-nav-link/data-nav-variant let initNavScrollSpy() (resources/
-             js/app.js) repaint Home/Nearby/Reviews/About live as their
-             section scrolls into view; Explore has neither attribute, so
-             the scroll-spy never touches it. --}}
+             the active link only. Inactive: sand-900 (this app's darkest
+             neutral, standing in for the spec's text-stone-800) for high
+             contrast against the beige header, no underline, hover fades to
+             the same teal. Home/Explore are real routes, so their initial
+             active state is server-rendered via request()->routeIs().
+             Nearby/Reviews/About are same-page anchor links with no route
+             of their own — data-nav-link/data-nav-variant let
+             initNavScrollSpy() (resources/js/app.js) repaint Home/Nearby/
+             Reviews/About live as their section scrolls into view; Explore
+             has neither attribute, so the scroll-spy never touches it. --}}
         <ul class="hidden items-center gap-7 text-sm font-medium lg:flex">
             @foreach ($navLinks as $link)
                 <li>
@@ -58,7 +63,7 @@
                         @class([
                             'border-b-2 pb-1 transition-all duration-200',
                             'border-accent-500 font-semibold text-primary-700' => $link['active'],
-                            'border-transparent text-sand-700 hover:text-primary-700' => ! $link['active'],
+                            'border-transparent text-sand-900 hover:text-primary-700' => ! $link['active'],
                         ])
                     >{{ $link['label'] }}</a>
                 </li>

@@ -11,6 +11,7 @@
 
 namespace App\Http\Controllers\Lgu;
 
+use App\Http\Controllers\Concerns\AuthorizesOwnMunicipality;
 use App\Http\Controllers\Concerns\ManagesDestinationListings;
 use App\Models\Listing;
 use App\Support\LguMockData;
@@ -22,7 +23,7 @@ use Illuminate\View\View;
 
 class DirectoryController extends LguController
 {
-    use ManagesDestinationListings;
+    use AuthorizesOwnMunicipality, ManagesDestinationListings;
 
     /**
      * Destinations: full management access, scoped to this municipality.
@@ -135,21 +136,5 @@ class DirectoryController extends LguController
         OperationLogger::validated($request->user(), 'establishment', $listing->id, $listing->municipality_id, $listing->id, OperationLogger::diff($before, $listing));
 
         return back()->with('toast', "{$listing->name} marked as verified.");
-    }
-
-    /**
-     * Every write here must stay inside the account's own municipality —
-     * this is the LGU directory's whole reason for having a separate
-     * controller from PTO's (province-wide) equivalent. Compares the real
-     * municipality_id FK, not the display-only municipality/organization_subtitle
-     * strings, so this can't be fooled by a name mismatch or a listing whose
-     * FK backfill didn't resolve.
-     */
-    private function authorizeOwnMunicipality(Request $request, Listing $listing): void
-    {
-        abort_unless(
-            $listing->municipality_id !== null && $listing->municipality_id === $request->user()->municipality_id,
-            403
-        );
     }
 }

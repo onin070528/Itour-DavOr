@@ -22,7 +22,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * still on this table but no longer written by either form.
  */
 #[Fillable([
-    'listing_id', 'source', 'date', 'visitor_name', 'visitor_contact',
+    'listing_id', 'monthly_arrival_report_id', 'source', 'date', 'visitor_name', 'visitor_contact',
     'gender', 'classification', 'visit_type', 'remarks', 'party_male',
     'party_female', 'party_adults', 'party_children', 'party_seniors',
     'party_local', 'party_foreign', 'party_size', 'status',
@@ -39,5 +39,14 @@ class Arrival extends Model
     public function listing(): BelongsTo
     {
         return $this->belongsTo(Listing::class);
+    }
+
+    /**
+     * The digitally-submitted monthly report this row was aggregated into,
+     * if its establishment has submitted that period yet.
+     */
+    public function monthlyArrivalReport(): BelongsTo
+    {
+        return $this->belongsTo(MonthlyArrivalReport::class);
     }
 }

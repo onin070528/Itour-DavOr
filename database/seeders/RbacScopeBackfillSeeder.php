@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Enums\UserRole;
 use App\Models\Listing;
 use App\Models\Municipality;
+use App\Models\MunicipalReport;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Log;
@@ -16,9 +17,10 @@ class RbacScopeBackfillSeeder extends Seeder
      * FK is already set) backfill of the RBAC-facing municipality_id /
      * establishment_id FKs from the pre-existing free-text columns
      * (listings.municipality, users.organization_subtitle,
-     * users.organization_name). Always runs, in every environment — this
-     * is structural data consistency, not demo data. Must run after
-     * MunicipalitySeeder, UserSeeder, and ListingSeeder.
+     * users.organization_name, municipal_reports.municipality). Always
+     * runs, in every environment — this is structural data consistency,
+     * not demo data. Must run after MunicipalitySeeder, UserSeeder,
+     * ListingSeeder, and MunicipalReportSeeder.
      */
     public function run(): void
     {
@@ -69,6 +71,21 @@ class RbacScopeBackfillSeeder extends Seeder
             Log::warning('RbacScopeBackfillSeeder: no municipality match for user.', [
                 'user_id' => $user->id,
                 'organization_subtitle' => $user->organization_subtitle,
+            ]);
+        });
+
+        MunicipalReport::query()->whereNull('municipality_id')->each(function (MunicipalReport $report) use ($municipalitiesByName) {
+            $municipality = $municipalitiesByName->get($report->municipality);
+
+            if ($municipality) {
+                $report->update(['municipality_id' => $municipality->id]);
+
+                return;
+            }
+
+            Log::warning('RbacScopeBackfillSeeder: no municipality match for municipal report.', [
+                'municipal_report_id' => $report->id,
+                'municipality' => $report->municipality,
             ]);
         });
     }

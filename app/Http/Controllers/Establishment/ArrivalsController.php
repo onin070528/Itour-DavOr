@@ -11,9 +11,16 @@
 
 namespace App\Http\Controllers\Establishment;
 
+use App\Enums\MonthlyReportStatus;
+use App\Enums\ReportSubmissionSource;
+use App\Models\MonthlyArrivalReport;
 use App\Support\EstablishmentMockData;
+use App\Support\OperationLogger;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
@@ -95,5 +102,112 @@ class ArrivalsController extends EstablishmentController
         return $this->renderEstablishment($request, 'establishment.arrivals.index', 'arrivals.index', 'Arrival Records', [
             'arrivals' => EstablishmentMockData::arrivals($name),
         ]);
+    }
+
+    /**
+     * Monthly Reports: this establishment's digital monthly submission
+     * history, plus a "Submit [Month]" control for any of the last 12
+     * months that doesn't have a report yet. Digital submission never asks
+     * for new data entry here — it sums whatever Arrival rows already exist
+     * for the chosen month from the Record Arrival wizard.
+     */
+    public function monthlyReports(Request $request): View
+    {
+        abort_if($request->user()->establishment_id === null, 403, 'Your account is not linked to an establishment yet.');
+        $listing = $request->user()->establishment()->firstOrFail();
+
+        $reports = $listing->monthlyArrivalReports()
+            ->with('verifier')
+            ->orderByDesc('period_month')
+            ->get();
+
+        $submittedMonths = $reports->pluck('period_month')->map->toDateString();
+
+        $monthOptions = collect(range(0, 11))
+            ->map(fn (int $i) => CarbonImmutable::now()->subMonthsNoOverflow($i)->startOfMonth())
+            ->reject(fn (CarbonImmutable $month) => $submittedMonths->contains($month->toDateString()))
+            ->values();
+
+        return $this->renderEstablishment($request, 'establishment.arrivals.monthly', 'arrivals.monthly', 'Monthly Reports', [
+            'reports' => $reports,
+            'monthOptions' => $monthOptions,
+        ]);
+    }
+
+    /**
+     * Submits one calendar month's report: sums that period's Arrival rows
+     * (staff-logged and self-checkin alike) for this establishment into a
+     * new MonthlyArrivalReport, then links those rows to it. A month with
+     * no recorded arrivals still submits, as a zero-arrival report — a
+     * missing report is never the same thing as a submitted zero one.
+     */
+    public function submitMonthlyReport(Request $request): RedirectResponse
+    {
+        abort_if($request->user()->establishment_id === null, 403, 'Your account is not linked to an establishment yet.');
+        $listing = $request->user()->establishment()->firstOrFail();
+
+        $data = $request->validate([
+            'period_month' => ['required', 'date_format:Y-m'],
+        ]);
+
+        $month = CarbonImmutable::createFromFormat('Y-m', $data['period_month'])->startOfMonth();
+
+        if ($listing->monthlyArrivalReports()->forPeriod($month)->exists()) {
+            return back()->with('toast', "A report for {$month->format('F Y')} has already been submitted.")->with('toast_tone', 'danger');
+        }
+
+        $totals = $listing->arrivals()
+            ->whereBetween('date', [$month->toDateString(), $month->endOfMonth()->toDateString()])
+            ->selectRaw('
+                COALESCE(SUM(party_male), 0) as party_male,
+                COALESCE(SUM(party_female), 0) as party_female,
+                COALESCE(SUM(party_adults), 0) as party_adults,
+                COALESCE(SUM(party_children), 0) as party_children,
+                COALESCE(SUM(party_seniors), 0) as party_seniors,
+                COALESCE(SUM(party_local), 0) as party_local,
+                COALESCE(SUM(party_foreign), 0) as party_foreign
+            ')
+            ->first();
+
+        $report = DB::transaction(function () use ($listing, $month, $totals, $request) {
+            $report = MonthlyArrivalReport::query()->create([
+                'listing_id' => $listing->id,
+                'municipality_id' => $listing->municipality_id,
+                'period_month' => $month->toDateString(),
+                'submission_source' => ReportSubmissionSource::Digital,
+                'status' => MonthlyReportStatus::ForReview,
+                'party_male' => $totals->party_male,
+                'party_female' => $totals->party_female,
+                'party_adults' => $totals->party_adults,
+                'party_children' => $totals->party_children,
+                'party_seniors' => $totals->party_seniors,
+                'party_local' => $totals->party_local,
+                'party_foreign' => $totals->party_foreign,
+                'total_visitors' => $totals->party_male + $totals->party_female,
+                'submitted_by' => $request->user()->id,
+                'submitted_at' => now(),
+            ]);
+
+            $listing->arrivals()
+                ->whereBetween('date', [$month->toDateString(), $month->endOfMonth()->toDateString()])
+                ->update(['monthly_arrival_report_id' => $report->id]);
+
+            return $report;
+        });
+
+        OperationLogger::created(
+            $request->user(),
+            'monthly_arrival_report',
+            $report->id,
+            $listing->municipality_id,
+            $listing->id,
+            [
+                'period_month' => $month->toDateString(),
+                'submission_source' => ReportSubmissionSource::Digital->value,
+                'total_visitors' => $report->total_visitors,
+            ],
+        );
+
+        return back()->with('toast', "{$month->format('F Y')} report submitted for LGU review.");
     }
 }

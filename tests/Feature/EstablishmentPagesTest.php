@@ -22,10 +22,8 @@ test('every Establishment page renders for an establishment with data', function
     'establishment.qr',
     'establishment.arrivals.record',
     'establishment.arrivals.index',
-    'establishment.statistics',
     'establishment.feedback.index',
     'establishment.feedback.analytics',
-    'establishment.reports',
     'establishment.settings',
 ]);
 
@@ -39,10 +37,8 @@ test('every Establishment page renders for an establishment with no mock data (e
     'establishment.qr',
     'establishment.arrivals.record',
     'establishment.arrivals.index',
-    'establishment.statistics',
     'establishment.feedback.index',
     'establishment.feedback.analytics',
-    'establishment.reports',
     'establishment.settings',
 ]);
 

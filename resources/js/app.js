@@ -42,7 +42,7 @@ function initNavScrollSpy() {
                 link.classList.toggle('text-primary-700', active);
                 link.classList.toggle('font-semibold', active);
                 link.classList.toggle('border-transparent', !active);
-                link.classList.toggle('text-sand-700', !active);
+                link.classList.toggle('text-sand-900', !active);
             } else {
                 link.classList.toggle('bg-sand-100', active);
                 link.classList.toggle('text-primary-700', active);
@@ -78,10 +78,10 @@ function initNavScrollSpy() {
  * Landing page hero background carousel: cross-fades between
  * [data-hero-slide] images every 6s (opacity-only, no layout shift —
  * transition-opacity/duration-1000 already set on each slide in the
- * Blade markup), updates the [data-hero-caption-text] caption and
- * [data-hero-indicator] pagination to match, and pauses autoplay while the
- * hero search input has focus so the background doesn't change mid-type.
- * No-ops entirely on pages without a [data-hero-carousel] section.
+ * Blade markup), updates [data-hero-indicator] pagination to match, and
+ * pauses autoplay while the hero search input has focus so the background
+ * doesn't change mid-type. No-ops entirely on pages without a
+ * [data-hero-carousel] section.
  */
 function initHeroCarousel() {
     const root = document.querySelector('[data-hero-carousel]');
@@ -89,7 +89,6 @@ function initHeroCarousel() {
 
     const slides = Array.from(root.querySelectorAll('[data-hero-slide]'));
     const indicators = Array.from(root.querySelectorAll('[data-hero-indicator]'));
-    const captionText = root.querySelector('[data-hero-caption-text]');
     const searchInput = document.getElementById('hero-search');
 
     if (!slides.length) return;
@@ -115,9 +114,6 @@ function initHeroCarousel() {
             indicator.classList.toggle('bg-white/40', !active);
         });
 
-        if (captionText) {
-            captionText.textContent = slides[current].dataset.heroCaption;
-        }
     }
 
     // Always clearing any existing interval before starting a new one, so a
@@ -790,7 +786,7 @@ function initChatbot() {
     const toggle = document.getElementById('chatbot-toggle');
     const panel = document.getElementById('chatbot-panel');
     const closeButton = document.getElementById('chatbot-close');
-    const iconOpen = document.getElementById('chatbot-toggle-icon-open');
+    const toggleAvatar = document.getElementById('chatbot-toggle-avatar');
     const iconClose = document.getElementById('chatbot-toggle-icon-close');
     const form = document.getElementById('chatbot-form');
     const input = document.getElementById('chatbot-input');
@@ -804,8 +800,8 @@ function initChatbot() {
         panel.classList.toggle('hidden', !open);
         panel.classList.toggle('flex', open);
         toggle.setAttribute('aria-expanded', String(open));
-        toggle.setAttribute('aria-label', open ? 'Close chat assistant' : 'Open chat assistant');
-        iconOpen?.classList.toggle('hidden', open);
+        toggle.setAttribute('aria-label', open ? 'Close chat with Ori' : 'Chat with Ori, your iTOUR tourism assistant');
+        toggleAvatar?.classList.toggle('hidden', open);
         iconClose?.classList.toggle('hidden', !open);
         if (open) input.focus();
     };
@@ -813,20 +809,30 @@ function initChatbot() {
     toggle.addEventListener('click', () => setOpen(panel.classList.contains('hidden')));
     closeButton?.addEventListener('click', () => setOpen(false));
 
+    const sendMessage = (text) => {
+        appendMessage(text, 'user');
+
+        window.setTimeout(() => {
+            appendMessage(
+                "Thanks for your message! I'm still being set up — in the meantime, try Explore to browse destinations, or check the Emergency contacts in the footer.",
+                'bot'
+            );
+        }, 500);
+    };
+
     form.addEventListener('submit', (event) => {
         event.preventDefault();
         const text = input.value.trim();
         if (!text) return;
 
-        appendMessage(text, 'user');
         input.value = '';
+        sendMessage(text);
+    });
 
-        window.setTimeout(() => {
-            appendMessage(
-                "Thanks for your message! The AI assistant is still being set up — in the meantime, try Explore to browse destinations, or check the Emergency contacts in the footer.",
-                'bot'
-            );
-        }, 500);
+    messages.querySelectorAll('[data-chatbot-suggestion]').forEach((button) => {
+        button.addEventListener('click', () => {
+            sendMessage(button.textContent.trim());
+        });
     });
 
     function appendMessage(text, from) {
@@ -840,7 +846,7 @@ function initChatbot() {
             wrapper.appendChild(bubble);
         } else {
             wrapper.className = 'flex items-start gap-2';
-            wrapper.innerHTML = '<span class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-100 text-primary-700"><i class="ti ti-message-chatbot text-sm" aria-hidden="true"></i></span>';
+            wrapper.innerHTML = '<span class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full border border-primary-100"><img src="/storage/itour-images/ori-chatbot-ai.png" alt="Ori" class="h-full w-full object-cover"></span>';
             bubble.className = 'max-w-[85%] rounded-md rounded-tl-none bg-sand-100 px-3 py-2 text-sm leading-relaxed text-sand-800';
             wrapper.appendChild(bubble);
         }

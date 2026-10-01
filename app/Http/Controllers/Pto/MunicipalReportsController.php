@@ -6,9 +6,9 @@
  * Purpose: PTO review of consolidated municipal tourism reports submitted
  * by LGU Tourism Admins — list, detail, approve, and return-for-revision.
  *
- * There is no LGU-facing submission UI yet; App\Models\MunicipalReport rows
- * currently only come from Database\Seeders\MunicipalReportSeeder. Building
- * the LGU submission flow is a separate, larger piece of work — this
+ * MunicipalReport rows are created by Lgu\MonthlyReportsController::consolidate(),
+ * which sums an LGU's Verified MonthlyArrivalReport rows for a municipality
+ * and period and submits the result here (status SUBMITTED) — this
  * controller only covers the PTO side of reviewing rows that already exist.
  *
  * Programmer/s: iTOUR Development Team
@@ -21,6 +21,7 @@ use App\Models\Municipality;
 use App\Models\MunicipalReport;
 use App\Support\OperationLogger;
 use App\Support\TourismCatalog;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -39,9 +40,27 @@ class MunicipalReportsController extends PtoController
             ->orderByDesc('period_start')
             ->get();
 
-        return $this->renderPto($request, 'pto.municipal-reports.index', 'municipalReports', 'Municipal Reports', [
+        // "Monitor which LGUs have submitted" for the current reporting
+        // month specifically — the main $reports list below spans every
+        // historical period, so a municipality with an old report but
+        // nothing yet this month would otherwise look like it's reporting
+        // when it isn't.
+        $currentMonth = CarbonImmutable::now()->startOfMonth();
+        $reportingMunicipalityIds = MunicipalReport::query()
+            ->whereDate('period_start', $currentMonth->toDateString())
+            ->where('status', '!=', MunicipalReport::STATUS_RETURNED)
+            ->whereNotNull('municipality_id')
+            ->pluck('municipality_id');
+        $notReportingMunicipalities = Municipality::query()
+            ->whereNotIn('id', $reportingMunicipalityIds)
+            ->orderBy('name')
+            ->get();
+
+        return $this->renderPto($request, 'pto.municipal-reports.index', 'municipalReports', 'LGU Reports', [
             'reports' => $reports,
             'municipalities' => TourismCatalog::municipalities(),
+            'currentMonth' => $currentMonth,
+            'notReportingMunicipalities' => $notReportingMunicipalities,
             'statuses' => [
                 MunicipalReport::STATUS_SUBMITTED,
                 MunicipalReport::STATUS_REVIEWED,
@@ -57,7 +76,7 @@ class MunicipalReportsController extends PtoController
      */
     public function show(Request $request, MunicipalReport $municipalReport): View
     {
-        $municipalReport->loadMissing(['submitter', 'reviewer']);
+        $municipalReport->loadMissing(['submitter', 'reviewer', 'monthlyArrivalReports.listing', 'monthlyArrivalReports.submitter', 'monthlyArrivalReports.verifier']);
 
         return $this->renderPto($request, 'pto.municipal-reports.show', 'municipalReports', 'Municipal Report', [
             'report' => $municipalReport,
@@ -76,7 +95,7 @@ class MunicipalReportsController extends PtoController
             'reviewed_at' => now(),
         ]);
 
-        OperationLogger::approved($request->user(), 'municipal_report', $municipalReport->id, $this->municipalityIdByName($municipalReport->municipality), OperationLogger::diff($before, $municipalReport));
+        OperationLogger::approved($request->user(), 'municipal_report', $municipalReport->id, $this->municipalityId($municipalReport), OperationLogger::diff($before, $municipalReport));
 
         return back()->with('toast', "{$municipalReport->municipality}'s report was approved.");
     }
@@ -98,13 +117,19 @@ class MunicipalReportsController extends PtoController
             'remarks' => $data['remarks'],
         ]);
 
-        OperationLogger::returned($request->user(), 'municipal_report', $municipalReport->id, $data['remarks'], $this->municipalityIdByName($municipalReport->municipality), OperationLogger::diff($before, $municipalReport));
+        OperationLogger::returned($request->user(), 'municipal_report', $municipalReport->id, $data['remarks'], $this->municipalityId($municipalReport), OperationLogger::diff($before, $municipalReport));
 
         return back()->with('toast', "{$municipalReport->municipality}'s report was returned for revision.");
     }
 
-    private function municipalityIdByName(string $municipality): ?int
+    /**
+     * Prefers the real municipality_id FK (set directly by
+     * Lgu\MonthlyReportsController::consolidate() going forward); falls
+     * back to a name lookup for any report that predates that FK or was
+     * otherwise created without it.
+     */
+    private function municipalityId(MunicipalReport $municipalReport): ?int
     {
-        return Municipality::query()->where('name', $municipality)->value('id');
+        return $municipalReport->municipality_id ?? Municipality::query()->where('name', $municipalReport->municipality)->value('id');
     }
 }

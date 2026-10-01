@@ -32,11 +32,17 @@ class OperationLogger
     }
 
     /**
+     * $reason is optional — most updates (e.g. editing a destination) don't
+     * need one, but a correction to an already-submitted/verified report
+     * does, so callers that have one (LGU correcting a MonthlyArrivalReport
+     * after PTO returns it for clarification) can pass it through rather
+     * than losing it.
+     *
      * @param  ?array{old: array<string, mixed>, new: array<string, mixed>}  $diff  From diff() — null if nothing meaningful changed.
      */
-    public static function updated(User $user, string $entityType, int $entityId, ?int $municipalityId, ?int $establishmentId, ?array $diff): void
+    public static function updated(User $user, string $entityType, int $entityId, ?int $municipalityId, ?int $establishmentId, ?array $diff, ?string $reason = null): void
     {
-        self::write('update', $user, $entityType, $entityId, $municipalityId, $establishmentId, $diff['old'] ?? null, $diff['new'] ?? null, null);
+        self::write('update', $user, $entityType, $entityId, $municipalityId, $establishmentId, $diff['old'] ?? null, $diff['new'] ?? null, $reason);
     }
 
     /**
@@ -64,6 +70,19 @@ class OperationLogger
     public static function returned(User $user, string $entityType, int $entityId, string $reason, ?int $municipalityId, ?array $diff = null): void
     {
         self::write('return', $user, $entityType, $entityId, $municipalityId, null, $diff['old'] ?? null, $diff['new'] ?? null, $reason);
+    }
+
+    /**
+     * An LGU rolling up its municipality's Verified monthly reports into a
+     * single MunicipalReport and submitting it to PTO — one user action,
+     * one log entry, even though it both creates the MunicipalReport row
+     * and is "submit to PTO" (there's no separate submission step).
+     *
+     * @param  array<string, mixed>  $newValues
+     */
+    public static function consolidated(User $user, string $entityType, int $entityId, ?int $municipalityId, array $newValues): void
+    {
+        self::write('consolidate', $user, $entityType, $entityId, $municipalityId, null, null, $newValues ?: null, null);
     }
 
     /**
