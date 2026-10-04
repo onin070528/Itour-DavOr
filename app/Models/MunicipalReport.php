@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable([
     'municipality', 'municipality_id', 'submitted_by', 'period_start', 'period_end',
     'total_arrivals', 'status', 'reviewed_by', 'reviewed_at', 'remarks',
+    'verification_code', 'revision_number', 'supersedes_id', 'frozen_snapshot',
 ])]
 class MunicipalReport extends Model
 {
@@ -39,7 +40,30 @@ class MunicipalReport extends Model
             'period_end' => 'date',
             'reviewed_at' => 'datetime',
             'total_arrivals' => 'integer',
+            'revision_number' => 'integer',
+            'frozen_snapshot' => 'array',
         ];
+    }
+
+    /**
+     * The Verified report this one reopened and replaced (A3-style audit
+     * trail: a resubmission over a Verified report always creates a new
+     * row — see Lgu\MonthlyReportsController::consolidate() — never
+     * overwrites it, so a Verified report's own row is permanently frozen).
+     */
+    public function supersedes(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'supersedes_id');
+    }
+
+    public function supersededBy(): HasMany
+    {
+        return $this->hasMany(self::class, 'supersedes_id');
+    }
+
+    public function isFrozen(): bool
+    {
+        return $this->status === self::STATUS_APPROVED;
     }
 
     /**

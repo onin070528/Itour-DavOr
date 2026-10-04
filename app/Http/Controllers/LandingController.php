@@ -11,6 +11,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Announcement;
 use App\Support\TourismCatalog;
 use Illuminate\View\View;
 
@@ -32,7 +33,7 @@ class LandingController extends Controller
     public function index(): View
     {
         $signatureExperiences = TourismCatalog::signatureExperiences();
-        $activeListings = collect(TourismCatalog::listings())->where('status', 'Active');
+        $activeListings = collect(TourismCatalog::listings())->where('isPubliclyVisible', true);
         $signatureIds = array_column($signatureExperiences, 'id');
 
         return view('landing', [
@@ -46,6 +47,7 @@ class LandingController extends Controller
             'municipalities' => TourismCatalog::municipalities(),
             'reviews' => $this->reviews(),
             'nearbyPlaces' => $this->nearbyPlaces(),
+            'announcements' => Announcement::query()->currentlyVisible()->limit(5)->get(),
         ]);
     }
 
@@ -58,7 +60,7 @@ class LandingController extends Controller
     private function nearbyPlaces(): array
     {
         return collect(TourismCatalog::listings())
-            ->where('status', 'Active')
+            ->where('isPubliclyVisible', true)
             ->filter(fn ($listing) => $listing['lat'] !== null && $listing['lng'] !== null)
             ->map(fn ($listing) => [
                 'name' => $listing['name'],

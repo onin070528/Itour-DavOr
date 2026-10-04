@@ -35,7 +35,8 @@ class OperationLog extends Model
      */
     public const ACTIONS = [
         'create', 'update', 'delete', 'submit', 'return', 'validate',
-        'reject', 'consolidate', 'approve', 'lock', 'unlock', 'export_report',
+        'reject', 'consolidate', 'approve', 'reopen', 'lock', 'unlock', 'export_report',
+        'replace', 'purge', 'publish', 'unpublish',
     ];
 
     protected function casts(): array
@@ -73,9 +74,9 @@ class OperationLog extends Model
     public static function badgeTone(string $action): string
     {
         return match ($action) {
-            'approve', 'validate' => 'success',
-            'return', 'unlock' => 'warning',
-            'reject', 'delete' => 'danger',
+            'approve', 'validate', 'publish' => 'success',
+            'return', 'unlock', 'reopen', 'replace', 'unpublish' => 'warning',
+            'reject', 'delete', 'purge' => 'danger',
             'create', 'update', 'submit', 'lock', 'export_report' => 'neutral',
             default => 'neutral',
         };

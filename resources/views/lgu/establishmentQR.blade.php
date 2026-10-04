@@ -37,6 +37,15 @@
                 <p class="mt-1 text-sm text-sand-600">You're checking in at this establishment.</p>
             </div>
 
+            @if ($refusalMessage)
+                <div class="flex flex-col items-center rounded-md border border-sand-200 bg-sand-0 p-8 text-center shadow-sm">
+                    <span class="flex h-14 w-14 items-center justify-center rounded-full bg-danger-bg text-danger">
+                        <i class="ti ti-ban text-3xl" aria-hidden="true"></i>
+                    </span>
+                    <p class="mt-4 font-display text-base font-bold text-sand-900">{{ $refusalMessage }}</p>
+                    <p class="mt-1 text-sm text-sand-600">Please check with staff at {{ $establishmentName }} for assistance.</p>
+                </div>
+            @else
             <form id="establishment-qr-form" data-action-url="{{ $checkinAction }}" novalidate>
                 {{-- Form step --}}
                 <div id="qr-form-step" class="flex flex-col gap-4">
@@ -142,6 +151,11 @@
                         </div>
                     </div>
 
+                    <p class="text-xs text-sand-500">
+                        Your information is used for tourism statistics of the Provincial Tourism Office of Davao Oriental.
+                        See our <a href="{{ route('privacy') }}" target="_blank" rel="noopener" class="font-semibold text-primary-700 hover:text-primary-900">Privacy Notice</a>.
+                    </p>
+
                     <button type="submit" class="flex items-center justify-center gap-2 rounded-md bg-primary-700 px-5 py-3.5 text-sm font-semibold text-sand-0 shadow-md transition-colors hover:bg-primary-900">
                         <i class="ti ti-clipboard-check text-lg" aria-hidden="true"></i>
                         Submit Registration
@@ -161,6 +175,7 @@
                     </button>
                 </div>
             </form>
+            @endif
         </div>
     </body>
 </html>

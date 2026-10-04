@@ -140,7 +140,7 @@ test('LGU consolidate only counts Verified reports and computes the total automa
     $listingB = DB::table('listings')->insertGetId([
         'slug' => 'xyz-hotel-'.Str::random(6), 'name' => 'XYZ Hotel', 'category' => 'accommodation',
         'municipality' => $municipality->name, 'municipality_id' => $municipality->id,
-        'barangay' => 'Poblacion', 'status' => 'Active', 'created_at' => now(), 'updated_at' => now(),
+        'barangay' => 'Poblacion', 'status' => 'PUBLISHED', 'created_at' => now(), 'updated_at' => now(),
     ]);
     $lgu = makeLguUser($municipality);
     $establishmentUser = makeEstablishmentUser($listingA);
@@ -226,7 +226,7 @@ test('PTO municipal report show page renders the consolidated-from drill-down ta
     $response = test()->actingAs($pto)->get(route('pto.municipalReports.show', $municipalReport));
 
     $response->assertOk();
-    $response->assertSee('Consolidated From');
+    $response->assertSee('Breakdown by Establishment');
     $response->assertSee($listing->name);
     $response->assertSee('42');
 });
@@ -237,7 +237,7 @@ test('LGU Tourism Reports page shows the workflow steps, KPI cards, and sorts No
     $notSubmitted = Listing::query()->create([
         'slug' => 'xyz-hotel-'.Str::random(6), 'name' => 'XYZ Hotel', 'category' => 'accommodation',
         'municipality' => $municipality->name, 'municipality_id' => $municipality->id,
-        'barangay' => 'Poblacion', 'status' => 'Active',
+        'barangay' => 'Poblacion', 'status' => 'PUBLISHED',
     ]);
     $lgu = makeLguUser($municipality);
     $establishmentUser = makeEstablishmentUser($verified);
@@ -268,7 +268,7 @@ test('LGU Tourism Reports page shows the workflow steps, KPI cards, and sorts No
     expect($notSubmittedPos)->toBeLessThan($verifiedPos);
 });
 
-test('PTO Tourism Reports page is read-only and can switch municipalities', function () {
+test('PTO Provincial Reports page is read-only and can switch municipalities', function () {
     $listing = makeEstablishmentListing('Caraga', 'CAR2', 'Riverside Resort');
     $municipality = $listing->municipalityRecord;
     $establishmentUser = makeEstablishmentUser($listing);

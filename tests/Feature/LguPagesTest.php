@@ -30,6 +30,7 @@ test('every LGU page renders for a municipality with data', function (string $ro
     'lgu.monthlyReports.index',
     'lgu.feedback.index',
     'lgu.feedback.analytics',
+    'lgu.images.index',
     'lgu.settings',
     'lgu.users',
 ]);
@@ -45,9 +46,17 @@ test('every LGU page renders for a municipality with no mock data (empty states)
     'lgu.monthlyReports.index',
     'lgu.feedback.index',
     'lgu.feedback.analytics',
+    'lgu.images.index',
     'lgu.settings',
     'lgu.users',
 ]);
+
+test('the old Photo Approvals URL redirects to the Photos page\'s approval tab', function () {
+    $user = actingAsLgu('City of Mati');
+
+    test()->actingAs($user)->get(route('lgu.images.queue'))
+        ->assertRedirect(route('lgu.images.index', ['tab' => 'approval']));
+});
 
 test('the dashboard only shows data scoped to the LGU\'s own municipality', function () {
     $user = actingAsLgu('Cateel');

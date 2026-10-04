@@ -89,7 +89,8 @@ class TourismAnalytics
             ->when($filters['month'] ?? null, fn (Builder $q, int $m) => $q->whereMonth('period_start', $m))
             ->when($filters['municipalityId'] ?? null, fn (Builder $q, int $id) => $q->where('municipality_id', $id))
             ->whereNotNull('municipality_id')
-            ->get(['municipality_id', 'status']);
+            ->whereDoesntHave('supersededBy')
+            ->get(['id', 'municipality_id', 'status']);
 
         $reportingMunicipalities = $municipalReportRows->where('status', '!=', MunicipalReport::STATUS_RETURNED)->pluck('municipality_id')->unique()->count();
         $forClarificationMunicipalities = $municipalReportRows->where('status', MunicipalReport::STATUS_RETURNED)->pluck('municipality_id')->unique()->count();
@@ -119,7 +120,7 @@ class TourismAnalytics
 
         return [
             ['label' => 'Total Tourist Arrivals', 'value' => number_format($totalArrivals), 'delta' => $arrivalsDelta, 'tone' => $arrivalsTone],
-            ['label' => 'Domestic Visitors', 'value' => number_format($domestic), 'delta' => null, 'tone' => 'neutral'],
+            ['label' => 'Local Visitors', 'value' => number_format($domestic), 'delta' => null, 'tone' => 'neutral'],
             ['label' => 'Foreign Visitors', 'value' => number_format($foreign), 'delta' => null, 'tone' => 'neutral'],
             ['label' => 'Reporting LGUs', 'value' => "{$reportingMunicipalities}/{$totalMunicipalities}", 'delta' => null, 'tone' => $reportingMunicipalities === $totalMunicipalities ? 'success' : 'warning'],
             ['label' => 'Verified Reports', 'value' => number_format($verifiedReportsCount), 'delta' => null, 'tone' => 'success'],
@@ -128,6 +129,11 @@ class TourismAnalytics
                 'value' => number_format($attentionCount),
                 'delta' => $attentionCount ? "{$forReviewCount} For Review · {$forClarificationMunicipalities} For Clarification · {$notSubmittedMunicipalities} Not Submitted" : null,
                 'tone' => $attentionCount ? 'warning' : 'success',
+                'href' => route('pto.municipalReports.index', [
+                    'status' => 'attention',
+                    'year' => $filters['year'],
+                    'month' => $filters['month'],
+                ]),
             ],
         ];
     }
@@ -223,6 +229,7 @@ class TourismAnalytics
             ->whereYear('period_start', $filters['year'])
             ->when($filters['month'] ?? null, fn (Builder $q, int $m) => $q->whereMonth('period_start', $m))
             ->whereNotNull('municipality_id')
+            ->whereDoesntHave('supersededBy')
             ->get()
             ->keyBy('municipality_id');
 
@@ -233,8 +240,8 @@ class TourismAnalytics
                 'municipality' => $municipality,
                 'report' => $report,
                 'status' => match ($report?->status) {
-                    'SUBMITTED', 'REVIEWED' => 'For Validation',
-                    'APPROVED' => 'Validated',
+                    'SUBMITTED', 'REVIEWED' => 'For Review',
+                    'APPROVED' => 'Verified',
                     'RETURNED' => 'For Clarification',
                     default => 'Not Submitted',
                 },
@@ -319,7 +326,7 @@ class TourismAnalytics
     {
         return OperationLog::query()
             ->whereIn('entity_type', ['monthly_arrival_report', 'municipal_report'])
-            ->whereIn('action', ['create', 'validate', 'consolidate', 'approve', 'return'])
+            ->whereIn('action', ['create', 'validate', 'consolidate', 'approve', 'return', 'reopen'])
             ->when($municipalityId, fn (Builder $q, int $id) => $q->where('municipality_id', $id))
             ->with('user')
             ->orderByDesc('created_at')
@@ -336,8 +343,9 @@ class TourismAnalytics
             'create' => ['ti-plus', 'encoded/submitted'],
             'validate' => ['ti-check', 'verified'],
             'consolidate' => ['ti-report', 'consolidated and submitted to PTO'],
-            'approve' => ['ti-circle-check', 'validated'],
+            'approve' => ['ti-circle-check', 'verified'],
             'return' => ['ti-arrow-back-up', 'returned for clarification'],
+            'reopen' => ['ti-lock-open', 'reopened a verified report with a new submission'],
             default => ['ti-info-circle', $log->action],
         };
 

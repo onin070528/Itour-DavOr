@@ -11,8 +11,11 @@
 
 namespace App\Http\Controllers\Pto;
 
+use App\Enums\ImageSourceRole;
+use App\Enums\ImageStatus;
 use App\Http\Controllers\Controller;
-use App\Support\PtoNavigation;
+use App\Models\EstablishmentImage;
+use App\Support\DashboardNavigation;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -28,10 +31,26 @@ abstract class PtoController extends Controller
     {
         return view($view, array_merge([
             'user' => $request->user(),
-            'navSections' => PtoNavigation::sections($activeKey),
+            'navSections' => DashboardNavigation::sections($request->user(), $activeKey, $this->_imageApprovalCount()),
             'pageTitle' => $pageTitle,
             'accountHeading' => 'System',
             'settingsHref' => route('pto.settings'),
         ], $data));
+    }
+
+    /**
+     * Establishments (not images) with at least one Pending photo routed
+     * to PTO — LGU-sourced uploads, province-wide (App\Policies\
+     * ImagePolicy::approve() routing, mirrored here for the badge count —
+     * one card per establishment on the queue page, so the badge counts
+     * cards, not photos).
+     */
+    private function _imageApprovalCount(): int
+    {
+        return EstablishmentImage::query()
+            ->where('img_status', ImageStatus::Pending->value)
+            ->where('img_source_role', ImageSourceRole::Lgu->value)
+            ->distinct()
+            ->count('listing_id');
     }
 }

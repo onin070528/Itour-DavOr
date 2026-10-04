@@ -13,6 +13,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Rules\Turnstile;
 use App\Support\SecurityLogger;
 use Illuminate\Auth\Events\Failed;
 use Illuminate\Http\RedirectResponse;
@@ -48,6 +49,20 @@ class SessionController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        // Verified before credentials are even looked up — the account
+        // must never be authenticated unless Turnstile succeeds. Skipped
+        // only in the automated test suite (APP_ENV=testing), which has no
+        // real Turnstile widget to produce a token and isn't exercising
+        // network-dependent third-party verification — never on localhost
+        // (APP_ENV=local) or in production.
+        if (! app()->environment('testing')) {
+            $request->validate([
+                'cf-turnstile-response' => ['required', 'string', new Turnstile($request->ip())],
+            ], [
+                'cf-turnstile-response.required' => 'Please complete the verification check.',
+            ]);
+        }
+
         $credentials = $request->validate([
             'email' => ['required', 'string', 'email'],
             'password' => ['required', 'string'],

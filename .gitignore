@@ -18,8 +18,12 @@
 /public/fonts-manifest.dev.json
 /public/hot
 /public/storage
+/public/sw.js
+/public/workbox-*.js
 /storage/*.key
 /storage/pail
+/storage/app/public
+/storage/testing.sqlite
 /vendor
 _ide_helper.php
 Homestead.json

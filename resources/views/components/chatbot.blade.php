@@ -86,23 +86,6 @@
         </form>
     </div>
 
-    <button
-        type="button"
-        id="chatbot-toggle"
-        class="group flex items-center gap-2.5 rounded-full border-2 border-accent-400 bg-sand-0 py-1.5 pl-1.5 pr-1.5 shadow-[0_4px_18px_rgba(0,0,0,0.22)] transition-all duration-200 hover:scale-105 hover:border-accent-500 hover:shadow-[0_6px_22px_rgba(0,0,0,0.26),0_0_16px_rgba(249,115,22,0.25)] sm:pr-4"
-        aria-expanded="false"
-        aria-controls="chatbot-panel"
-        aria-label="Chat with Ori, your iTOUR tourism assistant"
-    >
-        <span class="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-sand-0">
-            <img
-                id="chatbot-toggle-avatar"
-                src="{{ asset('storage/itour-images/ori-chatbot-ai.png') }}"
-                alt="Ori"
-                class="h-full w-full object-cover"
-            >
-            <i id="chatbot-toggle-icon-close" class="ti ti-x hidden text-xl text-primary-700" aria-hidden="true"></i>
-        </span>
-        <span class="hidden pr-1 text-sm font-semibold text-sand-800 sm:inline">Ask Ori</span>
-    </button>
 </div>
+
+<x-ori_launcher />

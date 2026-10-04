@@ -5,12 +5,7 @@
      the same listing shape (see App\Support\TourismCatalog::listings()). --}}
 <article {{ $attributes->merge(['class' => 'group flex flex-col overflow-hidden rounded-md border border-sand-200 bg-sand-0 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md']) }}>
     <div class="relative flex h-44 items-end overflow-hidden bg-sand-200">
-        <img
-            src="{{ asset('storage/itour-images/'.$listing['image']) }}"
-            alt="{{ $listing['name'] }}, {{ $listing['municipality'] }}"
-            loading="lazy"
-            class="absolute inset-0 h-full w-full object-cover"
-        >
+        <x-listing-photo :listing="$listing" />
         <div class="pointer-events-none absolute inset-0 bg-gradient-to-t from-sand-900/55 via-transparent to-transparent"></div>
         <span class="relative m-3 inline-flex items-center gap-1 rounded-sm bg-sand-900/45 px-2.5 py-1 text-xs font-semibold tracking-wide text-sand-0 uppercase">
             <i class="ti ti-map-pin text-[11px]" aria-hidden="true"></i>

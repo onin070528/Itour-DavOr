@@ -3,8 +3,8 @@
     $classificationTotal = $classification['local'] + $classification['foreign'];
     $genderTotal = $classification['male'] + $classification['female'];
     $statusTone = fn (string $status) => match ($status) {
-        'Validated' => 'success',
-        'For Validation' => 'warning',
+        'Verified' => 'success',
+        'For Review' => 'warning',
         'For Clarification' => 'danger',
         default => 'neutral',
     };
@@ -14,14 +14,7 @@
     <x-dashboard.page-header
         title="Tourism Monitoring Dashboard"
         description="Verified tourist arrivals, visitation statistics, and reporting status across the municipalities of Davao Oriental."
-    >
-        <x-slot:actions>
-            <a href="{{ route('pto.municipalReports.index') }}" class="inline-flex items-center gap-2 rounded-sm border border-sand-300 bg-sand-0 px-4 py-2.5 text-sm font-semibold text-sand-800 hover:border-primary-300">
-                <i class="ti ti-clipboard-check" aria-hidden="true"></i>
-                LGU Reports
-            </a>
-        </x-slot:actions>
-    </x-dashboard.page-header>
+    />
 
     {{-- Filters: every section below respects these, applied server-side.
          Only Verified reports ever count toward a total — see
@@ -66,7 +59,7 @@
             <label for="classification" class="mb-1 block text-xs font-semibold text-sand-700">Visitor Classification</label>
             <select id="classification" name="classification" onchange="this.form.submit()" class="rounded-sm border border-sand-300 bg-sand-50 px-3 py-2.5 text-sm text-sand-900">
                 <option value="">All Visitors</option>
-                <option value="local" @selected($filters['classification'] === 'local')>Domestic</option>
+                <option value="local" @selected($filters['classification'] === 'local')>Local</option>
                 <option value="foreign" @selected($filters['classification'] === 'foreign')>Foreign</option>
             </select>
         </div>
@@ -78,7 +71,7 @@
     {{-- KPI Summary --}}
     <div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         @foreach ($kpis as $card)
-            <x-dashboard.kpi-card :label="$card['label']" :value="$card['value']" :delta="$card['delta']" :tone="$card['tone']" />
+            <x-dashboard.kpi-card :label="$card['label']" :value="$card['value']" :delta="$card['delta']" :tone="$card['tone']" :href="$card['href'] ?? null" />
         @endforeach
     </div>
 
@@ -120,14 +113,14 @@
                 <div class="mt-4 flex items-center gap-5">
                     <x-dashboard.donut-chart
                         :segments="[
-                            ['label' => 'Domestic', 'value' => $classification['local'], 'color' => 'var(--color-primary-700)'],
+                            ['label' => 'Local', 'value' => $classification['local'], 'color' => 'var(--color-primary-700)'],
                             ['label' => 'Foreign', 'value' => $classification['foreign'], 'color' => 'var(--color-accent-500)'],
                         ]"
                         :center-label="$classificationTotal ? round(($classification['local'] / $classificationTotal) * 100).'%' : '—'"
-                        center-sublabel="Domestic"
+                        center-sublabel="Local"
                     />
                     <div class="flex flex-col gap-2 text-xs">
-                        <span class="flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-primary-700"></span>Domestic <b class="ml-auto font-semibold">{{ number_format($classification['local']) }}</b></span>
+                        <span class="flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-primary-700"></span>Local <b class="ml-auto font-semibold">{{ number_format($classification['local']) }}</b></span>
                         <span class="flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-accent-500"></span>Foreign <b class="ml-auto font-semibold">{{ number_format($classification['foreign']) }}</b></span>
                     </div>
                 </div>
@@ -205,24 +198,38 @@
         <div class="rounded-md border border-sand-200 bg-sand-0 p-5 lg:col-span-2">
             <h2 class="font-display text-base font-bold text-sand-900">LGU Reporting Status</h2>
             <p class="text-xs text-sand-500">A municipality with no report yet always shows as Not Submitted — never a zero.</p>
-            <div class="mt-3 overflow-x-auto">
-                <table class="w-full min-w-[360px] text-sm">
-                    <thead>
-                        <tr class="border-b border-sand-200 text-left text-xs font-semibold text-sand-500 uppercase">
-                            <th class="py-2 pr-2">Municipality</th>
-                            <th class="py-2 pr-2">Status</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-sand-100">
-                        @foreach ($reportingStatus as $row)
-                            <tr>
-                                <td class="py-2 pr-2 font-medium text-sand-900">{{ $row['municipality']->name }}</td>
-                                <td class="py-2 pr-2"><x-dashboard.status-badge :tone="$statusTone($row['status'])">{{ $row['status'] }}</x-dashboard.status-badge></td>
+
+            @if ($notYetReportedCount > 0)
+                <p class="mt-2 flex items-center gap-1.5 text-xs font-semibold text-warning">
+                    <i class="ti ti-alert-triangle" aria-hidden="true"></i>
+                    Official statistics above count only Verified reports — {{ $notYetReportedCount }} {{ Str::plural('LGU', $notYetReportedCount) }} {{ $notYetReportedCount === 1 ? 'has' : 'have' }} not yet reported for this period.
+                </p>
+            @endif
+
+            @if ($reportingStatus->isEmpty())
+                <x-dashboard.empty-state class="mt-3" icon="ti-map-pin-off" title="No municipalities to show" description="Try a different filter." />
+            @else
+                <div class="mt-3 overflow-x-auto">
+                    <table class="w-full min-w-[480px] text-sm">
+                        <thead>
+                            <tr class="border-b border-sand-200 text-left text-xs font-semibold text-sand-500 uppercase">
+                                <th class="py-2 pr-2">Municipality</th>
+                                <th class="py-2 pr-2">Status</th>
+                                <th class="py-2 pr-2">Date Submitted</th>
                             </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
+                        </thead>
+                        <tbody class="divide-y divide-sand-100">
+                            @foreach ($reportingStatus as $row)
+                                <tr>
+                                    <td class="py-2 pr-2 font-medium text-sand-900">{{ $row['municipality']->name }}</td>
+                                    <td class="py-2 pr-2"><x-dashboard.status-badge :tone="$statusTone($row['status'])">{{ $row['status'] }}</x-dashboard.status-badge></td>
+                                    <td class="py-2 pr-2 text-sand-700">{{ $row['report']?->created_at?->format('M j, Y') ?? '—' }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
         </div>
 
         {{-- Destination Performance — not yet available: destinations have
@@ -244,8 +251,8 @@
         <h2 class="font-display text-base font-bold text-sand-900">Quick Actions</h2>
         <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             @foreach ([
-                ['icon' => 'ti-calendar-event', 'label' => 'Tourism Reports', 'href' => route('pto.monthlyReports.index')],
-                ['icon' => 'ti-clipboard-check', 'label' => 'LGU Reports', 'href' => route('pto.municipalReports.index')],
+                ['icon' => 'ti-calendar-event', 'label' => 'Provincial Reports', 'href' => route('pto.monthlyReports.index')],
+                ['icon' => 'ti-clipboard-check', 'label' => 'LGU Submissions', 'href' => route('pto.municipalReports.index')],
                 ['icon' => 'ti-shield-check', 'label' => 'Audit Logs', 'href' => route('pto.auditLogs')],
             ] as $action)
                 <a href="{{ $action['href'] }}" class="flex items-center gap-2.5 rounded-md border border-sand-200 px-3.5 py-3 text-sm font-semibold text-sand-800 transition-colors hover:border-primary-300 hover:text-primary-700">

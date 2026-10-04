@@ -1,28 +1,47 @@
 <?php
 
+use App\Enums\ImageSourceRole;
+use App\Enums\ImageStatus;
 use App\Enums\UserRole;
+use App\Models\Category;
+use App\Models\EstablishmentImage;
 use App\Models\Listing;
-use App\Models\ListingImage;
 use App\Models\Municipality;
 use App\Models\User;
 use Illuminate\Support\Str;
 
-function makeEstablishmentListing(string $municipalityName, string $municipalityCode, string $name): Listing
+/**
+ * The QR-enabled "Accommodation" category every makeEstablishmentListing()
+ * fixture is filed under, so Listing::isQrEnabled() (status Active, not a
+ * Tour Guide, category QR-enabled) is true for every establishment fixture
+ * by default — matching how real establishments are categorized post
+ * Tourism Directory (Stage 2).
+ */
+function qrEnabledCategoryFixture(): Category
+{
+    return Category::query()->firstOrCreate(
+        ['cat_name' => 'Accommodation'],
+        ['cat_sort_order' => 1, 'cat_is_active' => true, 'cat_is_qr_enabled' => true]
+    );
+}
+
+function makeEstablishmentListing(string $municipalityName, string $municipalityCode, string $name, array $overrides = []): Listing
 {
     $municipality = Municipality::query()->firstOrCreate(
         ['code' => $municipalityCode],
         ['name' => $municipalityName]
     );
 
-    return Listing::query()->create([
+    return Listing::query()->create(array_merge([
         'slug' => Str::slug($name.'-'.Str::random(6)),
         'name' => $name,
         'category' => 'accommodation',
+        'cat_id' => qrEnabledCategoryFixture()->cat_id,
         'municipality' => $municipality->name,
         'municipality_id' => $municipality->id,
         'barangay' => 'Poblacion',
-        'status' => 'Active',
-    ]);
+        'status' => 'PUBLISHED',
+    ], $overrides));
 }
 
 function makeEstablishmentUser(Listing $listing): User
@@ -37,7 +56,9 @@ function makeEstablishmentUser(Listing $listing): User
 }
 
 test('an establishment user can update only its own listing', function () {
-    $own = makeEstablishmentListing('City of Mati', 'MATI', 'My Own Inn');
+    // DRAFT: establishment self-edits are only allowed while the package
+    // is editable (see App\Policies\ListingPolicy, the self-review merge).
+    $own = makeEstablishmentListing('City of Mati', 'MATI', 'My Own Inn', ['status' => 'DRAFT']);
     $user = makeEstablishmentUser($own);
 
     test()->actingAs($user)->put(route('establishment.profile.update'), [
@@ -54,24 +75,32 @@ test('an establishment user can update only its own listing', function () {
 test('an establishment user cannot touch another establishment\'s photo via a guessed image id', function () {
     $own = makeEstablishmentListing('City of Mati', 'MATI', 'My Own Inn');
     $other = makeEstablishmentListing('City of Mati', 'MATI', 'A Different Inn');
-    $otherImage = ListingImage::query()->create([
+    $otherUser = makeEstablishmentUser($other);
+    $otherImage = EstablishmentImage::query()->create([
         'listing_id' => $other->id,
-        'path' => 'fixture.jpg',
-        'is_primary' => true,
-        'sort_order' => 0,
+        'img_path' => 'fixture.jpg',
+        'img_thumbnail_path' => 'fixture_thumb.jpg',
+        'img_alt_text' => $other->name,
+        'img_source_role' => ImageSourceRole::Establishment,
+        'img_status' => ImageStatus::Published,
+        'img_is_cover' => true,
+        'img_sort_order' => 0,
+        'img_hash' => hash('sha256', 'guessed-id-fixture'),
+        'img_uploaded_by' => $otherUser->id,
+        'img_has_ownership_declared' => true,
     ]);
 
     $user = makeEstablishmentUser($own);
 
     test()->actingAs($user)
-        ->patch(route('establishment.profile.images.primary', $otherImage))
+        ->patch(route('establishment.images.cover', $otherImage))
         ->assertForbidden();
 
     test()->actingAs($user)
-        ->delete(route('establishment.profile.images.destroy', $otherImage))
+        ->patch(route('establishment.images.remove', $otherImage))
         ->assertForbidden();
 
-    expect($otherImage->fresh())->not->toBeNull();
+    expect($otherImage->fresh()->img_is_cover)->toBeTrue();
 });
 
 test('an establishment user in one municipality cannot reach another establishment via id, same or different municipality', function () {

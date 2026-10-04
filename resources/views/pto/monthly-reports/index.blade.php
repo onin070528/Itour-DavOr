@@ -8,9 +8,22 @@
 
 <x-layouts.dashboard :user="$user" :nav-sections="$navSections" :page-title="$pageTitle" account-heading="System" :settings-href="route('pto.settings')">
     <x-dashboard.page-header
-        title="Tourism Reports"
+        title="Provincial Reports"
         description="Province-wide view of establishment monthly reporting progress, by municipality — read-only; encoding, review, and consolidation stay with each LGU."
-    />
+    >
+        @if ($municipality)
+            <x-slot:actions>
+                <a
+                    href="{{ route('pto.monthlyReports.officialReport', ['period' => $month->format('Y-m'), 'municipality_id' => $municipality->id]) }}"
+                    target="_blank"
+                    class="inline-flex items-center gap-2 rounded-sm bg-primary-700 px-4 py-2.5 text-sm font-semibold text-sand-0 hover:bg-primary-900"
+                >
+                    <i class="ti ti-file-description" aria-hidden="true"></i>
+                    Official Report
+                </a>
+            </x-slot:actions>
+        @endif
+    </x-dashboard.page-header>
 
     <form method="GET" action="{{ route('pto.monthlyReports.index') }}" class="mt-6 flex flex-wrap items-end gap-3 rounded-md border border-sand-200 bg-sand-0 p-4">
         <div>

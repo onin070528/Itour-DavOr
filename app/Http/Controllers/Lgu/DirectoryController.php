@@ -11,14 +11,19 @@
 
 namespace App\Http\Controllers\Lgu;
 
+use App\Enums\ImageStatus;
 use App\Http\Controllers\Concerns\AuthorizesOwnMunicipality;
 use App\Http\Controllers\Concerns\ManagesDestinationListings;
+use App\Models\EstablishmentImage;
 use App\Models\Listing;
+use App\Services\ListingPublishWorkflow;
 use App\Support\LguMockData;
 use App\Support\OperationLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class DirectoryController extends LguController
@@ -114,27 +119,66 @@ class DirectoryController extends LguController
         return $this->renderLgu($request, 'lgu.directory.establishments', 'directory.establishments', 'Establishments', [
             'municipality' => $municipality,
             'listings' => LguMockData::establishments($municipality),
+            'photoLastUpdated' => $this->_photoLastUpdatedBySlug($request->user()->municipality_id),
         ]);
     }
 
-    public function verifyEstablishment(Request $request, Listing $listing): RedirectResponse
+    /**
+     * "Photo last updated" — the date of each establishment's latest
+     * PUBLISHED image, keyed by slug (what the mock-shaped $listings rows
+     * use as their 'id').
+     *
+     * @return array<string, Carbon>
+     */
+    private function _photoLastUpdatedBySlug(?int $municipalityId): array
     {
-        $this->authorizeOwnMunicipality($request, $listing);
-
-        abort_if($listing->category === 'destinations', 404);
-
-        $before = $listing->getOriginal();
-
-        try {
-            $listing->update(['status' => 'Active']);
-        } catch (\Throwable $e) {
-            Log::error('Failed to verify establishment.', ['exception' => $e, 'listing_id' => $listing->id]);
-
-            return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
+        if ($municipalityId === null) {
+            return [];
         }
 
-        OperationLogger::validated($request->user(), 'establishment', $listing->id, $listing->municipality_id, $listing->id, OperationLogger::diff($before, $listing));
+        return EstablishmentImage::query()
+            ->where('img_status', ImageStatus::Published->value)
+            ->whereHas('listing', fn ($query) => $query->where('municipality_id', $municipalityId))
+            ->with('listing:id,slug')
+            ->get()
+            ->groupBy('listing.slug')
+            ->map(fn ($images) => $images->max('img_updated_at'))
+            ->all();
+    }
 
-        return back()->with('toast', "{$listing->name} marked as verified.");
+    /**
+     * DRAFT/UNPUBLISHED → FOR_PTO_REVIEW. See
+     * App\Services\ListingPublishWorkflow::submitToPto().
+     */
+    public function submitToPto(Request $request, Listing $listing, ListingPublishWorkflow $workflow): RedirectResponse
+    {
+        abort_unless($request->user()->can('submit', $listing), 403);
+
+        try {
+            $workflow->submitToPto($request->user(), $listing);
+        } catch (ValidationException $e) {
+            return back()->with('toast', $e->validator->errors()->first())->with('toast_tone', 'danger');
+        }
+
+        return back()->with('toast', "{$listing->name} was submitted to the Provincial Tourism Office.");
+    }
+
+    /**
+     * DRAFT or FOR_PTO_REVIEW → DRAFT, with a reason the establishment
+     * sees. See App\Services\ListingPublishWorkflow::returnToEstablishment().
+     */
+    public function returnToEstablishment(Request $request, Listing $listing, ListingPublishWorkflow $workflow): RedirectResponse
+    {
+        abort_unless($request->user()->can('submit', $listing), 403);
+
+        $data = $request->validate(['reason' => ['required', 'string', 'max:500']]);
+
+        try {
+            $workflow->returnToEstablishment($request->user(), $listing, $data['reason']);
+        } catch (ValidationException $e) {
+            return back()->with('toast', $e->validator->errors()->first())->with('toast_tone', 'danger');
+        }
+
+        return back()->with('toast', "{$listing->name} was returned to the establishment.");
     }
 }

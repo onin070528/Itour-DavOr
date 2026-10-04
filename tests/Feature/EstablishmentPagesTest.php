@@ -1,17 +1,15 @@
 <?php
 
 use App\Enums\UserRole;
+use App\Models\Category;
+use App\Models\Listing;
 use App\Models\User;
 
-function actingAsEstablishment(string $name, string $subtitle = 'Somewhere, Davao Oriental'): User
-{
-    return User::factory()->create([
-        'role' => UserRole::Establishment,
-        'organization_name' => $name,
-        'organization_subtitle' => $subtitle,
-    ]);
-}
-
+/**
+ * The merged Profile/Photos page resolves the account's listing by FK
+ * (establishment_id), not by name-matching — so every establishment test
+ * fixture needs a real backing Listing, not just the account fields.
+ */
 test('every Establishment page renders for an establishment with data', function (string $routeName) {
     $user = actingAsEstablishment('Botanika Nature Resort', 'Brgy. Dahican, City of Mati');
 
@@ -54,17 +52,92 @@ test('the dashboard only shows data scoped to the account\'s own establishment',
 });
 
 test('feedback and arrival records are limited to the account\'s own establishment', function () {
-    $user = actingAsEstablishment('Botanika Nature Resort', 'Brgy. Dahican, City of Mati');
+    // Create category for establishments
+    $category = Category::query()->firstOrCreate(
+        ['cat_name' => 'Accommodation'],
+        ['cat_sort_order' => 1, 'cat_is_active' => true, 'cat_is_qr_enabled' => true]
+    );
 
-    $feedback = test()->actingAs($user)->get(route('establishment.feedback.index'));
+    // Establishment 1: Botanika (create listing and seed arrivals/feedback)
+    $botanikaListing = Listing::query()->create([
+        'slug' => 'botanika-nature-resort',
+        'name' => 'Botanika Nature Resort',
+        'category' => 'accommodation',
+        'cat_id' => $category->cat_id,
+        'municipality' => 'City of Mati',
+        'barangay' => 'Dahican',
+        'status' => 'PUBLISHED',
+    ]);
+
+    // Seed arrivals for Botanika (matching ArrivalSeeder data)
+    $botanikaListing->arrivals()->createMany([
+        [
+            'source' => 'staff',
+            'date' => '2026-08-22',
+            'visitor_name' => 'Kim Soo-jin',
+            'gender' => 'Female',
+            'classification' => 'Foreign',
+            'remarks' => 'Celebrating a birthday',
+            'status' => 'Recorded',
+            'party_size' => 1,
+        ],
+        [
+            'source' => 'staff',
+            'date' => '2026-08-22',
+            'visitor_name' => null,
+            'gender' => 'Male',
+            'classification' => 'Domestic (Other Province)',
+            'remarks' => null,
+            'status' => 'Recorded',
+            'party_size' => 1,
+        ],
+    ]);
+
+    $botanikaUser = User::factory()->create([
+        'role' => UserRole::Establishment,
+        'organization_name' => 'Botanika Nature Resort',
+        'organization_subtitle' => 'Brgy. Dahican, City of Mati',
+        'establishment_id' => $botanikaListing->id,
+    ]);
+
+    // Establishment 2: Badjao (no seeded data)
+    $badjaoListing = Listing::query()->create([
+        'slug' => 'badjao-seafront',
+        'name' => 'Badjao Seafront Restaurant',
+        'category' => 'restaurants',
+        'cat_id' => $category->cat_id,
+        'municipality' => 'City of Mati',
+        'barangay' => 'Dahican',
+        'status' => 'PUBLISHED',
+    ]);
+
+    $badjaoUser = User::factory()->create([
+        'role' => UserRole::Establishment,
+        'organization_name' => 'Badjao Seafront Restaurant',
+        'organization_subtitle' => 'Brgy. Dahican, City of Mati',
+        'establishment_id' => $badjaoListing->id,
+    ]);
+
+    // Botanika user should see their own feedback and arrivals
+    $feedback = test()->actingAs($botanikaUser)->get(route('establishment.feedback.index'));
     $feedback->assertOk();
     $feedback->assertSee('Beautiful sunrise from the room');
-    // Feedback left for a different establishment must not appear here.
+    // Feedback for a different establishment must not appear
     $feedback->assertDontSee('Lami kaayo ang kinilaw');
 
-    $arrivals = test()->actingAs($user)->get(route('establishment.arrivals.index'));
+    $arrivals = test()->actingAs($botanikaUser)->get(route('establishment.arrivals.index'));
     $arrivals->assertOk();
     $arrivals->assertSee('Kim Soo-jin');
+
+    // Badjao user should NOT see Botanika's data
+    $badjaoFeedback = test()->actingAs($badjaoUser)->get(route('establishment.feedback.index'));
+    $badjaoFeedback->assertOk();
+    $badjaoFeedback->assertDontSee('Beautiful sunrise from the room');
+    $badjaoFeedback->assertDontSee('Kim Soo-jin');
+
+    $badjaoArrivals = test()->actingAs($badjaoUser)->get(route('establishment.arrivals.index'));
+    $badjaoArrivals->assertOk();
+    $badjaoArrivals->assertDontSee('Kim Soo-jin');
 });
 
 test('an establishment user cannot access PTO or LGU routes', function () {

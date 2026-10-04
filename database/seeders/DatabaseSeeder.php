@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
             MunicipalitySeeder::class,
             UserSeeder::class,
             ListingSeeder::class,
+            CategorySeeder::class,
             ArrivalSeeder::class,
             MunicipalReportSeeder::class,
             RbacScopeBackfillSeeder::class,

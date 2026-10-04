@@ -6,6 +6,7 @@
             <button type="button" data-tab-target="profile" aria-selected="true" class="border-b-2 border-primary-700 px-4 py-3 text-sm font-semibold text-primary-700">Profile</button>
             <button type="button" data-tab-target="account" aria-selected="false" class="border-b-2 border-transparent px-4 py-3 text-sm font-semibold text-sand-500">Account Information</button>
             <button type="button" data-tab-target="preferences" aria-selected="false" class="border-b-2 border-transparent px-4 py-3 text-sm font-semibold text-sand-500">Preferences</button>
+            <button type="button" data-tab-target="categories" aria-selected="false" class="border-b-2 border-transparent px-4 py-3 text-sm font-semibold text-sand-500">Categories</button>
         </div>
 
         <div class="p-6">
@@ -66,6 +67,34 @@
                         Save Preferences
                     </button>
                 </form>
+            </div>
+
+            <div data-tab-panel="categories" class="hidden max-w-xl">
+                <p class="text-sm text-sand-600">
+                    Turning a category's QR switch off never deletes its establishments' QR codes or arrival history — it just refuses new scans with a clear message until switched back on.
+                </p>
+                <div class="mt-4 flex flex-col divide-y divide-sand-100">
+                    @foreach ($categories as $category)
+                        <div class="flex items-center justify-between gap-4 py-3">
+                            <div>
+                                <p class="text-sm font-medium text-sand-900">{{ $category->cat_name }}</p>
+                                <p class="text-xs text-sand-500">{{ $category->cat_is_qr_enabled ? 'Accepting QR scans' : 'QR scans refused' }}</p>
+                            </div>
+                            <form method="POST" action="{{ route('pto.settings.categories.toggleQr', $category) }}">
+                                @csrf
+                                @method('PUT')
+                                <button
+                                    type="submit"
+                                    role="switch"
+                                    aria-checked="{{ $category->cat_is_qr_enabled ? 'true' : 'false' }}"
+                                    class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors {{ $category->cat_is_qr_enabled ? 'bg-primary-700' : 'bg-sand-300' }}"
+                                >
+                                    <span class="inline-block h-4.5 w-4.5 transform rounded-full bg-sand-0 shadow transition-transform {{ $category->cat_is_qr_enabled ? 'translate-x-6' : 'translate-x-1' }}"></span>
+                                </button>
+                            </form>
+                        </div>
+                    @endforeach
+                </div>
             </div>
         </div>
     </div>

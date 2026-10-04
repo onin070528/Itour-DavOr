@@ -13,8 +13,8 @@
     $maxByEstablishment = $byEstablishment->max() ?: 1;
 
     $tabs = [
-        'index' => 'All Feedback',
-        'analytics' => 'Experience Analytics',
+        'index' => 'Reviews',
+        'analytics' => 'Sentiment Analytics',
     ];
 @endphp
 
@@ -59,6 +59,18 @@
                         <option value="{{ $s }}">{{ $s }}</option>
                     @endforeach
                 </select>
+                <select data-filter-select data-filter-key="municipality" class="rounded-sm border border-sand-300 bg-sand-50 px-3 py-2.5 text-sm text-sand-700">
+                    <option value="">All Municipalities</option>
+                    @foreach ($municipalities as $m)
+                        <option value="{{ $m }}">{{ $m }}</option>
+                    @endforeach
+                </select>
+                <select data-filter-select data-filter-key="category" class="rounded-sm border border-sand-300 bg-sand-50 px-3 py-2.5 text-sm text-sand-700">
+                    <option value="">All Categories</option>
+                    @foreach ($categories as $c)
+                        <option value="{{ $c }}">{{ $c }}</option>
+                    @endforeach
+                </select>
                 <button type="button" data-filter-reset class="rounded-sm border border-sand-300 px-3 py-2.5 text-sm font-semibold text-sand-700 hover:border-primary-300">
                     Reset
                 </button>
@@ -72,6 +84,8 @@
                         data-row
                         data-subject="{{ $entry['subject'] }}"
                         data-sentiment="{{ $entry['sentiment'] }}"
+                        data-municipality="{{ $entry['municipality'] }}"
+                        data-category="{{ $entry['category'] }}"
                         data-search-text="{{ strtolower($entry['name'].' '.$entry['subject'].' '.$entry['text']) }}"
                         class="flex flex-col gap-3 rounded-md border border-sand-200 bg-sand-0 p-4"
                     >
@@ -189,6 +203,49 @@
                     @endforelse
                 </div>
             </div>
+        </div>
+
+        {{-- Positive/neutral/negative distribution per destination/establishment --}}
+        <div class="mt-6 rounded-md border border-sand-200 bg-sand-0 p-5">
+            <h2 class="font-display text-base font-bold text-sand-900">Sentiment Distribution per Destination</h2>
+            <div class="mt-4 flex flex-col gap-3">
+                @foreach ($sentimentByDestination as $subject => $counts)
+                    @php $subjectTotal = array_sum($counts); @endphp
+                    <div>
+                        <div class="flex items-center justify-between text-xs text-sand-600">
+                            <span class="font-medium text-sand-800">{{ $subject }}</span>
+                            <span>{{ $subjectTotal }} {{ Str::plural('entry', $subjectTotal) }}</span>
+                        </div>
+                        <div class="mt-1 flex h-2.5 w-full overflow-hidden rounded-full bg-sand-100">
+                            <div class="h-full bg-success" style="width: {{ round(($counts['positive'] / $subjectTotal) * 100) }}%"></div>
+                            <div class="h-full bg-warning" style="width: {{ round(($counts['neutral'] / $subjectTotal) * 100) }}%"></div>
+                            <div class="h-full bg-danger" style="width: {{ round(($counts['negative'] / $subjectTotal) * 100) }}%"></div>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+
+        {{-- Common Concerns / Suggested Improvements: the lowest-polarity
+             (Negative/Neutral) entries' own text — the concern or
+             improvement is literally what the tourist wrote. --}}
+        <div class="mt-6 rounded-md border border-sand-200 bg-sand-0 p-5">
+            <h2 class="font-display text-base font-bold text-sand-900">Common Concerns &amp; Suggested Improvements</h2>
+            @if ($concerns->isEmpty())
+                <p class="mt-4 text-sm text-sand-500">No negative or neutral feedback to review.</p>
+            @else
+                <ul class="mt-4 flex flex-col gap-3">
+                    @foreach ($concerns as $entry)
+                        <li class="rounded-md border border-sand-200 p-3">
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="text-sm font-semibold text-sand-900">{{ $entry['subject'] }}</span>
+                                <x-dashboard.status-badge :tone="$sentimentTone($entry['sentiment'])">{{ $entry['sentiment'] }}</x-dashboard.status-badge>
+                            </div>
+                            <p class="mt-1.5 text-sm text-sand-700">&ldquo;{{ $entry['text'] }}&rdquo;</p>
+                        </li>
+                    @endforeach
+                </ul>
+            @endif
         </div>
     </div>
 </x-layouts.dashboard>

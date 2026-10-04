@@ -27,19 +27,19 @@ function makeEstablishmentListingFixture(Municipality $municipality, string $nam
         'municipality' => $municipality->name,
         'municipality_id' => $municipality->id,
         'barangay' => 'Poblacion',
-        'status' => 'Active',
+        'status' => 'PUBLISHED',
     ]);
 }
 
 test('PTO can create an LGU account', function () {
-    makeMunicipalityFixture('Cateel', 'CAT');
+    $cateel = makeMunicipalityFixture('Cateel', 'CAT');
     $pto = makePtoAdmin();
 
     $response = test()->actingAs($pto)->post(route('pto.users.store'), [
         'name' => 'New LGU Officer',
         'email' => 'new.lgu@example.test',
-        'role' => 'LGU Tourism Personnel',
-        'assignment' => 'Cateel',
+        'role' => UserRole::Lgu->value,
+        'municipality_id' => $cateel->id,
     ]);
 
     $response->assertRedirect();
@@ -47,17 +47,18 @@ test('PTO can create an LGU account', function () {
     expect($created)->not->toBeNull();
     expect($created->role)->toBe(UserRole::Lgu);
     expect($created->municipality_id)->not->toBeNull();
+    expect($created->usr_must_change_password)->toBeTrue();
 });
 
 test('created_by records which account created a new LGU account', function () {
-    makeMunicipalityFixture('Cateel', 'CAT');
+    $cateel = makeMunicipalityFixture('Cateel', 'CAT');
     $pto = makePtoAdmin();
 
     test()->actingAs($pto)->post(route('pto.users.store'), [
         'name' => 'New LGU Officer',
         'email' => 'created-by.lgu@example.test',
-        'role' => 'LGU Tourism Personnel',
-        'assignment' => 'Cateel',
+        'role' => UserRole::Lgu->value,
+        'municipality_id' => $cateel->id,
     ]);
 
     $created = User::query()->where('email', 'created-by.lgu@example.test')->first();
@@ -100,14 +101,14 @@ test('self-service settings cannot forge created_by', function () {
 });
 
 test('creating a new account records an account_created security log entry', function () {
-    makeMunicipalityFixture('Cateel', 'CAT');
+    $cateel = makeMunicipalityFixture('Cateel', 'CAT');
     $pto = makePtoAdmin();
 
     test()->actingAs($pto)->post(route('pto.users.store'), [
         'name' => 'New LGU Officer',
         'email' => 'security-log.lgu@example.test',
-        'role' => 'LGU Tourism Personnel',
-        'assignment' => 'Cateel',
+        'role' => UserRole::Lgu->value,
+        'municipality_id' => $cateel->id,
     ]);
 
     $created = User::query()->where('email', 'security-log.lgu@example.test')->first();
@@ -144,8 +145,9 @@ test('changing an account\'s role records a role_changed security log entry', fu
     test()->actingAs($pto)->put(route('pto.users.update', $lgu), [
         'name' => $lgu->name,
         'email' => $lgu->email,
-        'role' => 'Tourism Establishment',
-        'assignment' => 'Role Change Fixture Inn',
+        'role' => UserRole::Establishment->value,
+        'municipality_id' => $mati->id,
+        'establishment_id' => $listing->id,
     ])->assertSessionHasNoErrors();
 
     expect($lgu->fresh()->role)->toBe(UserRole::Establishment);
@@ -166,25 +168,31 @@ test('editing an account without changing its role does not record a role_change
     test()->actingAs($pto)->put(route('pto.users.update', $lgu), [
         'name' => 'Renamed Officer',
         'email' => $lgu->email,
-        'role' => 'LGU Tourism Personnel',
-        'assignment' => 'City of Mati',
+        'role' => UserRole::Lgu->value,
+        'municipality_id' => $mati->id,
     ])->assertSessionHasNoErrors();
 
     expect(SecurityLog::where('event_type', 'role_changed')->where('target_user_id', $lgu->id)->exists())->toBeFalse();
 });
 
-test('PTO cannot create a new PTO account through the Users page', function () {
+test('PTO can create a new PTO account through the Users page', function () {
+    // A1 (account-creation/first-login rework): PTO creates PTO Admin
+    // accounts too — this reverses the old "PTO Administrator accounts
+    // cannot be created from this page" rule for *creation* specifically;
+    // promoting an *existing* lower-role account to PTO is still refused
+    // (see the next test).
     $pto = makePtoAdmin();
 
     $response = test()->actingAs($pto)->post(route('pto.users.store'), [
-        'name' => 'Sneaky New Admin',
-        'email' => 'sneaky@example.test',
-        'role' => 'PTO Administrator',
-        'assignment' => 'Province of Davao Oriental',
+        'name' => 'New Admin',
+        'email' => 'new-admin@example.test',
+        'role' => UserRole::PtoAdministrator->value,
     ]);
 
-    $response->assertSessionHasErrors('role');
-    expect(User::query()->where('email', 'sneaky@example.test')->exists())->toBeFalse();
+    $response->assertRedirect()->assertSessionHasNoErrors();
+    $created = User::query()->where('email', 'new-admin@example.test')->first();
+    expect($created)->not->toBeNull();
+    expect($created->role)->toBe(UserRole::PtoAdministrator);
 });
 
 test('PTO cannot promote an existing LGU account to PTO Administrator', function () {
@@ -199,8 +207,7 @@ test('PTO cannot promote an existing LGU account to PTO Administrator', function
     $response = test()->actingAs($pto)->put(route('pto.users.update', $lgu), [
         'name' => $lgu->name,
         'email' => $lgu->email,
-        'role' => 'PTO Administrator',
-        'assignment' => 'Province of Davao Oriental',
+        'role' => UserRole::PtoAdministrator->value,
     ]);
 
     $response->assertSessionHasErrors('role');

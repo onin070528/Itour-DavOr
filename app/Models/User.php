@@ -31,7 +31,7 @@ use Illuminate\Notifications\Notifiable;
  * establishment_id/created_by entirely, so a user can never change their
  * own scope or forge who created them.
  */
-#[Fillable(['name', 'email', 'password', 'role', 'organization_name', 'organization_subtitle', 'status', 'municipality_id', 'establishment_id', 'created_by'])]
+#[Fillable(['name', 'email', 'password', 'role', 'organization_name', 'organization_subtitle', 'status', 'municipality_id', 'establishment_id', 'created_by', 'usr_must_change_password', 'usr_password_changed_at', 'usr_phone'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -50,7 +50,20 @@ class User extends Authenticatable
             'last_login_at' => 'datetime',
             'password' => 'hashed',
             'role' => UserRole::class,
+            'usr_must_change_password' => 'boolean',
+            'usr_password_changed_at' => 'datetime',
         ];
+    }
+
+    /**
+     * True for an account that must set its own password before reaching
+     * any other page — a brand-new account created with a temporary
+     * passphrase (see App\Http\Middleware\ForcePasswordChange). Always
+     * false for every account that existed before this feature shipped.
+     */
+    public function mustChangePassword(): bool
+    {
+        return (bool) $this->usr_must_change_password;
     }
 
     public function municipality(): BelongsTo

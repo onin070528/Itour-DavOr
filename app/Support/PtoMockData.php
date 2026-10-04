@@ -10,6 +10,8 @@
 
 namespace App\Support;
 
+use App\Enums\UserRole;
+use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
@@ -126,7 +128,7 @@ class PtoMockData
      */
     public static function users(): array
     {
-        return \App\Models\User::query()
+        return User::query()
             ->orderByDesc('last_login_at')
             ->get()
             ->map(fn ($user) => [
@@ -134,10 +136,14 @@ class PtoMockData
                 'name' => $user->name,
                 'email' => $user->email,
                 'role' => $user->role->title(),
+                'roleValue' => $user->role->value,
                 // Mirrors Pto\UsersController's write-side mapping: the LGU
                 // role's meaningful field is organization_subtitle (the
                 // municipality), every other role's is organization_name.
-                'assignment' => $user->role === \App\Enums\UserRole::Lgu ? $user->organization_subtitle : $user->organization_name,
+                'assignment' => $user->role === UserRole::Lgu ? $user->organization_subtitle : $user->organization_name,
+                'municipalityId' => $user->municipality_id,
+                'establishmentId' => $user->establishment_id,
+                'phone' => $user->usr_phone,
                 'status' => $user->status,
                 'lastActive' => $user->last_login_at?->toDateString() ?? $user->created_at->toDateString(),
             ])

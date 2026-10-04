@@ -185,7 +185,9 @@
                                             <i class="ti {{ $item['icon'] }} text-base" aria-hidden="true"></i>
                                             {{ $item['label'] }}
                                         </span>
-                                        @if ($item['soon'] ?? ! ($item['active'] ?? false))
+                                        @if (! empty($item['badge']))
+                                            <span class="rounded-full bg-accent-500 px-1.5 py-0.5 text-[10px] font-bold text-sand-0">{{ $item['badge'] }}</span>
+                                        @elseif ($item['soon'] ?? ! ($item['active'] ?? false))
                                             <span class="rounded-sm bg-white/10 px-1.5 py-0.5 text-[9px] font-semibold tracking-wide text-white/50 uppercase">Soon</span>
                                         @endif
                                     </a>
@@ -196,32 +198,6 @@
                 @endforeach
             </nav>
 
-            <div class="border-t border-white/10 px-3 py-4">
-                <p class="mb-1.5 px-2 text-[10px] font-bold tracking-widest text-white/45 uppercase">{{ $accountHeading }}</p>
-                <ul class="flex flex-col gap-0.5 text-sm text-white/78">
-                    <li>
-                        <a href="{{ $profileHref }}" class="flex items-center gap-2.5 rounded-sm px-2.5 py-2 hover:bg-white/10 hover:text-sand-0">
-                            <i class="ti ti-user-circle text-base" aria-hidden="true"></i>
-                            My Profile
-                        </a>
-                    </li>
-                    <li>
-                        <a href="{{ $settingsHref }}" class="flex items-center gap-2.5 rounded-sm px-2.5 py-2 hover:bg-white/10 hover:text-sand-0">
-                            <i class="ti ti-settings text-base" aria-hidden="true"></i>
-                            Settings
-                        </a>
-                    </li>
-                    <li>
-                        <form method="POST" action="{{ route('logout') }}">
-                            @csrf
-                            <button type="submit" class="flex w-full items-center gap-2.5 rounded-sm px-2.5 py-2 text-left hover:bg-white/10 hover:text-sand-0">
-                                <i class="ti ti-logout text-base" aria-hidden="true"></i>
-                                Log Out
-                            </button>
-                        </form>
-                    </li>
-                </ul>
-            </div>
         </aside>
 
         <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
@@ -249,14 +225,38 @@
                         <span class="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-accent-500"></span>
                     </button>
 
-                    <div class="flex items-center gap-2.5">
-                        <span class="flex h-9 w-9 items-center justify-center rounded-full bg-primary-100 font-display text-sm font-bold text-primary-700">
-                            {{ collect(explode(' ', $user->name))->map(fn ($part) => mb_substr($part, 0, 1))->take(2)->implode('') }}
-                        </span>
-                        <span class="hidden leading-tight sm:block">
-                            <span class="block text-sm font-semibold text-sand-900">{{ $user->name }}</span>
-                            <span class="block text-xs text-sand-500">{{ $user->role->title() }}</span>
-                        </span>
+                    <div class="relative">
+                        <button type="button" data-dropdown-toggle class="flex cursor-pointer items-center gap-2.5 rounded-sm">
+                            <span class="flex h-9 w-9 items-center justify-center rounded-full bg-primary-100 font-display text-sm font-bold text-primary-700">
+                                {{ collect(explode(' ', $user->name))->map(fn ($part) => mb_substr($part, 0, 1))->take(2)->implode('') }}
+                            </span>
+                            <span class="hidden leading-tight sm:block">
+                                <span class="block text-sm font-semibold text-sand-900">{{ $user->name }}</span>
+                                <span class="block text-xs text-sand-500">{{ $user->role->title() }}</span>
+                            </span>
+                            <i class="ti ti-chevron-down hidden text-sm text-sand-500 sm:block" aria-hidden="true"></i>
+                        </button>
+
+                        <div data-dropdown-menu class="absolute right-0 z-20 mt-2 hidden w-48 rounded-md border border-sand-200 bg-sand-0 py-1 shadow-md">
+                            <a href="{{ $profileHref }}" class="flex items-center gap-2.5 px-3.5 py-2 text-sm text-sand-700 hover:bg-sand-50">
+                                <i class="ti ti-user-circle text-base" aria-hidden="true"></i>
+                                My Profile
+                            </a>
+                            {{-- PTO keeps Settings as its own Administration nav item instead of here. --}}
+                            @unless ($user->isPto())
+                                <a href="{{ $settingsHref }}" class="flex items-center gap-2.5 px-3.5 py-2 text-sm text-sand-700 hover:bg-sand-50">
+                                    <i class="ti ti-settings text-base" aria-hidden="true"></i>
+                                    Settings
+                                </a>
+                            @endunless
+                            <form method="POST" action="{{ route('logout') }}">
+                                @csrf
+                                <button type="submit" class="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm text-sand-700 hover:bg-sand-50">
+                                    <i class="ti ti-logout text-base" aria-hidden="true"></i>
+                                    Log Out
+                                </button>
+                            </form>
+                        </div>
                     </div>
                 </div>
             </header>

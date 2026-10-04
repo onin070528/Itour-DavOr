@@ -51,16 +51,21 @@ class ListingPolicy
 
     /**
      * Establishment users may update only their own linked listing, never
-     * a destination and never another establishment. Which *fields* they
-     * may change (a "limited" edit per the matrix) is enforced by the
-     * controller/validation, not this ability check.
+     * a destination and never another establishment, and only while their
+     * package is editable (DRAFT or UNPUBLISHED) — once submitted, the
+     * profile page goes read-only until it's returned. PTO/LGU are
+     * unaffected: their own review work is untouched by this status check.
+     * Which *fields* an establishment may change (a "limited" edit per the
+     * matrix) is enforced by the controller/validation, not this ability.
      */
     public function update(User $user, Listing $listing): bool
     {
         return match ($user->role) {
             UserRole::PtoAdministrator => true,
             UserRole::Lgu => $listing->municipality_id === $user->municipality_id,
-            UserRole::Establishment => $listing->category !== 'destinations' && $listing->id === $user->establishment_id,
+            UserRole::Establishment => $listing->category !== 'destinations'
+                && $listing->id === $user->establishment_id
+                && in_array($listing->status, ['DRAFT', 'UNPUBLISHED'], true),
             default => false,
         };
     }
@@ -72,5 +77,42 @@ class ListingPolicy
             UserRole::Lgu => $listing->municipality_id === $user->municipality_id,
             default => false,
         };
+    }
+
+    /**
+     * LGU only, own municipality, establishments only — submitting to PTO
+     * or returning to the establishment are both gated the same way (the
+     * LGU "owns" the listing while it's DRAFT/FOR_PTO_REVIEW/UNPUBLISHED).
+     * Controllers additionally check the current status before allowing a
+     * specific transition; this is the jurisdiction check alone.
+     */
+    public function submit(User $user, Listing $listing): bool
+    {
+        return $user->role === UserRole::Lgu
+            && $listing->category !== 'destinations'
+            && $listing->municipality_id === $user->municipality_id;
+    }
+
+    /**
+     * P1: only the PTO may publish (or unpublish) a listing. The single
+     * place this rule is enforced — every publish/unpublish action must
+     * check this, never re-derive "PTO only" inline.
+     */
+    public function publish(User $user, Listing $listing): bool
+    {
+        return $user->role === UserRole::PtoAdministrator && $listing->category !== 'destinations';
+    }
+
+    /**
+     * Establishment only, own listing, establishments only — the first
+     * step of the self-review workflow (DRAFT/UNPUBLISHED →
+     * FOR_LGU_REVIEW). Whether the Ready-to-publish checklist actually
+     * passes is the controller's job, not this jurisdiction check.
+     */
+    public function submitToLgu(User $user, Listing $listing): bool
+    {
+        return $user->role === UserRole::Establishment
+            && $listing->category !== 'destinations'
+            && $listing->id === $user->establishment_id;
     }
 }

@@ -31,11 +31,20 @@ class DashboardController extends PtoController
         $comparison = TourismAnalytics::periodComparison($filters);
 
         $municipalities = Municipality::query()->orderBy('name')->get();
+
+        // The Establishment filter only ever lists records that can
+        // actually collect arrivals — same single source of truth as the
+        // Tourism Directory (Listing::isQrEnabled()).
         $establishments = Listing::query()
-            ->where('category', '!=', 'destinations')
+            ->with('categoryRecord')
             ->when($filters['municipalityId'], fn ($q, $id) => $q->where('municipality_id', $id))
             ->orderBy('name')
-            ->get();
+            ->get()
+            ->filter(fn (Listing $listing) => $listing->isQrEnabled())
+            ->values();
+
+        $reportingStatus = TourismAnalytics::reportingStatus($filters);
+        $notYetReportedCount = $reportingStatus->where('status', '!=', 'Verified')->count();
 
         return $this->renderPto($request, 'pto.dashboard', 'dashboard', 'Tourism Monitoring Dashboard', [
             'filters' => $filters,
@@ -45,7 +54,8 @@ class DashboardController extends PtoController
             'kpis' => TourismAnalytics::kpis($filters, $comparison),
             'arrivalTrend' => TourismAnalytics::arrivalTrend($filters),
             'municipalityComparison' => TourismAnalytics::municipalityComparison($filters),
-            'reportingStatus' => TourismAnalytics::reportingStatus($filters),
+            'reportingStatus' => $reportingStatus,
+            'notYetReportedCount' => $notYetReportedCount,
             'classification' => TourismAnalytics::classificationBreakdown($filters),
             'recentActivity' => TourismAnalytics::recentActivity($filters['municipalityId']),
         ]);

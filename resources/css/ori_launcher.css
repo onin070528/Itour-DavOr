@@ -1,0 +1,174 @@
+/*
+ * System     : iTOUR - Integrated Tourism Information and Monitoring System
+ * Purpose    : Standalone floating "Ask Ori" launcher — glow, speech bubble, and float animation.
+ * Programmer : <name(s)>
+ * Copyright  : 2026 University of Mindanao. All rights reserved.
+ */
+
+/* Single source of truth for the glow color and the launcher's bottom
+   offset — a page with its own sticky bottom bar can raise the launcher by
+   overriding --ori-launcher-bottom-offset on a wrapping element. */
+:root
+{
+    --ori-glow: #1d8580;
+    --ori-launcher-bottom-offset: 0px;
+}
+
+/* Block: the launcher button itself — no pill, no background, fixed to the
+   bottom-right corner of the viewport, above page content but below the
+   chat panel and any modal (z-40 sits under chatbot-root's z-50). */
+.ori-launcher
+{
+    position: fixed;
+    right: calc(1.25rem + env(safe-area-inset-right, 0px));
+    bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px) + var(--ori-launcher-bottom-offset));
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* Wider bottom-right gap on small screens, same safe-area treatment. */
+@media (min-width: 640px)
+{
+    .ori-launcher
+    {
+        right: calc(1.5rem + env(safe-area-inset-right, 0px));
+        bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px) + var(--ori-launcher-bottom-offset));
+    }
+}
+
+/* Element: the "Ask Ori" speech bubble above Ori's head. Visibility is
+   driven by JS (ori_launcher.js) toggling the --hidden modifier below; the
+   fade itself lives here so the script only ever flips one class. */
+.ori-launcher__bubble
+{
+    position: relative;
+    white-space: nowrap;
+    border-radius: 999px;
+    background: #ffffff;
+    padding: 0.5rem 0.875rem;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: #211f1a;
+    box-shadow: 0 6px 16px rgba(33, 31, 26, 0.18);
+    opacity: 1;
+    visibility: visible;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+
+/* Modifier: hidden state — opacity/visibility (not display:none) so the
+   transition above can run, and so :hover/:focus-visible on the button can
+   bring it back without any JS involvement. */
+.ori-launcher__bubble--hidden
+{
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.ori-launcher:hover .ori-launcher__bubble--hidden,
+.ori-launcher:focus-visible .ori-launcher__bubble--hidden
+{
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Element: the small tail pointing down from the bubble at Ori's head — a
+   rotated square, not an image, so no extra asset is needed. */
+.ori-launcher__bubble-tail
+{
+    position: absolute;
+    bottom: -4px;
+    left: 50%;
+    width: 10px;
+    height: 10px;
+    background: #ffffff;
+    transform: translateX(-50%) rotate(45deg);
+    box-shadow: 2px 2px 3px rgba(33, 31, 26, 0.08);
+}
+
+/* Element: the floating wrapper — the gentle up/down motion lives here,
+   separate from the avatar image itself, so the hover/focus scale below
+   can run independently without fighting this animation's transform. */
+.ori-launcher__avatar-wrap
+{
+    display: flex;
+    animation: ori-launcher-float 3.2s ease-in-out infinite;
+}
+
+@keyframes ori-launcher-float
+{
+    0%,
+    100%
+    {
+        transform: translateY(0);
+    }
+    50%
+    {
+        transform: translateY(-8px);
+    }
+}
+
+/* Element: Ori himself. The glow is two stacked drop-shadow layers, which
+   (unlike box-shadow) follow the artwork's alpha outline rather than its
+   rectangular bounding box. */
+.ori-launcher__avatar
+{
+    display: block;
+    width: 96px;
+    height: auto;
+    filter: drop-shadow(0 0 6px var(--ori-glow)) drop-shadow(0 0 18px var(--ori-glow));
+    transition: transform 0.15s ease;
+}
+
+@media (max-width: 639px)
+{
+    .ori-launcher__avatar
+    {
+        width: 72px;
+    }
+}
+
+.ori-launcher:hover .ori-launcher__avatar,
+.ori-launcher:focus-visible .ori-launcher__avatar
+{
+    transform: scale(1.06);
+}
+
+/* Modifier: offline state — dimmed and desaturated instead of the glow, per
+   the "CSS only, no extra image" rule. Applied by ori_launcher.js when the
+   browser goes offline. */
+.ori-launcher--offline .ori-launcher__avatar
+{
+    filter: grayscale(1) opacity(0.55);
+}
+
+/* Motion-sensitive visitors: no float, no bubble fade, no hover/focus
+   scale transition — the bubble's show/hide still works, it just snaps
+   instead of animating. */
+@media (prefers-reduced-motion: reduce)
+{
+    .ori-launcher__avatar-wrap
+    {
+        animation: none;
+    }
+
+    .ori-launcher__bubble
+    {
+        transition: none;
+    }
+
+    .ori-launcher__avatar
+    {
+        transition: none;
+    }
+}

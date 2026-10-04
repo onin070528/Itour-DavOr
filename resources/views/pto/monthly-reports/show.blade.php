@@ -6,7 +6,7 @@
         <x-slot:actions>
             <a href="{{ route('pto.monthlyReports.index', ['period' => $report->period_month->format('Y-m'), 'municipality_id' => $report->municipality_id]) }}" class="inline-flex items-center gap-2 rounded-sm border border-sand-300 bg-sand-0 px-4 py-2.5 text-sm font-semibold text-sand-800 hover:border-primary-300">
                 <i class="ti ti-arrow-left" aria-hidden="true"></i>
-                Back to Tourism Reports
+                Back to Provincial Reports
             </a>
         </x-slot:actions>
     </x-dashboard.page-header>

@@ -1,4 +1,6 @@
 <x-layouts.auth title="Sign In">
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+
     <h1 class="mt-6 text-xl sm:text-2xl">Welcome to iTOUR</h1>
     <p class="mt-1.5 text-sm text-sand-600">For the Provincial Tourism Office, LGU Tourism Offices, and accredited establishments.</p>
 
@@ -70,17 +72,31 @@
             </div>
         </div>
 
+        {{-- Cloudflare Turnstile — see App\Rules\Turnstile for the
+             server-side verification this widget's token is checked
+             against. Site key only; the secret key never leaves the
+             server (config/services.php, TURNSTILE_SECRET_KEY). Centered
+             and set off with its own label/border since the widget has a
+             fixed width narrower than the rest of the form. --}}
+        <div>
+            <p class="mb-1.5 block text-sm font-medium text-sand-700">Security Check</p>
+            <div class="flex justify-center rounded-sm border border-sand-300 bg-sand-50 py-3">
+                <div class="cf-turnstile" data-sitekey="{{ config('services.turnstile.site_key') }}"></div>
+            </div>
+            @error('cf-turnstile-response')
+                <p class="mt-1.5 text-sm text-danger">{{ $message }}</p>
+            @enderror
+        </div>
+
         <button
             type="submit"
             id="login-submit"
-            class="mt-1 inline-flex min-h-[44px] items-center justify-center gap-2 rounded-sm bg-primary-700 px-4 py-2.5 text-sm font-semibold text-sand-0 shadow-sm transition-colors hover:bg-primary-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-sand-0 disabled:cursor-not-allowed disabled:opacity-75"
+            class="mt-2 inline-flex min-h-[44px] items-center justify-center gap-2 rounded-sm bg-primary-700 px-4 py-2.5 text-sm font-semibold text-sand-0 shadow-sm transition-colors hover:bg-primary-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-sand-0 disabled:cursor-not-allowed disabled:opacity-75"
         >
             <i class="ti ti-loader-2 hidden animate-spin" data-submit-spinner aria-hidden="true"></i>
             <span data-submit-label>Sign In</span>
         </button>
     </form>
-
-    <p class="mt-4 text-center text-xs text-sand-500">First time signing in? Use <span class="font-semibold">Forgot password?</span> to set your password.</p>
 
     <a
         href="{{ url('/') }}"

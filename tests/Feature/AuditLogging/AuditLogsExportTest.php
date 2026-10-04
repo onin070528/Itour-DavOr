@@ -46,7 +46,7 @@ test('an LGU export only contains rows from its own municipality', function () {
         'municipality' => 'Baganga',
         'municipality_id' => $baganga->id,
         'barangay' => 'Poblacion',
-        'status' => 'Active',
+        'status' => 'PUBLISHED',
     ]);
     OperationLog::factory()->create(['municipality_id' => $mati->id, 'action' => 'update', 'entity_type' => 'destination', 'entity_id' => 1]);
     OperationLog::factory()->create(['municipality_id' => $baganga->id, 'establishment_id' => $bagangaListing->id, 'action' => 'update', 'entity_type' => 'establishment', 'entity_id' => $bagangaListing->id]);

@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\UserRole;
+use App\Models\Category;
 use App\Models\Listing;
 use App\Models\MunicipalReport;
 use App\Models\OperationLog;
@@ -11,18 +12,28 @@ function makePtoForOperationLogs(): User
     return User::factory()->create(['role' => UserRole::PtoAdministrator]);
 }
 
+function destinationsCategoryFixture(): Category
+{
+    return Category::query()->firstOrCreate(
+        ['cat_name' => 'Tourist Destinations'],
+        ['cat_sort_order' => 0, 'cat_is_active' => true, 'cat_is_qr_enabled' => true]
+    );
+}
+
 test('PTO creating a destination records a create operation log with the resolved municipality', function () {
     makeMunicipalityFixture('Cateel', 'CAT');
+    $category = destinationsCategoryFixture();
     $pto = makePtoForOperationLogs();
 
-    test()->actingAs($pto)->post(route('pto.directory.destinations.store'), [
+    test()->actingAs($pto)->post(route('pto.directory.store'), [
         'name' => 'Aliwagwag Falls',
+        'cat_id' => $category->cat_id,
         'barangay' => 'Aliwagwag',
         'municipality' => 'Cateel',
     ])->assertSessionHasNoErrors();
 
     $listing = Listing::query()->where('name', 'Aliwagwag Falls')->first();
-    $log = OperationLog::where('entity_type', 'destination')->where('entity_id', $listing->id)->where('action', 'create')->first();
+    $log = OperationLog::where('entity_type', 'establishment')->where('entity_id', $listing->id)->where('action', 'create')->first();
 
     expect($log)->not->toBeNull();
     expect($log->user_id)->toBe($pto->id);
@@ -33,42 +44,51 @@ test('PTO creating a destination records a create operation log with the resolve
 
 test('PTO updating a destination records an update operation log with only the changed fields', function () {
     makeMunicipalityFixture('Cateel', 'CAT');
+    $category = destinationsCategoryFixture();
     $pto = makePtoForOperationLogs();
 
-    test()->actingAs($pto)->post(route('pto.directory.destinations.store'), [
+    test()->actingAs($pto)->post(route('pto.directory.store'), [
         'name' => 'Aliwagwag Falls',
+        'cat_id' => $category->cat_id,
         'barangay' => 'Aliwagwag',
         'municipality' => 'Cateel',
     ]);
     $listing = Listing::query()->where('name', 'Aliwagwag Falls')->first();
 
-    test()->actingAs($pto)->put(route('pto.directory.destinations.update', $listing), [
+    test()->actingAs($pto)->put(route('pto.directory.update', $listing), [
         'name' => 'Aliwagwag Falls',
+        'cat_id' => $category->cat_id,
         'barangay' => 'New Barangay',
         'municipality' => 'Cateel',
     ])->assertSessionHasNoErrors();
 
-    $log = OperationLog::where('entity_type', 'destination')->where('entity_id', $listing->id)->where('action', 'update')->first();
+    $log = OperationLog::where('entity_type', 'establishment')->where('entity_id', $listing->id)->where('action', 'update')->first();
     expect($log)->not->toBeNull();
     expect($log->old_values)->toBe(['barangay' => 'Aliwagwag']);
     expect($log->new_values)->toBe(['barangay' => 'New Barangay']);
 });
 
-test('archiving a destination records an update operation log for the status change', function () {
+test('suspending a destination records an update operation log with the required reason', function () {
     makeMunicipalityFixture('Cateel', 'CAT');
+    $category = destinationsCategoryFixture();
     $pto = makePtoForOperationLogs();
 
-    test()->actingAs($pto)->post(route('pto.directory.destinations.store'), [
+    test()->actingAs($pto)->post(route('pto.directory.store'), [
         'name' => 'Aliwagwag Falls',
+        'cat_id' => $category->cat_id,
         'barangay' => 'Aliwagwag',
         'municipality' => 'Cateel',
     ]);
     $listing = Listing::query()->where('name', 'Aliwagwag Falls')->first();
 
-    test()->actingAs($pto)->patch(route('pto.directory.destinations.archive', $listing));
+    test()->actingAs($pto)->put(route('pto.directory.updateStatus', $listing), [
+        'status' => 'Suspended',
+        'reason' => 'Temporarily closed for maintenance.',
+    ])->assertSessionHasNoErrors();
 
-    $log = OperationLog::where('entity_type', 'destination')->where('entity_id', $listing->id)->where('action', 'update')->latest('id')->first();
-    expect($log->new_values)->toBe(['status' => 'Archived']);
+    $log = OperationLog::where('entity_type', 'establishment')->where('entity_id', $listing->id)->where('action', 'update')->latest('id')->first();
+    expect($log->new_values)->toBe(['status' => 'Suspended']);
+    expect($log->reason)->toBe('Temporarily closed for maintenance.');
 });
 
 test('LGU can create, update, and archive its own destination, each recording an operation log', function () {
@@ -100,7 +120,7 @@ test('LGU can create, update, and archive its own destination, each recording an
     expect(OperationLog::where('entity_type', 'destination')->where('entity_id', $listing->id)->where('municipality_id', $mati->id)->exists())->toBeTrue();
 });
 
-test('LGU verifying an establishment records a validate operation log', function () {
+test('LGU submitting an establishment to PTO records a submit operation log', function () {
     $mati = makeMunicipalityFixture('City of Mati', 'MATI');
     $lgu = User::factory()->create([
         'role' => UserRole::Lgu,
@@ -114,15 +134,36 @@ test('LGU verifying an establishment records a validate operation log', function
         'municipality' => 'City of Mati',
         'municipality_id' => $mati->id,
         'barangay' => 'Poblacion',
-        'status' => 'Pending Review',
+        'status' => 'DRAFT',
     ]);
 
-    test()->actingAs($lgu)->patch(route('lgu.directory.establishments.verify', $listing))->assertSessionHasNoErrors();
+    test()->actingAs($lgu)->patch(route('lgu.directory.establishments.submit', $listing))->assertSessionHasNoErrors();
 
-    $log = OperationLog::where('entity_type', 'establishment')->where('entity_id', $listing->id)->where('action', 'validate')->first();
+    $log = OperationLog::where('entity_type', 'establishment')->where('entity_id', $listing->id)->where('action', 'submit')->first();
     expect($log)->not->toBeNull();
     expect($log->establishment_id)->toBe($listing->id);
-    expect($log->new_values)->toBe(['status' => 'Active']);
+    expect($log->new_values)->toBe(['status' => 'FOR_PTO_REVIEW']);
+});
+
+test('PTO publishing an establishment records a publish operation log', function () {
+    $mati = makeMunicipalityFixture('City of Mati', 'MATI');
+    $pto = makePtoForOperationLogs();
+    $listing = Listing::query()->create([
+        'slug' => 'for-review-inn',
+        'name' => 'For Review Inn',
+        'category' => 'accommodation',
+        'municipality' => 'City of Mati',
+        'municipality_id' => $mati->id,
+        'barangay' => 'Poblacion',
+        'status' => 'FOR_PTO_REVIEW',
+    ]);
+
+    test()->actingAs($pto)->patch(route('pto.directory.publish', $listing))->assertSessionHasNoErrors();
+
+    $log = OperationLog::where('entity_type', 'establishment')->where('entity_id', $listing->id)->where('action', 'publish')->first();
+    expect($log)->not->toBeNull();
+    expect($log->new_values)->toBe(['status' => 'PUBLISHED']);
+    expect($listing->fresh()->status)->toBe('PUBLISHED');
 });
 
 test('editing an establishment\'s info records an update operation log with masked email', function () {
@@ -137,7 +178,7 @@ test('editing an establishment\'s info records an update operation log with mask
         'owner_name' => 'Juan Dela Cruz',
         'contact_phone' => '09171234567',
         'email' => 'old@matifixtureinn.test',
-        'status' => 'Active',
+        'status' => 'PUBLISHED',
     ]);
     $establishmentUser = User::factory()->create([
         'role' => UserRole::Establishment,

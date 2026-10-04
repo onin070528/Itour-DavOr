@@ -12,7 +12,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Listing;
-use App\Support\TourismCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -23,20 +22,34 @@ class CheckinController extends Controller
     /**
      * Visitor self-registration form, reached by scanning the QR code
      * posted at a registered establishment. {establishment} is the
-     * listing's id slug (e.g. "dahican-surf-guides") — the same id every
-     * establishment's QR code encodes (see Establishment\ProfileController
-     * ::qr), so each establishment gets its own unique, stable check-in
-     * link and the form always knows which establishment it's for.
+     * listing's slug — the same id every establishment's QR code encodes
+     * (see Establishment\ProfileController::qr), so each establishment gets
+     * its own unique, stable check-in link.
+     *
+     * Validates the QR identifier (a real, existing listing) and then
+     * Listing::isQrEnabled() before showing the form at all — a Tour Guide,
+     * an "Others" record, a suspended/inactive record, or a category with
+     * QR scanning switched off all show a refusal message instead, per the
+     * single QR rule.
      */
     public function show(string $establishment): View
     {
-        $listing = collect(TourismCatalog::listings())->firstWhere('id', $establishment);
+        $listing = Listing::query()->where('slug', $establishment)->first();
 
         abort_if(! $listing, 404);
 
+        if (! $listing->isQrEnabled()) {
+            return view('lgu.establishmentQR', [
+                'establishmentName' => $listing->name,
+                'checkinAction' => null,
+                'refusalMessage' => 'This establishment is not accepting registrations.',
+            ]);
+        }
+
         return view('lgu.establishmentQR', [
-            'establishmentName' => $listing['name'],
+            'establishmentName' => $listing->name,
             'checkinAction' => route('checkin.store', $establishment),
+            'refusalMessage' => null,
         ]);
     }
 
@@ -50,6 +63,13 @@ class CheckinController extends Controller
     public function store(Request $request, string $establishment): JsonResponse
     {
         $listing = Listing::query()->where('slug', $establishment)->firstOrFail();
+
+        // Defense in depth: show() already refuses the form, but the QR
+        // switch (Settings > Categories) or a status change could happen
+        // between the scan and the submit — never save in that case.
+        if (! $listing->isQrEnabled()) {
+            return response()->json(['message' => 'This establishment is not accepting registrations.'], 422);
+        }
 
         $data = $request->validate([
             'visitorName' => ['required', 'string', 'max:255'],

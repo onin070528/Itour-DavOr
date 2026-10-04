@@ -41,8 +41,8 @@ class LguMockData
     public static function establishments(string $municipality): array
     {
         // `status` now comes straight from the listings table (real
-        // accreditation state, editable via Lgu\DirectoryController
-        // @verifyEstablishment) instead of a hardcoded pending/inactive id list.
+        // publish-workflow state, see App\Services\ListingPublishWorkflow)
+        // instead of a hardcoded pending/inactive id list.
         return collect(TourismCatalog::listings())
             ->where('category', '!=', 'destinations')
             ->where('municipality', $municipality)
@@ -102,7 +102,7 @@ class LguMockData
         return [
             ['label' => 'Tourist Arrivals (30 days)', 'value' => number_format($arrivals->sum('visitors')), 'delta' => $arrivals->count().' records logged', 'tone' => 'neutral'],
             ['label' => 'Tourism Destinations', 'value' => (string) count($destinations), 'delta' => 'Managed by your office', 'tone' => 'neutral'],
-            ['label' => 'Tourism Establishments', 'value' => (string) count($establishments), 'delta' => collect($establishments)->where('status', 'Active')->count().' active', 'tone' => 'success'],
+            ['label' => 'Tourism Establishments', 'value' => (string) count($establishments), 'delta' => collect($establishments)->where('isPubliclyVisible', true)->count().' published', 'tone' => 'success'],
             ['label' => 'Tourist Feedback', 'value' => (string) count($feedback), 'delta' => 'This period', 'tone' => 'neutral'],
         ];
     }

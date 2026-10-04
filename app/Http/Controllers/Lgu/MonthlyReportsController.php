@@ -80,6 +80,7 @@ class MonthlyReportsController extends LguController
             ->where('municipality_id', $user->municipality_id)
             ->whereDate('period_start', $month->toDateString())
             ->where('status', '!=', MunicipalReport::STATUS_RETURNED)
+            ->whereDoesntHave('supersededBy')
             ->exists();
 
         return $this->renderLgu($request, 'lgu.monthly-reports.index', 'monthlyReports', 'Tourism Reports', [
@@ -330,22 +331,49 @@ class MonthlyReportsController extends LguController
         $existing = MunicipalReport::query()
             ->where('municipality_id', $user->municipality_id)
             ->whereDate('period_start', $month->toDateString())
+            ->whereDoesntHave('supersededBy')
             ->first();
 
-        abort_if($existing && $existing->status !== MunicipalReport::STATUS_RETURNED, 403, 'This municipality already has a submitted report for that month.');
+        // Pending PTO review can't be resubmitted out from under it, but a
+        // Verified (APPROVED) report CAN be reopened by a fresh LGU
+        // resubmission — it just goes back to For Review and is logged as a
+        // reopen, not an ordinary consolidation.
+        abort_if(
+            $existing && in_array($existing->status, [MunicipalReport::STATUS_SUBMITTED, MunicipalReport::STATUS_REVIEWED], true),
+            403,
+            'This municipality already has a report pending PTO review for that month.'
+        );
+        $wasVerified = $existing?->isFrozen() ?? false;
 
         $total = (int) $verifiedReports->sum('total_visitors');
 
-        $municipalReport = DB::transaction(function () use ($existing, $user, $month, $total, $verifiedReports) {
-            $municipalReport = $existing
-                ? tap($existing)->update([
+        $municipalReport = DB::transaction(function () use ($existing, $wasVerified, $user, $month, $total, $verifiedReports) {
+            // A Verified report's own row is frozen forever (its
+            // frozen_snapshot, PDF, and verification code must never
+            // change) — reopening it creates a brand-new revision row
+            // instead of overwriting it. Returning a RETURNED report (or
+            // consolidating for the first time) still updates/creates in
+            // place as before, since neither of those is frozen.
+            $municipalReport = match (true) {
+                $wasVerified => MunicipalReport::query()->create([
+                    'municipality' => $existing->municipality,
+                    'municipality_id' => $existing->municipality_id,
+                    'submitted_by' => $user->id,
+                    'period_start' => $month->toDateString(),
+                    'period_end' => $month->endOfMonth()->toDateString(),
+                    'total_arrivals' => $total,
+                    'status' => MunicipalReport::STATUS_SUBMITTED,
+                    'revision_number' => $existing->revision_number + 1,
+                    'supersedes_id' => $existing->id,
+                ]),
+                $existing !== null => tap($existing)->update([
                     'total_arrivals' => $total,
                     'status' => MunicipalReport::STATUS_SUBMITTED,
                     'submitted_by' => $user->id,
                     'reviewed_by' => null,
                     'reviewed_at' => null,
-                ])
-                : MunicipalReport::query()->create([
+                ]),
+                default => MunicipalReport::query()->create([
                     'municipality' => $user->organization_subtitle,
                     'municipality_id' => $user->municipality_id,
                     'submitted_by' => $user->id,
@@ -353,18 +381,25 @@ class MonthlyReportsController extends LguController
                     'period_end' => $month->endOfMonth()->toDateString(),
                     'total_arrivals' => $total,
                     'status' => MunicipalReport::STATUS_SUBMITTED,
-                ]);
+                ]),
+            };
 
             $verifiedReports->each->update(['municipal_report_id' => $municipalReport->id]);
 
             return $municipalReport;
         });
 
-        OperationLogger::consolidated($user, 'municipal_report', $municipalReport->id, $user->municipality_id, [
+        $newValues = [
             'period_month' => $month->toDateString(),
             'total_arrivals' => $total,
             'source_report_count' => $verifiedReports->count(),
-        ]);
+        ];
+
+        if ($wasVerified) {
+            OperationLogger::reopened($user, 'municipal_report', $municipalReport->id, $user->municipality_id, $newValues);
+        } else {
+            OperationLogger::consolidated($user, 'municipal_report', $municipalReport->id, $user->municipality_id, $newValues);
+        }
 
         return redirect()->route('lgu.monthlyReports.index', ['period' => $month->format('Y-m')])
             ->with('toast', "{$month->format('F Y')} report consolidated and submitted to PTO.");

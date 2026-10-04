@@ -10,6 +10,8 @@
 
 namespace App\Support;
 
+use App\Models\Arrival;
+use App\Models\Listing;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -48,7 +50,7 @@ class EstablishmentMockData
             return [];
         }
 
-        return \App\Models\Listing::query()
+        return Listing::query()
             ->where('slug', $profile['id'])
             ->firstOrFail()
             ->images
@@ -80,7 +82,7 @@ class EstablishmentMockData
             return [];
         }
 
-        return \App\Models\Arrival::query()
+        return Arrival::query()
             ->whereHas('listing', fn ($q) => $q->where('slug', $listing['id']))
             ->where('source', 'staff')
             ->orderByDesc('date')

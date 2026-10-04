@@ -15,11 +15,37 @@ test('every PTO page renders for an authenticated PTO administrator', function (
     'pto.dashboard',
     'pto.municipalReports.index',
     'pto.monthlyReports.index',
-    'pto.directory.destinations',
-    'pto.directory.establishments',
-    'pto.directory.map',
+    'pto.directory.index',
+    'pto.hotlines.index',
+    'pto.announcements.index',
     'pto.feedback.index',
     'pto.feedback.analytics',
+    'pto.images.index',
+    'pto.users',
+    'pto.settings',
+]);
+
+test('the old Photo Approvals URL redirects to the Photos page\'s approval tab', function () {
+    $user = User::factory()->create(['role' => UserRole::PtoAdministrator]);
+
+    $this->actingAs($user)->get(route('pto.images.queue'))
+        ->assertRedirect(route('pto.images.index', ['tab' => 'approval']));
+});
+
+test('a non-PTO user gets a 403 on every PTO page', function (string $routeName) {
+    $lgu = User::factory()->create(['role' => UserRole::Lgu]);
+
+    $this->actingAs($lgu)->get(route($routeName))->assertForbidden();
+})->with([
+    'pto.dashboard',
+    'pto.municipalReports.index',
+    'pto.monthlyReports.index',
+    'pto.directory.index',
+    'pto.hotlines.index',
+    'pto.announcements.index',
+    'pto.feedback.index',
+    'pto.images.index',
+    'pto.images.queue',
     'pto.users',
     'pto.settings',
 ]);

@@ -23,20 +23,23 @@ class ListingSeeder extends Seeder
      * table, verbatim — TourismCatalog itself stays as the single source
      * of content, this just makes it durable/editable instead of static.
      *
-     * Status mirrors the exact pending/inactive id lists that
+     * Status mirrors the exact draft/unpublished id lists that
      * App\Support\LguMockData::establishments() has been hardcoding at
-     * read time — now a real, editable column instead.
+     * read time — now a real, editable column instead. Establishments use
+     * the publish-workflow vocabulary (App\Services\ListingPublishWorkflow);
+     * destinations keep the unchanged Active/Suspended/Archived one.
      */
     public function run(): void
     {
-        $pending = ['dahican-surf-guides', 'delicacies-hub'];
-        $inactive = ['tourist-transport-terminal'];
+        $draft = ['dahican-surf-guides', 'delicacies-hub'];
+        $unpublished = ['tourist-transport-terminal'];
 
         foreach (TourismCatalog::seedData() as $listing) {
             $status = match (true) {
-                $listing['category'] !== 'destinations' && in_array($listing['id'], $pending, true) => 'Pending Review',
-                $listing['category'] !== 'destinations' && in_array($listing['id'], $inactive, true) => 'Inactive',
-                default => 'Active',
+                $listing['category'] === 'destinations' => 'Active',
+                in_array($listing['id'], $draft, true) => 'DRAFT',
+                in_array($listing['id'], $unpublished, true) => 'UNPUBLISHED',
+                default => 'PUBLISHED',
             };
 
             $model = Listing::query()->updateOrCreate(

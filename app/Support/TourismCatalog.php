@@ -48,6 +48,16 @@ class TourismCatalog
     }
 
     /**
+     * The Tabler icon class for a category slug — reused as the public
+     * placeholder (7E: "a neutral icon ... we own") when a listing has no
+     * cover photo at all.
+     */
+    public static function categoryIcon(string $slug): string
+    {
+        return collect(self::categories())->firstWhere('slug', $slug)['icon'] ?? 'ti-photo';
+    }
+
+    /**
      * Explore-hub-only category chips — a relabeling of the same underlying
      * `category` slugs used everywhere else (categories() above, still used
      * by directory pages and the establishment registration forms; slugs
@@ -118,6 +128,7 @@ class TourismCatalog
     public static function listings(): array
     {
         return Listing::query()
+            ->with(['establishmentImages' => fn ($query) => $query->where('img_status', 'PUBLISHED')])
             ->orderBy('id')
             ->get()
             ->map(fn ($listing) => [
@@ -132,11 +143,14 @@ class TourismCatalog
                 'rating' => $listing->rating !== null ? (float) $listing->rating : null,
                 'tags' => $listing->tags ?? [],
                 'image' => $listing->image,
+                'displayImageUrl' => $listing->publicCoverImageUrl(),
+                'categoryIcon' => self::categoryIcon($listing->category),
                 'contactOffice' => $listing->contact_office,
                 'contactPhone' => $listing->contact_phone,
                 'hours' => $listing->hours,
-                'href' => '#',
+                'href' => route('listings.show', $listing->slug),
                 'status' => $listing->status,
+                'isPubliclyVisible' => $listing->isPubliclyVisible(),
                 'email' => $listing->email,
                 'website' => $listing->website,
             ])
@@ -409,22 +423,22 @@ class TourismCatalog
     {
         return collect(self::listings())
             ->where('category', 'destinations')
-            ->where('status', 'Active')
+            ->where('isPubliclyVisible', true)
             ->take($limit)
             ->all();
     }
 
     /**
      * The first N tourism establishments (everything but destinations), for
-     * the homepage preview. Only shows Active ones — Pending Review/
-     * Inactive/Archived establishments aren't yet meant to be publicly
-     * visible (see Lgu\DirectoryController@verifyEstablishment).
+     * the homepage preview. Only shows publicly visible ones — DRAFT/
+     * FOR_PTO_REVIEW/UNPUBLISHED/Archived establishments aren't yet meant to
+     * be publicly visible (see App\Services\ListingPublishWorkflow).
      */
     public static function featuredEstablishments(int $limit = 6): array
     {
         return collect(self::listings())
             ->where('category', '!=', 'destinations')
-            ->where('status', 'Active')
+            ->where('isPubliclyVisible', true)
             ->take($limit)
             ->all();
     }
@@ -450,7 +464,7 @@ class TourismCatalog
         ];
 
         $byId = collect(self::listings())
-            ->where('status', 'Active')
+            ->where('isPubliclyVisible', true)
             ->keyBy('id');
 
         return collect($order)

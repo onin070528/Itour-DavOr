@@ -18,7 +18,7 @@
              the site keeps this app's existing Manrope display font. --}}
         <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@800;900&display=swap" rel="stylesheet">
 
-        @vite(['resources/css/app.css', 'resources/js/app.js'])
+        @vite(['resources/css/app.css', 'resources/css/ori_launcher.css', 'resources/js/app.js', 'resources/js/storage_notice.js'])
     </head>
     <body class="flex min-h-screen flex-col bg-sand-50 text-sand-900">
         <x-navbar />
@@ -29,5 +29,6 @@
 
         <x-footer />
         <x-chatbot />
+        <x-storage-notice />
     </body>
 </html>

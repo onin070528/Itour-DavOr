@@ -17,7 +17,7 @@ function makeAuditLogEstablishmentListing(int $municipalityId, string $municipal
         'municipality' => $municipality,
         'municipality_id' => $municipalityId,
         'barangay' => 'Poblacion',
-        'status' => 'Active',
+        'status' => 'PUBLISHED',
     ]);
 }
 

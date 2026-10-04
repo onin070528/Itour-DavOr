@@ -4,7 +4,7 @@
         ['label' => 'Explore', 'href' => route('explore'), 'active' => request()->routeIs('explore')],
         ['label' => 'Nearby', 'href' => url('/').'#near-you', 'active' => false],
         ['label' => 'Reviews', 'href' => url('/').'#reviews', 'active' => false],
-        ['label' => 'About', 'href' => url('/').'#about', 'active' => false],
+        ['label' => 'Hotlines', 'href' => route('hotlines'), 'active' => request()->routeIs('hotlines')],
     ];
 
     $authedDashboardRoute = auth()->check() && auth()->user()->role
@@ -44,19 +44,19 @@
              the active link only. Inactive: sand-900 (this app's darkest
              neutral, standing in for the spec's text-stone-800) for high
              contrast against the beige header, no underline, hover fades to
-             the same teal. Home/Explore are real routes, so their initial
-             active state is server-rendered via request()->routeIs().
-             Nearby/Reviews/About are same-page anchor links with no route
-             of their own — data-nav-link/data-nav-variant let
-             initNavScrollSpy() (resources/js/app.js) repaint Home/Nearby/
-             Reviews/About live as their section scrolls into view; Explore
-             has neither attribute, so the scroll-spy never touches it. --}}
+             the same teal. Home/Explore/Hotlines are real routes, so their
+             initial active state is server-rendered via request()->routeIs().
+             Nearby/Reviews are same-page anchor links with no route of their
+             own — data-nav-link/data-nav-variant let initNavScrollSpy()
+             (resources/js/app.js) repaint Home/Nearby/Reviews live as their
+             section scrolls into view; Explore/Hotlines have neither
+             attribute, so the scroll-spy never touches them. --}}
         <ul class="hidden items-center gap-7 text-sm font-medium lg:flex">
             @foreach ($navLinks as $link)
                 <li>
                     <a
                         href="{{ $link['href'] }}"
-                        @if ($link['label'] !== 'Explore')
+                        @if (! in_array($link['label'], ['Explore', 'Hotlines'], true))
                             data-nav-link="{{ $link['label'] }}"
                             data-nav-variant="underline"
                         @endif
@@ -111,7 +111,7 @@
                 <li>
                     <a
                         href="{{ $link['href'] }}"
-                        @if ($link['label'] !== 'Explore')
+                        @if (! in_array($link['label'], ['Explore', 'Hotlines'], true))
                             data-nav-link="{{ $link['label'] }}"
                             data-nav-variant="pill"
                         @endif

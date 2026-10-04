@@ -143,7 +143,7 @@ test('log text containing HTML/script is escaped in the rendered page', function
         'municipality' => 'City of Mati',
         'municipality_id' => $mati->id,
         'barangay' => 'Poblacion',
-        'status' => 'Active',
+        'status' => 'PUBLISHED',
     ]);
     $pto = User::factory()->create(['role' => UserRole::PtoAdministrator]);
     OperationLog::factory()->create([

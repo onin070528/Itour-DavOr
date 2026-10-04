@@ -4,9 +4,8 @@ import QRCode from 'qrcode';
 /**
  * Establishment-specific frontend interactions that don't belong in the
  * shared dashboard.js engine: the Record Arrival page's reactive
- * Alpine.js form (see arrivalForm() below), auto-submitting the
- * Establishment Profile image gallery's hidden upload form, and rendering
- * the establishment's QR code (resources/views/establishment/qr.blade.php)
+ * Alpine.js form (see arrivalForm() below), and rendering the
+ * establishment's QR code (resources/views/establishment/qr.blade.php)
  * client-side (via the `qrcode` package). Every action here is now backed
  * by a real endpoint — see App\Http\Controllers\Establishment.
  *
@@ -19,7 +18,6 @@ Alpine.data('arrivalForm', arrivalForm);
 Alpine.start();
 
 document.addEventListener('DOMContentLoaded', () => {
-    initImageGallery();
     initQrActions();
 });
 
@@ -182,21 +180,3 @@ function emptyGuestMatrix() {
     };
 }
 
-/**
- * Set-as-Featured, Remove, and Add Image are each a real per-photo
- * `<form>` now (resources/views/establishment/profile.blade.php) — Set-
- * as-Featured and Remove submit like any other form (Remove goes through
- * the shared confirm-dialog flow in dashboard.js first), so the only
- * gallery-specific behavior left here is auto-submitting the hidden Add
- * Image form the moment a file is chosen.
- */
-function initImageGallery() {
-    const uploadForm = document.getElementById('image-upload-form');
-    const addInput = document.getElementById('image-upload-input');
-
-    addInput?.addEventListener('change', () => {
-        if (addInput.files?.length) {
-            uploadForm.submit();
-        }
-    });
-}

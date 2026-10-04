@@ -255,4 +255,52 @@
             </button>
         </x-slot:footer>
     </x-dashboard.modal>
+
+    {{--
+        One-time account-created confirmation panel — same shape and JS
+        hook (resources/js/user_account.js) as the PTO Add User page.
+    --}}
+    @if (session('accountCreated'))
+        @php($accountCreated = session('accountCreated'))
+        <x-dashboard.modal id="account-created-modal" title="Account Created">
+            <div class="flex flex-col gap-3">
+                <dl class="flex flex-col gap-2 text-sm">
+                    <div><dt class="text-xs font-semibold text-sand-500 uppercase">Name</dt><dd class="text-sand-800">{{ $accountCreated['name'] }}</dd></div>
+                    <div><dt class="text-xs font-semibold text-sand-500 uppercase">Role</dt><dd class="text-sand-800">{{ $accountCreated['role'] }}</dd></div>
+                    <div><dt class="text-xs font-semibold text-sand-500 uppercase">Municipality</dt><dd class="text-sand-800">{{ $accountCreated['municipality'] }}</dd></div>
+                </dl>
+
+                <div class="rounded-md border border-sand-300 bg-sand-50 p-3">
+                    <p class="text-xs font-semibold text-sand-700">Temporary Password</p>
+                    <div class="mt-1.5 flex items-center justify-between gap-2">
+                        <span id="account-created-passphrase" class="font-mono text-sm text-sand-900">{{ $accountCreated['passphrase'] }}</span>
+                        <button type="button" id="account-created-copy" class="shrink-0 rounded-sm border border-sand-300 bg-sand-0 px-2.5 py-1 text-xs font-semibold text-sand-800 hover:border-primary-300">Copy</button>
+                    </div>
+                </div>
+
+                <p class="text-xs text-sand-500">This password will not be shown again.</p>
+
+                <p id="account-created-email-status" @class(['rounded-sm px-3 py-2 text-xs', 'bg-warning-bg text-warning' => ! $accountCreated['emailSent'], 'hidden' => $accountCreated['emailSent']])>
+                    Email could not be sent. Please give the temporary password to the user directly.
+                </p>
+            </div>
+
+            <x-slot:footer>
+                @unless ($accountCreated['emailSent'])
+                    <button
+                        type="button"
+                        id="account-created-resend"
+                        data-user-id="{{ $accountCreated['userId'] }}"
+                        data-resend-url="{{ route('lgu.users.resendWelcomeEmail') }}"
+                        class="rounded-sm border border-sand-300 bg-sand-0 px-4 py-2.5 text-sm font-semibold text-sand-800 hover:border-primary-300"
+                    >
+                        Send Welcome Email
+                    </button>
+                @endunless
+                <button type="button" data-modal-close class="rounded-sm bg-primary-700 px-4 py-2 text-sm font-semibold text-sand-0 hover:bg-primary-900">Done</button>
+            </x-slot:footer>
+        </x-dashboard.modal>
+    @endif
+
+    @vite(['resources/js/user_account.js'])
 </x-layouts.dashboard>

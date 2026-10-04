@@ -1,6 +1,11 @@
 <?php
 
+use App\Enums\UserRole;
+use App\Models\Category;
+use App\Models\Listing;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /*
@@ -47,4 +52,41 @@ expect()->extend('toBeOne', function () {
 function something()
 {
     // ..
+}
+
+/**
+ * Create an establishment user linked to an existing seeded listing
+ * (or create a new one if no seeded listing matches the name).
+ *
+ * Reuses pre-seeded listings (e.g., "Botanika Nature Resort") so that
+ * ArrivalSeeder data is available for tests that need it.
+ */
+function actingAsEstablishment(string $name, string $subtitle = 'Somewhere, Davao Oriental'): User
+{
+    // Try to find the pre-seeded listing first (so ArrivalSeeder data works)
+    $listing = Listing::query()->where('name', $name)->first();
+
+    if (! $listing) {
+        $category = Category::query()->firstOrCreate(
+            ['cat_name' => 'Accommodation'],
+            ['cat_sort_order' => 1, 'cat_is_active' => true, 'cat_is_qr_enabled' => true]
+        );
+
+        $listing = Listing::query()->create([
+            'slug' => Str::slug($name.'-'.Str::random(6)),
+            'name' => $name,
+            'category' => 'accommodation',
+            'cat_id' => $category->cat_id,
+            'municipality' => 'City of Mati',
+            'barangay' => 'Dahican',
+            'status' => 'DRAFT',
+        ]);
+    }
+
+    return User::factory()->create([
+        'role' => UserRole::Establishment,
+        'organization_name' => $name,
+        'organization_subtitle' => $subtitle,
+        'establishment_id' => $listing->id,
+    ]);
 }

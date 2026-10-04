@@ -1,3 +1,5 @@
+import QRCode from 'qrcode';
+
 /**
  * Shared frontend interactions for authenticated dashboards (PTO, LGU, and
  * later Establishment): sidebar submenus, filterable data tables, tabs,
@@ -20,6 +22,10 @@ document.addEventListener('DOMContentLoaded', () => {
     initReportGenerator();
     initFlashToast();
     initTourismMap();
+    initCategoryPanels();
+    initDirectoryFormToggles();
+    initQrActions();
+    initPhotoReorder();
 });
 
 /**
@@ -551,8 +557,40 @@ function initConfirmActions() {
             modal.classList.add('hidden');
             document.body.classList.remove('overflow-hidden');
 
-            const ownForm = trigger.closest('form');
+            // closest('form') finds a trigger nested inside its form;
+            // trigger.form resolves one associated via a form="" attribute
+            // instead, for a trigger placed elsewhere in the page (e.g.
+            // action buttons after a separate section, same pattern as any
+            // <button form="other-form-id">).
+            const ownForm = trigger.closest('form') || trigger.form;
             if (ownForm) {
+                // A trigger can point the shared form at a different
+                // endpoint/verb (e.g. one form, two actions — "Save draft"
+                // vs "Save and submit to LGU" on the establishment profile
+                // page) via real formaction/formmethod attributes. A plain
+                // form.submit() ignores those, so apply them to the form
+                // itself first — a no-op for every trigger that doesn't set
+                // them.
+                if (trigger.hasAttribute('formaction')) {
+                    ownForm.action = trigger.getAttribute('formaction');
+                }
+                if (trigger.hasAttribute('formmethod')) {
+                    const verb = trigger.getAttribute('formmethod').toUpperCase();
+                    if (verb === 'GET' || verb === 'POST') {
+                        ownForm.method = verb;
+                    } else {
+                        ownForm.method = 'POST';
+                        let spoof = ownForm.querySelector('input[name="_method"]');
+                        if (!spoof) {
+                            spoof = document.createElement('input');
+                            spoof.type = 'hidden';
+                            spoof.name = '_method';
+                            ownForm.appendChild(spoof);
+                        }
+                        spoof.value = verb;
+                    }
+                }
+
                 ownForm.submit();
 
                 return;
@@ -926,5 +964,177 @@ function initReportGenerator() {
         if (e.target.closest('#report-print-button')) {
             window.print();
         }
+    });
+}
+
+/**
+ * Tourism Directory Categories panel (resources/views/pto/directory/index.blade.php):
+ * `[data-category-panel]`'s `data-category-panel` attribute names the
+ * hidden `[data-filter-select][data-filter-key="category"]` it drives.
+ * Clicking a `[data-category-value]` button sets that select's value and
+ * dispatches `change`, so the existing generic table filter
+ * (initFilterableTables) does the actual row hiding — adding or renaming a
+ * category only means rendering another button, no JS change.
+ */
+function initCategoryPanels() {
+    document.querySelectorAll('[data-category-panel]').forEach((panel) => {
+        const select = document.querySelector(panel.dataset.categoryPanel);
+        const buttons = Array.from(panel.querySelectorAll('[data-category-value]'));
+        if (!select) return;
+
+        function activate(value) {
+            select.value = value;
+            select.dispatchEvent(new Event('change'));
+            buttons.forEach((btn) => {
+                const active = btn.dataset.categoryValue === value;
+                btn.classList.toggle('bg-primary-50', active);
+                btn.classList.toggle('text-primary-700', active);
+                btn.classList.toggle('text-sand-700', !active);
+            });
+        }
+
+        buttons.forEach((btn) => btn.addEventListener('click', () => activate(btn.dataset.categoryValue)));
+    });
+}
+
+/**
+ * Tourism Directory Add/Edit form: shows only the fields that apply to the
+ * selected category/type. `[data-show-when="travel"]` fields only show for
+ * the Travel & Tours category, `[data-show-when="guide"]` only for
+ * type=Tour Guide within it, `[[data-hide-when="guide"]]` (coordinates, QR)
+ * hide for a guide, and `[data-show-when="others"]` (the category note)
+ * only shows for the Others category. Re-run after an edit trigger
+ * populates the form (see initEditTriggers) since setting .value directly
+ * doesn't fire `change`.
+ */
+function initDirectoryFormToggles() {
+    const form = document.getElementById('listing-form');
+    if (!form) return;
+
+    const categorySelect = form.elements.namedItem('cat_id');
+    const typeSelect = form.elements.namedItem('type');
+
+    function apply() {
+        const categoryName = categorySelect?.selectedOptions?.[0]?.dataset.categoryName;
+        const isTravel = categoryName === 'Travel & Tours';
+        const isOthers = categoryName === 'Others';
+        const isGuide = isTravel && typeSelect?.value === 'Tour Guide';
+
+        form.querySelectorAll('[data-show-when="travel"]').forEach((el) => el.classList.toggle('hidden', !isTravel));
+        form.querySelectorAll('[data-show-when="others"]').forEach((el) => el.classList.toggle('hidden', !isOthers));
+        form.querySelectorAll('[data-show-when="guide"]').forEach((el) => el.classList.toggle('hidden', !isGuide));
+        form.querySelectorAll('[data-hide-when="guide"]').forEach((el) => el.classList.toggle('hidden', isGuide));
+    }
+
+    categorySelect?.addEventListener('change', apply);
+    typeSelect?.addEventListener('change', apply);
+    document.querySelectorAll('[data-edit-trigger="listing-form-modal"], [data-modal-open="listing-form-modal"]').forEach((trigger) => {
+        trigger.addEventListener('click', () => window.setTimeout(apply, 0));
+    });
+
+    apply();
+}
+
+/**
+ * Renders a real, scannable SVG QR code into every
+ * `[data-qr-mount]` on the page (one per QR-enabled listing's "View QR"
+ * modal), encoding that element's `data-qr-value` — the listing's check-in
+ * URL. Mirrors resources/js/establishment.js's single-mount version, but
+ * scoped per modal since a directory page has many listings.
+ */
+function initQrActions() {
+    document.querySelectorAll('[data-qr-mount]').forEach((mount) => {
+        const value = mount.dataset.qrValue;
+        if (!value) return;
+
+        QRCode.toString(value, { type: 'svg', margin: 1, width: 220 })
+            .then((svg) => {
+                mount.innerHTML = svg;
+                mount.querySelector('svg')?.classList.add('h-full', 'w-full');
+            })
+            .catch(() => {
+                mount.innerHTML = '<span class="text-xs text-danger">Couldn\'t generate QR code.</span>';
+            });
+    });
+
+    document.addEventListener('click', (e) => {
+        const printTrigger = e.target.closest('[data-qr-print]');
+        if (printTrigger) {
+            window.print();
+
+            return;
+        }
+
+        const downloadTrigger = e.target.closest('[data-qr-download]');
+        if (!downloadTrigger) return;
+
+        const svg = downloadTrigger.closest('[data-modal]')?.querySelector('[data-qr-mount] svg');
+        if (!svg) return;
+
+        const source = new XMLSerializer().serializeToString(svg);
+        const blob = new Blob([source], { type: 'image/svg+xml' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = downloadTrigger.dataset.qrFilename || 'qr-code.svg';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+    });
+}
+
+/**
+ * Drag-to-reorder for the shared photo manager
+ * (resources/views/components/dashboard/photo-manager.blade.php):
+ * `[data-photo-reorder]` wraps `[data-photo-item]` cards. Native HTML5
+ * drag-and-drop (no library) — on drop, the new left-to-right order of
+ * every card in the grid is posted to `data-reorder-action`
+ * (Concerns\ManagesEstablishmentImages::reorderImages()). The server is
+ * the source of truth for the final order; this is an optimistic DOM
+ * reorder that a page refresh always reconciles against it.
+ */
+function initPhotoReorder() {
+    document.querySelectorAll('[data-photo-reorder]').forEach((container) => {
+        let draggedItem = null;
+
+        container.addEventListener('dragstart', (e) => {
+            const item = e.target.closest('[data-photo-item]');
+            if (!item) return;
+            draggedItem = item;
+            e.dataTransfer.effectAllowed = 'move';
+        });
+
+        container.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            const target = e.target.closest('[data-photo-item]');
+            if (!target || target === draggedItem || !draggedItem) return;
+
+            const items = Array.from(container.querySelectorAll('[data-photo-item]'));
+            const draggedIndex = items.indexOf(draggedItem);
+            const targetIndex = items.indexOf(target);
+
+            if (draggedIndex < targetIndex) {
+                target.after(draggedItem);
+            } else {
+                target.before(draggedItem);
+            }
+        });
+
+        container.addEventListener('dragend', () => {
+            if (!draggedItem) return;
+            draggedItem = null;
+
+            const order = Array.from(container.querySelectorAll('[data-photo-item]')).map((item) => item.dataset.imageId);
+
+            fetch(container.dataset.reorderAction, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                },
+                body: JSON.stringify({ order }),
+            }).catch(() => showToast("Couldn't save the new photo order. Please try again.", 'danger'));
+        });
     });
 }

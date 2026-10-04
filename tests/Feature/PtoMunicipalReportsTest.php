@@ -16,17 +16,20 @@ function actingAsPtoAdministrator(): User
 
 function makeMunicipalReport(array $overrides = []): MunicipalReport
 {
+    $municipality = Municipality::query()->firstOrCreate(['code' => 'PTOMATI'], ['name' => 'City of Mati']);
     $submitter = User::factory()->create([
         'role' => UserRole::Lgu,
         'organization_name' => 'City of Mati Tourism Office',
         'organization_subtitle' => 'City of Mati',
+        'municipality_id' => $municipality->id,
     ]);
 
     return MunicipalReport::query()->create(array_merge([
         'municipality' => 'City of Mati',
+        'municipality_id' => $municipality->id,
         'submitted_by' => $submitter->id,
-        'period_start' => '2026-08-01',
-        'period_end' => '2026-08-31',
+        'period_start' => now()->startOfMonth()->toDateString(),
+        'period_end' => now()->endOfMonth()->toDateString(),
         'total_arrivals' => 1000,
         'status' => MunicipalReport::STATUS_SUBMITTED,
     ], $overrides));
@@ -96,18 +99,18 @@ test('an approved municipal report cannot be approved or returned again', functi
     test()->actingAs($pto)->patch(route('pto.municipalReports.return', $report), ['remarks' => 'x'])->assertForbidden();
 });
 
-test('the LGU Reports page uses the For Validation / Validated / For Clarification terminology', function () {
+test('the LGU Submissions page uses the Not Submitted / For Review / For Clarification / Verified terminology', function () {
     makeMunicipalReport(['status' => MunicipalReport::STATUS_SUBMITTED]);
 
     $response = test()->actingAs(actingAsPtoAdministrator())->get(route('pto.municipalReports.index'));
 
     $response->assertOk();
-    $response->assertSee('LGU Reports');
-    $response->assertSee('For Validation');
+    $response->assertSee('LGU Submissions');
+    $response->assertSee('For Review');
 });
 
-test('the LGU Reports page flags municipalities that have not submitted a current-month report', function () {
-    $mati = Municipality::query()->create(['name' => 'City of Mati', 'code' => 'PTOMATI']);
+test('the LGU Submissions page lists every municipality for the selected period, flagging the ones with no report as Not Submitted', function () {
+    Municipality::query()->create(['name' => 'City of Mati', 'code' => 'PTOMATI']);
     Municipality::query()->create(['name' => 'Baganga', 'code' => 'PTOBAG']);
 
     $response = test()->actingAs(actingAsPtoAdministrator())->get(route('pto.municipalReports.index'));
@@ -115,7 +118,7 @@ test('the LGU Reports page flags municipalities that have not submitted a curren
     $response->assertOk();
     $response->assertSee('City of Mati');
     $response->assertSee('Baganga');
-    $response->assertSee('not submitted a consolidated report', false);
+    $response->assertSee('Not Submitted');
 });
 
 test('a non-PTO user cannot access municipal reports routes', function () {

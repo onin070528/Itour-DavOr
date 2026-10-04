@@ -12,7 +12,7 @@
 namespace App\Http\Controllers\Establishment;
 
 use App\Http\Controllers\Controller;
-use App\Support\EstablishmentNavigation;
+use App\Support\DashboardNavigation;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -32,7 +32,7 @@ abstract class EstablishmentController extends Controller
         return view($view, array_merge([
             'user' => $user,
             'establishmentName' => $user->organization_name,
-            'navSections' => EstablishmentNavigation::sections($activeKey),
+            'navSections' => DashboardNavigation::sections($user, $activeKey),
             'pageTitle' => $pageTitle,
             'accountHeading' => 'System',
             'settingsHref' => route('establishment.settings'),

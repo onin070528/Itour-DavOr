@@ -15,19 +15,21 @@
 namespace App\Http\Controllers\Lgu;
 
 use App\Enums\UserRole;
-use App\Events\UserAccountCreated;
 use App\Events\UserAccountStatusChanged;
 use App\Http\Controllers\Concerns\ManagesDestinationListings;
+use App\Mail\WelcomeAccountCreated;
 use App\Models\Listing;
 use App\Models\User;
+use App\Services\UserAccountProvisioner;
 use App\Support\BusinessHours;
 use App\Support\OperationLogger;
 use App\Support\TourismCatalog;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Unique;
 use Illuminate\View\View;
@@ -57,13 +59,13 @@ class UsersController extends LguController
      * Registers a new establishment (listing) in this LGU's municipality
      * together with the login account linked to it.
      */
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, UserAccountProvisioner $objProvisioner): RedirectResponse
     {
         $data = $this->validatedEstablishmentFields($request, Rule::unique('users', 'email'));
         $lgu = $request->user();
 
         try {
-            $user = DB::transaction(function () use ($data, $lgu): User {
+            $arrCreated = DB::transaction(function () use ($data, $lgu, $objProvisioner): array {
                 // Municipality always comes from the LGU's own account, never
                 // from the request — an LGU can only register establishments
                 // inside its own jurisdiction.
@@ -72,15 +74,15 @@ class UsersController extends LguController
                     'slug' => $this->uniqueDestinationSlug($data['listing']['name']),
                     'municipality' => $lgu->organization_subtitle,
                     'municipality_id' => $lgu->municipality_id,
-                    'status' => 'Active',
+                    // Not public yet — the LGU reviews and submits it to
+                    // PTO (App\Services\ListingPublishWorkflow) before it
+                    // goes live, same as any other establishment.
+                    'status' => 'DRAFT',
                 ]);
 
-                return User::query()->create([
+                return $objProvisioner->createWithPassphrase([
                     'name' => $data['account']['name'],
                     'email' => $data['account']['email'],
-                    // Random password nobody knows — the account holder sets
-                    // their own via "Forgot password?" on the sign-in page.
-                    'password' => Str::password(32),
                     'email_verified_at' => now(),
                     'role' => UserRole::Establishment,
                     'organization_name' => $listing->name,
@@ -97,9 +99,17 @@ class UsersController extends LguController
             return back()->withInput()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
 
-        event(new UserAccountCreated($lgu, $user));
+        $user = $arrCreated['user'];
+        $blnEmailSent = $objProvisioner->notifyCreated($lgu, $user, $arrCreated['passphrase']);
 
-        return back()->with('toast', "{$user->organization_name} was registered. They can set their password using \"Forgot password?\" on the sign-in page.");
+        return back()->with('accountCreated', [
+            'userId' => $user->id,
+            'name' => $user->name,
+            'role' => UserRole::Establishment->title(),
+            'municipality' => $lgu->organization_subtitle,
+            'passphrase' => $arrCreated['passphrase'],
+            'emailSent' => $blnEmailSent,
+        ]);
     }
 
     public function update(Request $request, User $user): RedirectResponse
@@ -135,6 +145,32 @@ class UsersController extends LguController
         }
 
         return back()->with('toast', 'Establishment information saved.');
+    }
+
+    /**
+     * Retries the welcome email from the confirmation panel after an
+     * automatic send failed — same pattern as Pto\UsersController's
+     * equivalent, scoped to the LGU's own municipality.
+     */
+    public function resendWelcomeEmail(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'user_id' => ['required', 'integer', 'exists:users,id'],
+            'passphrase' => ['required', 'string'],
+        ]);
+
+        $user = User::query()->findOrFail($data['user_id']);
+        $this->authorizeOwnEstablishmentUser($request, $user);
+
+        try {
+            Mail::to($user->email)->send(new WelcomeAccountCreated($user, $data['passphrase']));
+
+            return response()->json(['sent' => true]);
+        } catch (\Throwable $e) {
+            Log::error('Failed to resend the welcome email.', ['exception' => $e, 'user_id' => $user->id]);
+
+            return response()->json(['sent' => false], 500);
+        }
     }
 
     public function toggleStatus(Request $request, User $user): RedirectResponse

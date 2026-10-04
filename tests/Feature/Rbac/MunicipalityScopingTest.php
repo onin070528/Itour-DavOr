@@ -44,7 +44,7 @@ test('PTO can reach the province-wide directory regardless of municipality', fun
 
     $pto = User::factory()->create(['role' => UserRole::PtoAdministrator]);
 
-    test()->actingAs($pto)->get(route('pto.directory.destinations'))->assertOk();
+    test()->actingAs($pto)->get(route('pto.directory.index'))->assertOk();
 });
 
 test('an LGU can manage a destination inside its own municipality', function () {
@@ -78,18 +78,18 @@ test('an LGU cannot update or archive a destination belonging to another municip
     expect($baganganDestination->fresh()->name)->not->toBe('Hijacked Name');
 });
 
-test('an LGU cannot verify an establishment belonging to another municipality', function () {
+test('an LGU cannot submit to PTO an establishment belonging to another municipality', function () {
     $mati = makeMunicipality('City of Mati', 'MATI');
     $baganga = makeMunicipality('Baganga', 'BAG');
     $baganganEstablishment = makeListing($baganga, 'accommodation');
-    $baganganEstablishment->update(['status' => 'Pending Review']);
+    $baganganEstablishment->update(['status' => 'DRAFT']);
     $matiLgu = makeLguUser($mati);
 
     test()->actingAs($matiLgu)
-        ->patch(route('lgu.directory.establishments.verify', $baganganEstablishment))
+        ->patch(route('lgu.directory.establishments.submit', $baganganEstablishment))
         ->assertForbidden();
 
-    expect($baganganEstablishment->fresh()->status)->toBe('Pending Review');
+    expect($baganganEstablishment->fresh()->status)->toBe('DRAFT');
 });
 
 test('direct listing id manipulation across municipalities never returns 200', function () {
