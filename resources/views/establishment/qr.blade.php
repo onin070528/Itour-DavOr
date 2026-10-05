@@ -10,17 +10,17 @@
 
             <p class="font-display text-lg font-bold text-sand-900">{{ $establishmentName }}</p>
 
-            {{-- Rendered client-side into a real, scannable SVG QR code —
-                 see initQrActions() in resources/js/establishment.js. Each
-                 establishment's data-qr-value is its own unique check-in
-                 URL, so no two establishments share a code. --}}
+            {{-- Rendered server-side as a real, scannable SVG QR code (see
+                 simplesoftwareio/simple-qrcode's QrCode facade) — each
+                 establishment's $checkinUrl is its own unique check-in URL,
+                 so no two establishments share a code. The download/print
+                 buttons are wired up in initQrActions() (resources/js/establishment.js). --}}
             <div
-                id="establishment-qr-mount"
-                data-qr-value="{{ $checkinUrl }}"
-                class="flex h-56 w-56 items-center justify-center rounded-md border border-sand-200 bg-sand-0 p-2 sm:h-64 sm:w-64"
+                id="establishment-qr-svg"
+                class="flex h-56 w-56 items-center justify-center rounded-md border border-sand-200 bg-sand-0 p-2 [&>svg]:h-full [&>svg]:w-full sm:h-64 sm:w-64"
                 aria-label="QR code for {{ $establishmentName }} check-in"
             >
-                <span class="text-xs text-sand-400">Generating QR code…</span>
+                {!! \SimpleSoftwareIO\QrCode\Facades\QrCode::format('svg')->size(256)->margin(1)->generate($checkinUrl) !!}
             </div>
 
             <p class="max-w-xs break-all font-mono text-[11px] text-sand-400">{{ $checkinUrl }}</p>

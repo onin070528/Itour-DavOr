@@ -15,6 +15,12 @@ class ArrivalSeeder extends Seeder
      */
     public function run(): void
     {
+        if (app()->environment('production')) {
+            $this->command?->warn('ArrivalSeeder: skipped — refusing to seed demo arrivals in production.');
+
+            return;
+        }
+
         $listing = Listing::query()->where('name', 'Botanika Nature Resort')->first();
 
         if (! $listing) {

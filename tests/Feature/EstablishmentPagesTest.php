@@ -140,6 +140,71 @@ test('feedback and arrival records are limited to the account\'s own establishme
     $badjaoArrivals->assertDontSee('Kim Soo-jin');
 });
 
+test('two establishments with the same display name do not see each other\'s arrivals', function () {
+    $category = Category::query()->firstOrCreate(
+        ['cat_name' => 'Accommodation'],
+        ['cat_sort_order' => 1, 'cat_is_active' => true, 'cat_is_qr_enabled' => true]
+    );
+
+    $sharedName = 'Paradise Resort';
+
+    $listingA = Listing::query()->create([
+        'slug' => 'paradise-resort-a',
+        'name' => $sharedName,
+        'category' => 'accommodation',
+        'cat_id' => $category->cat_id,
+        'municipality' => 'City of Mati',
+        'barangay' => 'Dahican',
+        'status' => 'PUBLISHED',
+    ]);
+    $listingB = Listing::query()->create([
+        'slug' => 'paradise-resort-b',
+        'name' => $sharedName,
+        'category' => 'accommodation',
+        'cat_id' => $category->cat_id,
+        'municipality' => 'Baganga',
+        'barangay' => 'Poblacion',
+        'status' => 'PUBLISHED',
+    ]);
+
+    $listingA->arrivals()->create([
+        'source' => 'staff', 'date' => '2026-08-22', 'visitor_name' => 'Guest At A',
+        'party_male' => 1, 'party_size' => 1, 'status' => 'Recorded',
+    ]);
+    $listingB->arrivals()->create([
+        'source' => 'staff', 'date' => '2026-08-22', 'visitor_name' => 'Guest At B',
+        'party_male' => 1, 'party_size' => 1, 'status' => 'Recorded',
+    ]);
+
+    $userA = User::factory()->create([
+        'role' => UserRole::Establishment,
+        'organization_name' => $sharedName,
+        'organization_subtitle' => 'Brgy. Dahican, City of Mati',
+        'establishment_id' => $listingA->id,
+    ]);
+    $userB = User::factory()->create([
+        'role' => UserRole::Establishment,
+        'organization_name' => $sharedName,
+        'organization_subtitle' => 'Brgy. Poblacion, Baganga',
+        'establishment_id' => $listingB->id,
+    ]);
+
+    $arrivalsA = test()->actingAs($userA)->get(route('establishment.arrivals.index'));
+    $arrivalsA->assertOk();
+    $arrivalsA->assertSee('Guest At A');
+    $arrivalsA->assertDontSee('Guest At B');
+
+    $arrivalsB = test()->actingAs($userB)->get(route('establishment.arrivals.index'));
+    $arrivalsB->assertOk();
+    $arrivalsB->assertSee('Guest At B');
+    $arrivalsB->assertDontSee('Guest At A');
+
+    $qrA = test()->actingAs($userA)->get(route('establishment.qr'));
+    $qrA->assertOk();
+    $qrA->assertSee(route('lgu.establishmentQr', ['establishment' => $listingA->uuid]), false);
+    $qrA->assertDontSee($listingB->uuid);
+});
+
 test('an establishment user cannot access PTO or LGU routes', function () {
     $user = actingAsEstablishment('Botanika Nature Resort', 'Brgy. Dahican, City of Mati');
 

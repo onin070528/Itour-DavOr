@@ -21,6 +21,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 
 /**
  * A tourism destination or establishment — the real, DB-backed replacement
@@ -39,6 +40,13 @@ use Illuminate\Support\Collection;
 class Listing extends Model
 {
     use HasFactory;
+
+    protected static function booted(): void
+    {
+        static::creating(function (Listing $listing) {
+            $listing->uuid ??= (string) Str::uuid();
+        });
+    }
 
     protected function casts(): array
     {

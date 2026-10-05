@@ -12,6 +12,7 @@
 
 namespace App\Models;
 
+use App\Enums\ArrivalOriginScope;
 use App\Enums\MonthlyReportStatus;
 use App\Enums\ReportSubmissionSource;
 use App\Enums\UserRole;
@@ -22,6 +23,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
 
 /**
  * One row per (listing_id, period_month). `submission_source` distinguishes
@@ -93,6 +95,37 @@ class MonthlyArrivalReport extends Model
     public function arrivals(): HasMany
     {
         return $this->hasMany(Arrival::class);
+    }
+
+    /**
+     * Within/outside-province and top-origin breakdown of this report's
+     * underlying arrivals (see arrivals(), above — only ever populated for
+     * Digital reports, so a ManualPaper report simply yields all-empty
+     * results here rather than an error). Headcounts are weighted by
+     * party_local/party_foreign, not party_size, since a single arrival
+     * row's local_origin_place/foreign_country describes only the local or
+     * foreign portion of that party, not everyone in it.
+     *
+     * @return array{withinProvince: int, outsideProvince: int, topOriginPlaces: Collection<string, int>, topForeignCountries: Collection<string, int>}
+     */
+    public function originBreakdown(): array
+    {
+        $arrivals = $this->relationLoaded('arrivals') ? $this->arrivals : $this->arrivals()->get();
+
+        return [
+            'withinProvince' => (int) $arrivals->where('local_origin_scope', ArrivalOriginScope::WithinProvince)->sum('party_local'),
+            'outsideProvince' => (int) $arrivals->where('local_origin_scope', ArrivalOriginScope::OutsideProvince)->sum('party_local'),
+            'topOriginPlaces' => $arrivals->whereNotNull('local_origin_place')
+                ->groupBy('local_origin_place')
+                ->map(fn ($group) => $group->sum('party_local'))
+                ->sortDesc()
+                ->take(5),
+            'topForeignCountries' => $arrivals->whereNotNull('foreign_country')
+                ->groupBy('foreign_country')
+                ->map(fn ($group) => $group->sum('party_foreign'))
+                ->sortDesc()
+                ->take(5),
+        ];
     }
 
     public function scopeVisibleTo(Builder $query, User $user): Builder

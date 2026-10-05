@@ -305,7 +305,9 @@
 
                     @if ($listing->isQrEnabled())
                         <x-dashboard.modal id="qr-view-{{ $listing->id }}" title="{{ $listing->name }} QR Code">
-                            <div data-qr-mount data-qr-value="{{ route('lgu.establishmentQr', ['establishment' => $listing->slug]) }}" class="mx-auto flex h-56 w-56 items-center justify-center rounded-md border border-sand-200 bg-sand-0 p-3"></div>
+                            <div data-qr-mount class="mx-auto flex h-56 w-56 items-center justify-center rounded-md border border-sand-200 bg-sand-0 p-3 [&>svg]:h-full [&>svg]:w-full">
+                                {!! \SimpleSoftwareIO\QrCode\Facades\QrCode::format('svg')->size(220)->margin(1)->generate(route('lgu.establishmentQr', ['establishment' => $listing->uuid])) !!}
+                            </div>
                             <p class="mt-3 text-center text-xs text-sand-500">Tourists scan this to register their arrival at {{ $listing->name }}.</p>
 
                             <x-slot:footer>

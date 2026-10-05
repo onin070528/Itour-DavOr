@@ -10,6 +10,8 @@
 
 namespace App\Models;
 
+use App\Enums\ArrivalOriginScope;
+use App\Enums\ArrivalSource;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -26,6 +28,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'gender', 'classification', 'visit_type', 'remarks', 'party_male',
     'party_female', 'party_adults', 'party_children', 'party_seniors',
     'party_local', 'party_foreign', 'party_size', 'status',
+    'local_origin_scope', 'local_origin_place', 'foreign_country',
 ])]
 class Arrival extends Model
 {
@@ -33,6 +36,8 @@ class Arrival extends Model
     {
         return [
             'date' => 'date',
+            'source' => ArrivalSource::class,
+            'local_origin_scope' => ArrivalOriginScope::class,
         ];
     }
 

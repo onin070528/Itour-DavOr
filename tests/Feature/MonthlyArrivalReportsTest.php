@@ -412,3 +412,78 @@ test('verification history shows on both the LGU and PTO report detail pages', f
     $ptoResponse = test()->actingAs($pto)->get(route('pto.monthlyReports.show', $report));
     $ptoResponse->assertSee('Verification History');
 });
+
+test('the Logged Via column on both report detail pages correctly labels staff vs self-checkin arrivals', function () {
+    $listing = makeEstablishmentListing('Caraga', 'CAR2', 'Underlying Arrivals Resort');
+    $municipality = $listing->municipalityRecord;
+    $lgu = makeLguUser($municipality);
+    $pto = User::factory()->create(['role' => UserRole::PtoAdministrator]);
+    $user = makeEstablishmentUser($listing);
+
+    $listing->arrivals()->create([
+        'source' => 'staff', 'date' => '2026-09-05', 'visit_type' => 'Daytour',
+        'party_male' => 1, 'party_size' => 1, 'status' => 'Recorded',
+    ]);
+    $listing->arrivals()->create([
+        'source' => 'self_checkin', 'date' => '2026-09-06', 'visit_type' => 'Daytour',
+        'party_male' => 1, 'party_size' => 1, 'status' => 'Recorded',
+    ]);
+
+    test()->actingAs($user)
+        ->post(route('establishment.arrivals.monthly.submit'), ['period_month' => '2026-09'])
+        ->assertRedirect();
+    $report = MonthlyArrivalReport::query()->where('listing_id', $listing->id)->sole();
+
+    $lguResponse = test()->actingAs($lgu)->get(route('lgu.monthlyReports.show', $report));
+    $lguResponse->assertSee('Front Desk');
+    $lguResponse->assertSee('QR Self Check-in');
+
+    $ptoResponse = test()->actingAs($pto)->get(route('pto.monthlyReports.show', $report));
+    $ptoResponse->assertSee('Front Desk');
+    $ptoResponse->assertSee('QR Self Check-in');
+});
+
+test('the monthly report detail pages show the within/outside-province and top-country breakdown', function () {
+    $listing = makeEstablishmentListing('Boston', 'BOS3', 'Origin Breakdown Resort');
+    $municipality = $listing->municipalityRecord;
+    $lgu = makeLguUser($municipality);
+    $pto = User::factory()->create(['role' => UserRole::PtoAdministrator]);
+    $user = makeEstablishmentUser($listing);
+
+    $listing->arrivals()->create([
+        'source' => 'staff', 'date' => '2026-09-05', 'visit_type' => 'Daytour',
+        'party_local' => 2, 'party_size' => 2, 'status' => 'Recorded',
+        'local_origin_scope' => 'within_province',
+    ]);
+    $listing->arrivals()->create([
+        'source' => 'self_checkin', 'date' => '2026-09-06', 'visit_type' => 'Daytour',
+        'party_local' => 3, 'party_size' => 3, 'status' => 'Recorded',
+        'local_origin_scope' => 'outside_province', 'local_origin_place' => 'Davao del Sur',
+    ]);
+    $listing->arrivals()->create([
+        'source' => 'self_checkin', 'date' => '2026-09-07', 'visit_type' => 'Daytour',
+        'party_foreign' => 1, 'party_size' => 1, 'status' => 'Recorded',
+        'foreign_country' => 'Japan',
+    ]);
+
+    test()->actingAs($user)
+        ->post(route('establishment.arrivals.monthly.submit'), ['period_month' => '2026-09'])
+        ->assertRedirect();
+    $report = MonthlyArrivalReport::query()->where('listing_id', $listing->id)->sole();
+
+    $breakdown = $report->fresh('arrivals')->originBreakdown();
+    expect($breakdown['withinProvince'])->toBe(2);
+    expect($breakdown['outsideProvince'])->toBe(3);
+    expect($breakdown['topOriginPlaces']->get('Davao del Sur'))->toBe(3);
+    expect($breakdown['topForeignCountries']->get('Japan'))->toBe(1);
+
+    $lguResponse = test()->actingAs($lgu)->get(route('lgu.monthlyReports.show', $report));
+    $lguResponse->assertSee('Local Guest Origin');
+    $lguResponse->assertSee('Davao del Sur');
+    $lguResponse->assertSee('Japan');
+
+    $ptoResponse = test()->actingAs($pto)->get(route('pto.monthlyReports.show', $report));
+    $ptoResponse->assertSee('Local Guest Origin');
+    $ptoResponse->assertSee('Davao del Sur');
+    $ptoResponse->assertSee('Japan');
+});

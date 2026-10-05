@@ -195,6 +195,7 @@ class MonthlyReportsController extends LguController
             'report' => $monthlyArrivalReport,
             'locked' => $this->isLocked($monthlyArrivalReport),
             'history' => $this->reportHistory($monthlyArrivalReport),
+            'originBreakdown' => $monthlyArrivalReport->originBreakdown(),
         ]);
     }
 

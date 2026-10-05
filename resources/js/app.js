@@ -919,13 +919,28 @@ function initEstablishmentQrForm() {
         return sums;
     }
 
+    const localOriginScope = document.getElementById('qr-local-origin-scope');
+    const localOriginPlace = document.getElementById('qr-local-origin-place');
+    const localOriginPlaceWrap = document.getElementById('qr-local-origin-place-wrap');
+    const localOriginWrap = document.getElementById('qr-local-origin-wrap');
+    const foreignCountry = document.getElementById('qr-foreign-country');
+    const foreignCountryWrap = document.getElementById('qr-foreign-country-wrap');
+
     function updateTotal() {
         const sums = computeMatrixSums();
         const companions = sums.foreign + sums.local;
-        totalValue.textContent = String(1 + companions);
+        totalValue.textContent = String(companions);
         foreignValue.textContent = String(sums.foreign);
         localValue.textContent = String(sums.local);
+
+        localOriginWrap?.classList.toggle('hidden', sums.local <= 0);
+        foreignCountryWrap?.classList.toggle('hidden', sums.foreign <= 0);
+        if (localOriginPlaceWrap) {
+            localOriginPlaceWrap.classList.toggle('hidden', localOriginScope?.value !== 'outside_province');
+        }
     }
+
+    localOriginScope?.addEventListener('change', updateTotal);
 
     counters.forEach((counter) => {
         counter.querySelector('[data-counter-decrement]').addEventListener('click', () => {
@@ -942,6 +957,12 @@ function initEstablishmentQrForm() {
         event.preventDefault();
         if (!form.reportValidity()) return;
 
+        const sums = computeMatrixSums();
+        if (sums.male + sums.female < 1) {
+            alert('Add at least one guest to the headcount.');
+            return;
+        }
+
         const submitButton = form.querySelector('button[type="submit"]');
         if (submitButton) submitButton.disabled = true;
 
@@ -954,7 +975,10 @@ function initEstablishmentQrForm() {
             const payload = {
                 visitorName: form.elements.namedItem('visitorName')?.value,
                 visitorContact: form.elements.namedItem('visitorContact')?.value,
-                ...computeMatrixSums(),
+                localOriginScope: sums.local > 0 ? (localOriginScope?.value || null) : null,
+                localOriginPlace: sums.local > 0 && localOriginScope?.value === 'outside_province' ? (localOriginPlace?.value || null) : null,
+                foreignCountry: sums.foreign > 0 ? (foreignCountry?.value || null) : null,
+                ...sums,
             };
 
             const response = await fetch(form.dataset.actionUrl, {
@@ -984,6 +1008,9 @@ function initEstablishmentQrForm() {
     resetButton?.addEventListener('click', () => {
         form.reset();
         counters.forEach((counter) => writeValue(counter, 0));
+        if (localOriginScope) localOriginScope.value = '';
+        if (localOriginPlace) localOriginPlace.value = '';
+        if (foreignCountry) foreignCountry.value = '';
         updateTotal();
         successStep?.classList.add('hidden');
         successStep?.classList.remove('flex');

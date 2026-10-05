@@ -131,8 +131,40 @@
                                 </div>
                             </template>
                         </div>
+
+                        @if ($group['key'] === 'local')
+                            <div class="mt-4 border-t border-dashed border-sand-200 pt-4" x-show="localTotal > 0" x-cloak>
+                                <label for="local-origin-scope" class="mb-1 block text-xs font-semibold text-sand-700">Where are they from? <span class="font-normal text-sand-500">(optional)</span></label>
+                                <select id="local-origin-scope" x-model="localOriginScope" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none">
+                                    <option value="">Prefer not to say</option>
+                                    <option value="within_province">Within Davao Oriental</option>
+                                    <option value="outside_province">Outside Davao Oriental</option>
+                                </select>
+
+                                <div class="mt-3" x-show="localOriginScope === 'outside_province'" x-cloak>
+                                    <label for="local-origin-place" class="mb-1 block text-xs font-semibold text-sand-700">Home Province</label>
+                                    <input id="local-origin-place" type="text" list="province-options" x-model="localOriginPlace" placeholder="e.g. Davao del Sur" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none">
+                                </div>
+                            </div>
+                        @else
+                            <div class="mt-4 border-t border-dashed border-sand-200 pt-4" x-show="foreignTotal > 0" x-cloak>
+                                <label for="foreign-country" class="mb-1 block text-xs font-semibold text-sand-700">Home Country <span class="font-normal text-sand-500">(optional)</span></label>
+                                <input id="foreign-country" type="text" list="country-options" x-model="foreignCountry" placeholder="e.g. Japan" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none">
+                            </div>
+                        @endif
                     </div>
                 @endforeach
+
+                <datalist id="province-options">
+                    @foreach ($provinces as $province)
+                        <option value="{{ $province }}"></option>
+                    @endforeach
+                </datalist>
+                <datalist id="country-options">
+                    @foreach ($countries as $country)
+                        <option value="{{ $country }}"></option>
+                    @endforeach
+                </datalist>
             </div>
 
             {{-- Right column: sticky live summary + submit --}}

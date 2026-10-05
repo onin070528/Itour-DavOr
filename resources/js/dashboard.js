@@ -1,4 +1,3 @@
-import QRCode from 'qrcode';
 
 /**
  * Shared frontend interactions for authenticated dashboards (PTO, LGU, and
@@ -1036,27 +1035,13 @@ function initDirectoryFormToggles() {
 }
 
 /**
- * Renders a real, scannable SVG QR code into every
- * `[data-qr-mount]` on the page (one per QR-enabled listing's "View QR"
- * modal), encoding that element's `data-qr-value` — the listing's check-in
- * URL. Mirrors resources/js/establishment.js's single-mount version, but
- * scoped per modal since a directory page has many listings.
+ * Print/download actions for every `[data-qr-mount]` on the page (one per
+ * QR-enabled listing's "View QR" modal). The QR code itself is rendered
+ * server-side as SVG directly into the mount (simplesoftwareio/simple-qrcode,
+ * see resources/views/pto/directory/index.blade.php) — this only wires up
+ * the buttons, mirroring resources/js/establishment.js.
  */
 function initQrActions() {
-    document.querySelectorAll('[data-qr-mount]').forEach((mount) => {
-        const value = mount.dataset.qrValue;
-        if (!value) return;
-
-        QRCode.toString(value, { type: 'svg', margin: 1, width: 220 })
-            .then((svg) => {
-                mount.innerHTML = svg;
-                mount.querySelector('svg')?.classList.add('h-full', 'w-full');
-            })
-            .catch(() => {
-                mount.innerHTML = '<span class="text-xs text-danger">Couldn\'t generate QR code.</span>';
-            });
-    });
-
     document.addEventListener('click', (e) => {
         const printTrigger = e.target.closest('[data-qr-print]');
         if (printTrigger) {

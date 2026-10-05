@@ -86,8 +86,8 @@
                                 <i class="ti ti-users text-lg" aria-hidden="true"></i>
                             </span>
                             <div>
-                                <h2 class="font-display text-sm font-bold text-sand-900">Your Travel Companions</h2>
-                                <p class="text-xs text-sand-500">Tap (+) to add people traveling with you (do not count yourself).</p>
+                                <h2 class="font-display text-sm font-bold text-sand-900">Your Group</h2>
+                                <p class="text-xs text-sand-500">Tap (+) to add everyone in your group, including yourself.</p>
                             </div>
                         </div>
 
@@ -134,8 +134,40 @@
                                         </div>
                                     @endforeach
                                 </div>
+
+                                @if ($group['key'] === 'local')
+                                    <div id="qr-local-origin-wrap" class="mt-4 border-t border-dashed border-sand-200 pt-4 hidden">
+                                        <label for="qr-local-origin-scope" class="mb-1 block text-xs font-semibold text-sand-700">Where are you from? <span class="font-normal text-sand-500">(optional)</span></label>
+                                        <select id="qr-local-origin-scope" name="localOriginScope" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none">
+                                            <option value="">Prefer not to say</option>
+                                            <option value="within_province">Within Davao Oriental</option>
+                                            <option value="outside_province">Outside Davao Oriental</option>
+                                        </select>
+
+                                        <div id="qr-local-origin-place-wrap" class="mt-3 hidden">
+                                            <label for="qr-local-origin-place" class="mb-1 block text-xs font-semibold text-sand-700">Home Province</label>
+                                            <input id="qr-local-origin-place" name="localOriginPlace" type="text" list="province-options" placeholder="e.g. Davao del Sur" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none">
+                                        </div>
+                                    </div>
+                                @else
+                                    <div id="qr-foreign-country-wrap" class="mt-4 border-t border-dashed border-sand-200 pt-4 hidden">
+                                        <label for="qr-foreign-country" class="mb-1 block text-xs font-semibold text-sand-700">Home Country <span class="font-normal text-sand-500">(optional)</span></label>
+                                        <input id="qr-foreign-country" name="foreignCountry" type="text" list="country-options" placeholder="e.g. Japan" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none">
+                                    </div>
+                                @endif
                             </div>
                         @endforeach
+
+                        <datalist id="province-options">
+                            @foreach ($provinces as $province)
+                                <option value="{{ $province }}"></option>
+                            @endforeach
+                        </datalist>
+                        <datalist id="country-options">
+                            @foreach ($countries as $country)
+                                <option value="{{ $country }}"></option>
+                            @endforeach
+                        </datalist>
                     </div>
 
                     {{-- Total Group Size --}}
@@ -143,10 +175,10 @@
                         <p class="text-xs font-semibold tracking-wide text-primary-700 uppercase">Total Group Size</p>
                         <div class="mt-1.5 flex items-center justify-between gap-3">
                             <p id="qr-total-caption" class="text-sm text-sand-700">
-                                You (<b>1</b>) + Local (<b id="qr-local-value">0</b>) + International (<b id="qr-foreign-value">0</b>)
+                                Local (<b id="qr-local-value">0</b>) + International (<b id="qr-foreign-value">0</b>)
                             </p>
                             <p class="shrink-0 font-display text-3xl font-extrabold text-primary-900">
-                                <span id="qr-total-value">1</span> <span class="text-sm font-semibold text-sand-500">People</span>
+                                <span id="qr-total-value">0</span> <span class="text-sm font-semibold text-sand-500">People</span>
                             </p>
                         </div>
                     </div>

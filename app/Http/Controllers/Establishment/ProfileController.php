@@ -15,7 +15,6 @@ namespace App\Http\Controllers\Establishment;
 use App\Models\Listing;
 use App\Models\OperationLog;
 use App\Services\ListingPublishWorkflow;
-use App\Support\EstablishmentMockData;
 use App\Support\ListingReadinessChecklist;
 use App\Support\OperationLogger;
 use App\Support\TourismCatalog;
@@ -222,12 +221,12 @@ class ProfileController extends EstablishmentController
      */
     public function qr(Request $request): View
     {
-        $name = $request->user()->organization_name;
-        $profile = EstablishmentMockData::profile($name);
+        abort_if($request->user()->establishment_id === null, 403, 'Your account is not linked to an establishment yet.');
+        $listing = $request->user()->establishment()->firstOrFail();
 
         return $this->renderEstablishment($request, 'establishment.qr', 'establishment.qr', 'QR Code', [
-            'profile' => $profile,
-            'checkinUrl' => $profile ? route('lgu.establishmentQr', ['establishment' => $profile['id']]) : null,
+            'establishmentName' => $listing->name,
+            'checkinUrl' => route('lgu.establishmentQr', ['establishment' => $listing->uuid]),
         ]);
     }
 

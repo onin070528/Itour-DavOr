@@ -11,10 +11,12 @@
 
 namespace App\Http\Controllers\Establishment;
 
+use App\Enums\ArrivalOriginScope;
+use App\Enums\ArrivalSource;
 use App\Enums\MonthlyReportStatus;
 use App\Enums\ReportSubmissionSource;
+use App\Models\Arrival;
 use App\Models\MonthlyArrivalReport;
-use App\Support\EstablishmentMockData;
 use App\Support\OperationLogger;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
@@ -22,6 +24,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -32,7 +35,10 @@ class ArrivalsController extends EstablishmentController
      */
     public function record(Request $request): View
     {
-        return $this->renderEstablishment($request, 'establishment.arrivals.record', 'arrivals.record', 'Record Arrival');
+        return $this->renderEstablishment($request, 'establishment.arrivals.record', 'arrivals.record', 'Record Arrival', [
+            'provinces' => config('ph_provinces'),
+            'countries' => config('countries'),
+        ]);
     }
 
     /**
@@ -46,7 +52,7 @@ class ArrivalsController extends EstablishmentController
      */
     public function store(Request $request): JsonResponse
     {
-        $data = $request->validate([
+        $data = Validator::make($request->all(), [
             'date' => ['required', 'date'],
             'visitorName' => ['nullable', 'string', 'max:255'],
             'visitType' => ['required', Rule::in(['Daytour', 'Overnight'])],
@@ -57,7 +63,29 @@ class ArrivalsController extends EstablishmentController
             'seniors' => ['nullable', 'integer', 'min:0'],
             'local' => ['nullable', 'integer', 'min:0'],
             'foreign' => ['nullable', 'integer', 'min:0'],
-        ]);
+            'localOriginScope' => [
+                'nullable',
+                Rule::enum(ArrivalOriginScope::class),
+                Rule::prohibitedIf((int) $request->input('local', 0) <= 0),
+            ],
+            'localOriginPlace' => [
+                'nullable', 'string', 'max:100',
+                Rule::requiredIf($request->input('localOriginScope') === ArrivalOriginScope::OutsideProvince->value),
+                Rule::prohibitedIf($request->input('localOriginScope') !== ArrivalOriginScope::OutsideProvince->value),
+            ],
+            'foreignCountry' => [
+                'nullable', 'string', 'max:100',
+                Rule::prohibitedIf((int) $request->input('foreign', 0) <= 0),
+            ],
+        ])->after(function ($validator) use ($request) {
+            // Counting rule: the companion grid includes the lead visitor
+            // (see arrivalForm()'s totalPeople in resources/js/establishment.js),
+            // so the group's total headcount is the grid sum itself — never 0.
+            $total = (int) $request->input('male', 0) + (int) $request->input('female', 0);
+            if ($total < 1) {
+                $validator->errors()->add('male', 'Add at least one guest to the headcount.');
+            }
+        })->validate();
 
         $companions = collect(['male', 'female', 'adults', 'children', 'seniors', 'local', 'foreign'])
             ->mapWithKeys(fn ($key) => [$key => (int) ($data[$key] ?? 0)]);
@@ -69,7 +97,7 @@ class ArrivalsController extends EstablishmentController
 
         try {
             $listing->arrivals()->create([
-                'source' => 'staff',
+                'source' => ArrivalSource::Staff,
                 'date' => $data['date'],
                 'visitor_name' => $data['visitorName'] ?? null,
                 'visit_type' => $data['visitType'],
@@ -80,7 +108,10 @@ class ArrivalsController extends EstablishmentController
                 'party_seniors' => $companions['seniors'],
                 'party_local' => $companions['local'],
                 'party_foreign' => $companions['foreign'],
-                'party_size' => 1 + $companions['male'] + $companions['female'],
+                'party_size' => $companions['male'] + $companions['female'],
+                'local_origin_scope' => $data['localOriginScope'] ?? null,
+                'local_origin_place' => $data['localOriginPlace'] ?? null,
+                'foreign_country' => $data['foreignCountry'] ?? null,
                 'status' => 'Recorded',
             ]);
         } catch (\Throwable $e) {
@@ -93,14 +124,33 @@ class ArrivalsController extends EstablishmentController
     }
 
     /**
-     * Arrival Records: guest arrivals previously recorded for this establishment.
+     * Arrival Records: guest arrivals previously recorded for this
+     * establishment, staff-logged and self-checkin alike. Scoped via
+     * establishment_id (not a Listing.name match against organization_name —
+     * see ProfileController::ownListing()), so two establishments sharing a
+     * display name never see each other's arrivals.
      */
     public function index(Request $request): View
     {
-        $name = $request->user()->organization_name;
+        abort_if($request->user()->establishment_id === null, 403, 'Your account is not linked to an establishment yet.');
+        $listing = $request->user()->establishment()->firstOrFail();
+
+        $arrivals = $listing->arrivals()
+            ->orderByDesc('date')
+            ->orderByDesc('id')
+            ->get()
+            ->map(fn (Arrival $arrival) => [
+                'id' => 'GR-'.$arrival->id,
+                'date' => $arrival->date->toDateString(),
+                'visitorName' => $arrival->visitor_name,
+                'gender' => $arrival->gender,
+                'classification' => $arrival->classification,
+                'remarks' => $arrival->remarks,
+                'status' => $arrival->status,
+            ]);
 
         return $this->renderEstablishment($request, 'establishment.arrivals.index', 'arrivals.index', 'Arrival Records', [
-            'arrivals' => EstablishmentMockData::arrivals($name),
+            'arrivals' => $arrivals,
         ]);
     }
 

@@ -69,7 +69,7 @@ test('the QR arrival form links to the privacy notice above its submit button', 
         'status' => 'PUBLISHED',
     ]);
 
-    test()->get(route('lgu.establishmentQr', $listing->slug))
+    test()->get(route('lgu.establishmentQr', $listing->uuid))
         ->assertOk()
         ->assertSee('Provincial Tourism Office of Davao Oriental')
         ->assertSee(route('privacy'), false);

@@ -105,6 +105,7 @@ class MonthlyReportsController extends PtoController
         return $this->renderPto($request, 'pto.monthly-reports.show', 'monthlyReports', 'Monthly Report', [
             'report' => $monthlyArrivalReport,
             'history' => $this->reportHistory($monthlyArrivalReport),
+            'originBreakdown' => $monthlyArrivalReport->originBreakdown(),
         ]);
     }
 
