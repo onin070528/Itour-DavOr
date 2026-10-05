@@ -79,6 +79,11 @@ class CheckinController extends Controller
         }
 
         $data = Validator::make($request->all(), [
+            // Honeypot: real visitors never see or fill this field (see
+            // resources/views/lgu/establishmentQR.blade.php). A filled value
+            // means a bot submitted the form, so the whole request fails
+            // validation and nothing is saved.
+            'website' => ['prohibited'],
             'visitorName' => ['required', 'string', 'max:255'],
             'visitorContact' => ['required', 'string', 'max:255'],
             'male' => ['nullable', 'integer', 'min:0'],

@@ -292,13 +292,18 @@ class Listing extends Model
     /**
      * Single source of truth for the QR rule: a listing can collect
      * arrivals only if its category allows QR check-in, it is not a Tour
-     * Guide, and it is publicly visible. Every QR-related surface
-     * (directory, forms, dashboard filters, report breakdowns, public scan)
-     * must call this instead of re-checking category/type/status itself.
+     * Guide, it is publicly visible, and it has a `uuid` to encode into the
+     * QR/check-in link. Every QR-related surface (directory, forms,
+     * dashboard filters, report breakdowns, public scan) must call this
+     * instead of re-checking category/type/status itself. The `uuid` check
+     * guards against a pre-uuid-era or directly-inserted row with no uuid,
+     * which would otherwise crash route('lgu.establishmentQr', ...) in the
+     * Tourism Directory's QR modal.
      */
     public function isQrEnabled(): bool
     {
-        return $this->isPubliclyVisible()
+        return $this->uuid !== null
+            && $this->isPubliclyVisible()
             && ! $this->isTourGuide()
             && (bool) $this->categoryRecord?->cat_is_qr_enabled;
     }

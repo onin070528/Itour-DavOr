@@ -5,6 +5,7 @@
     'accountHeading' => 'Account',
     'profileHref' => null,
     'settingsHref' => '#',
+    'showBreadcrumb' => true,
 ])
 
 @php
@@ -214,9 +215,14 @@
                         <i class="ti ti-menu-2 text-lg" aria-hidden="true"></i>
                     </button>
 
-                    <p class="min-w-0 truncate text-sm text-sand-500">
-                        {{ $user->role->title() }} <span class="mx-1 text-sand-300">/</span> <span class="font-semibold text-sand-900">{{ $pageTitle }}</span>
-                    </p>
+                    {{-- Provincial Reports already repeats the role/portal context shown
+                         in the sidebar header and account menu, so that page passes
+                         :show-breadcrumb="false" to skip it here. --}}
+                    @if ($showBreadcrumb)
+                        <p class="min-w-0 truncate text-sm text-sand-500">
+                            {{ $user->role->title() }} <span class="mx-1 text-sand-300">/</span> <span class="font-semibold text-sand-900">{{ $pageTitle }}</span>
+                        </p>
+                    @endif
                 </div>
 
                 <div class="flex shrink-0 items-center gap-4">

@@ -8,9 +8,10 @@
     scannable link/code per establishment.
 
     Counters are wired up client-side in resources/js/app.js (initEstablishmentQrForm).
-    There is no backend/database yet — submitting shows a local success
-    step, matching the front-end-only arrival wizard under
-    resources/views/establishment/arrivals/record.blade.php.
+    Submitting posts to CheckinController::store, which saves one arrival
+    row for this establishment (same table/fields as the staff-entered
+    arrival wizard under resources/views/establishment/arrivals/record.blade.php),
+    then shows a local success step rather than reloading the page.
 --}}
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
@@ -47,6 +48,12 @@
                 </div>
             @else
             <form id="establishment-qr-form" data-action-url="{{ $checkinAction }}" novalidate>
+                {{-- Honeypot: left empty by real visitors, hidden from
+                     screen readers and sighted users, but visible to naive
+                     bots that fill in every field. CheckinController::store
+                     rejects the submission if this is non-empty. --}}
+                <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" class="absolute left-[-9999px] h-0 w-0 opacity-0">
+
                 {{-- Form step --}}
                 <div id="qr-form-step" class="flex flex-col gap-4">
                     {{-- Your Details --}}

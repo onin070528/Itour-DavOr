@@ -975,6 +975,7 @@ function initEstablishmentQrForm() {
             const payload = {
                 visitorName: form.elements.namedItem('visitorName')?.value,
                 visitorContact: form.elements.namedItem('visitorContact')?.value,
+                website: form.elements.namedItem('website')?.value,
                 localOriginScope: sums.local > 0 ? (localOriginScope?.value || null) : null,
                 localOriginPlace: sums.local > 0 && localOriginScope?.value === 'outside_province' ? (localOriginPlace?.value || null) : null,
                 foreignCountry: sums.foreign > 0 ? (foreignCountry?.value || null) : null,

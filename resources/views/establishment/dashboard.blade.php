@@ -95,7 +95,7 @@
                         <div class="flex items-center gap-3">
                             <span class="w-44 shrink-0 truncate text-sm text-sand-700">{{ $classification }}</span>
                             <div class="h-2.5 flex-1 rounded-full bg-sand-100">
-                                <div class="h-2.5 rounded-full bg-primary-700" style="width: {{ max(4, round(($count / $totalClassified) * 100)) }}%"></div>
+                                <div class="h-2.5 rounded-full bg-primary-700" @style(['width' => max(4, round(($count / $totalClassified) * 100)) . '%'])></div>
                             </div>
                             <span class="w-8 shrink-0 text-right text-sm font-semibold text-sand-800">{{ $count }}</span>
                         </div>

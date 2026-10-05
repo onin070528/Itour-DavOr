@@ -1,8 +1,11 @@
 <?php
 
+use App\Enums\UserRole;
 use App\Models\Arrival;
 use App\Models\Category;
 use App\Models\Listing;
+use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 function qrScanCategoryFixture(string $name, bool $qrEnabled): Category
@@ -75,6 +78,37 @@ test('submitting a check-in for a QR-disabled establishment saves nothing, even 
 
     $response = test()->post(route('checkin.store', $listing->uuid), [
         'visitorName' => 'Jane Doe', 'visitorContact' => '0912',
+    ]);
+
+    $response->assertStatus(422);
+    expect(Arrival::query()->where('listing_id', $listing->id)->count())->toBe(0);
+});
+
+test('a legacy listing with no uuid is treated as not QR-enabled and does not crash the PTO directory', function () {
+    // uuid is not mass-assignable (set only by Listing::booted()'s creating
+    // hook), so a pre-uuid-era row is simulated with a raw update, the same
+    // state 16 legacy listings were found in before being backfilled.
+    $listing = qrScanListingFixture();
+    DB::table('listings')->where('id', $listing->id)->update(['uuid' => null]);
+
+    expect($listing->fresh()->isQrEnabled())->toBeFalse();
+
+    $pto = User::factory()->create([
+        'role' => UserRole::PtoAdministrator,
+        'organization_name' => 'Provincial Tourism Office',
+        'organization_subtitle' => 'Province of Davao Oriental',
+    ]);
+    test()->actingAs($pto)->get(route('pto.directory.index'))->assertOk();
+});
+
+test('a filled honeypot field is rejected and saves no arrival', function () {
+    $listing = qrScanListingFixture();
+
+    $response = test()->postJson(route('checkin.store', $listing->uuid), [
+        'visitorName' => 'Jane Doe',
+        'visitorContact' => '0912',
+        'website' => 'https://spam.example',
+        'male' => 1,
     ]);
 
     $response->assertStatus(422);

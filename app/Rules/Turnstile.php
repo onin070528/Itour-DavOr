@@ -44,6 +44,11 @@ class Turnstile implements ValidationRule
             ]);
 
             if (! $response->successful() || ! ($response->json('success') === true)) {
+                Log::warning('Turnstile verification failed.', [
+                    'status' => $response->status(),
+                    'response' => $response->json(),
+                ]);
+
                 $fail('Verification check failed. Please try again.');
             }
         } catch (\Throwable $e) {
