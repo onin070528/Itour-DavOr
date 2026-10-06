@@ -1,24 +1,24 @@
 @php
-    $statusTone = match ($report->status) {
+    $statusTone = match ($report->mrp_status) {
         'APPROVED' => 'success',
         'SUBMITTED', 'REVIEWED' => 'warning',
         'RETURNED' => 'danger',
         default => 'neutral',
     };
-    $statusLabel = match ($report->status) {
+    $statusLabel = match ($report->mrp_status) {
         'SUBMITTED' => 'Submitted',
         'REVIEWED' => 'Reviewed',
         'APPROVED' => 'Approved',
         'RETURNED' => 'Returned',
         default => 'Draft',
     };
-    $isApproved = $report->status === 'APPROVED';
+    $isApproved = $report->mrp_status === 'APPROVED';
 @endphp
 
 <x-layouts.dashboard :user="$user" :nav-sections="$navSections" :page-title="$pageTitle" account-heading="System" :settings-href="route('pto.settings')">
     <x-dashboard.page-header
-        :title="$report->municipality.' — Municipal Report'"
-        :description="$report->period_start->format('F j, Y').' to '.$report->period_end->format('F j, Y')"
+        :title="$report->mrp_municipality.' — Municipal Report'"
+        :description="$report->mrp_period_start->format('F j, Y').' to '.$report->mrp_period_end->format('F j, Y')"
     >
         <x-slot:actions>
             <a href="{{ route('pto.municipalReports.index') }}" class="inline-flex items-center gap-2 rounded-sm border border-sand-300 bg-sand-0 px-4 py-2.5 text-sm font-semibold text-sand-800 hover:border-primary-300">
@@ -29,12 +29,12 @@
     </x-dashboard.page-header>
 
     <div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <x-dashboard.kpi-card label="Total Arrivals" :value="number_format($report->total_arrivals)" tone="neutral" />
+        <x-dashboard.kpi-card label="Total Arrivals" :value="number_format($report->mrp_total_arrivals)" tone="neutral" />
         <div class="rounded-md border border-sand-200 bg-sand-0 p-4">
             <p class="text-xs font-medium text-sand-500">Status</p>
             <p class="mt-1.5"><x-dashboard.status-badge :tone="$statusTone">{{ $statusLabel }}</x-dashboard.status-badge></p>
         </div>
-        <x-dashboard.kpi-card label="Submitted By" :value="$report->submitter->name ?? '—'" :delta="$report->created_at->format('M j, Y')" tone="neutral" />
+        <x-dashboard.kpi-card label="Submitted By" :value="$report->submitter->usr_name ?? '—'" :delta="$report->mrp_created_at->format('M j, Y')" tone="neutral" />
     </div>
 
     <div class="mt-6 rounded-md border border-sand-200 bg-sand-0 p-5">
@@ -42,32 +42,32 @@
         <dl class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
                 <dt class="text-xs font-semibold text-sand-500 uppercase">Municipality</dt>
-                <dd class="mt-1 text-sm text-sand-800">{{ $report->municipality }}</dd>
+                <dd class="mt-1 text-sm text-sand-800">{{ $report->mrp_municipality }}</dd>
             </div>
             <div>
                 <dt class="text-xs font-semibold text-sand-500 uppercase">Reporting Period</dt>
-                <dd class="mt-1 text-sm text-sand-800">{{ $report->period_start->format('M j, Y') }} – {{ $report->period_end->format('M j, Y') }}</dd>
+                <dd class="mt-1 text-sm text-sand-800">{{ $report->mrp_period_start->format('M j, Y') }} – {{ $report->mrp_period_end->format('M j, Y') }}</dd>
             </div>
             <div>
                 <dt class="text-xs font-semibold text-sand-500 uppercase">Total Arrivals</dt>
-                <dd class="mt-1 text-sm text-sand-800">{{ number_format($report->total_arrivals) }}</dd>
+                <dd class="mt-1 text-sm text-sand-800">{{ number_format($report->mrp_total_arrivals) }}</dd>
             </div>
             <div>
                 <dt class="text-xs font-semibold text-sand-500 uppercase">Submitted</dt>
-                <dd class="mt-1 text-sm text-sand-800">{{ $report->submitter->name ?? '—' }} · {{ $report->created_at->format('M j, Y g:i A') }}</dd>
+                <dd class="mt-1 text-sm text-sand-800">{{ $report->submitter->usr_name ?? '—' }} · {{ $report->mrp_created_at->format('M j, Y g:i A') }}</dd>
             </div>
-            @if ($report->reviewed_at)
+            @if ($report->mrp_reviewed_at)
                 <div>
                     <dt class="text-xs font-semibold text-sand-500 uppercase">Reviewed</dt>
-                    <dd class="mt-1 text-sm text-sand-800">{{ $report->reviewer->name ?? '—' }} · {{ $report->reviewed_at->format('M j, Y g:i A') }}</dd>
+                    <dd class="mt-1 text-sm text-sand-800">{{ $report->reviewer->usr_name ?? '—' }} · {{ $report->mrp_reviewed_at->format('M j, Y g:i A') }}</dd>
                 </div>
             @endif
         </dl>
 
-        @if ($report->remarks)
+        @if ($report->mrp_remarks)
             <div class="mt-5 rounded-md border border-sand-200 bg-sand-50 p-4">
                 <p class="text-xs font-semibold text-sand-500 uppercase">PTO Remarks</p>
-                <p class="mt-1.5 text-sm leading-relaxed text-sand-800">{{ $report->remarks }}</p>
+                <p class="mt-1.5 text-sm leading-relaxed text-sand-800">{{ $report->mrp_remarks }}</p>
             </div>
         @endif
     </div>
@@ -86,7 +86,7 @@
                     type="button"
                     data-confirm-trigger
                     data-confirm-title="Approve this report?"
-                    data-confirm-message="{{ $report->municipality }}'s report for {{ $report->period_start->format('M j') }} – {{ $report->period_end->format('M j, Y') }} will be marked Approved."
+                    data-confirm-message="{{ $report->mrp_municipality }}'s report for {{ $report->mrp_period_start->format('M j') }} – {{ $report->mrp_period_end->format('M j, Y') }} will be marked Approved."
                     data-confirm-label="Approve"
                     class="inline-flex items-center gap-2 rounded-sm bg-primary-700 px-4 py-2.5 text-sm font-semibold text-sand-0 hover:bg-primary-900"
                 >

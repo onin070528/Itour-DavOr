@@ -29,11 +29,11 @@ class ListingPolicy
 
     public function view(User $user, Listing $listing): bool
     {
-        return match ($user->role) {
+        return match ($user->usr_role) {
             UserRole::PtoAdministrator => true,
-            UserRole::Lgu => $listing->municipality_id === $user->municipality_id,
-            UserRole::Establishment => $listing->id === $user->establishment_id
-                || ($listing->category === 'destinations' && $listing->municipality_id === $user->municipality_id),
+            UserRole::Lgu => $listing->mun_id === $user->mun_id,
+            UserRole::Establishment => $listing->lst_id === $user->lst_id
+                || ($listing->lst_category === 'destinations' && $listing->mun_id === $user->mun_id),
             default => false,
         };
     }
@@ -46,7 +46,7 @@ class ListingPolicy
      */
     public function create(User $user): bool
     {
-        return in_array($user->role, [UserRole::PtoAdministrator, UserRole::Lgu], true);
+        return in_array($user->usr_role, [UserRole::PtoAdministrator, UserRole::Lgu], true);
     }
 
     /**
@@ -57,19 +57,19 @@ class ListingPolicy
      */
     public function update(User $user, Listing $listing): bool
     {
-        return match ($user->role) {
+        return match ($user->usr_role) {
             UserRole::PtoAdministrator => true,
-            UserRole::Lgu => $listing->municipality_id === $user->municipality_id,
-            UserRole::Establishment => $listing->category !== 'destinations' && $listing->id === $user->establishment_id,
+            UserRole::Lgu => $listing->mun_id === $user->mun_id,
+            UserRole::Establishment => $listing->lst_category !== 'destinations' && $listing->lst_id === $user->lst_id,
             default => false,
         };
     }
 
     public function deactivate(User $user, Listing $listing): bool
     {
-        return match ($user->role) {
+        return match ($user->usr_role) {
             UserRole::PtoAdministrator => true,
-            UserRole::Lgu => $listing->municipality_id === $user->municipality_id,
+            UserRole::Lgu => $listing->mun_id === $user->mun_id,
             default => false,
         };
     }

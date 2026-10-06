@@ -32,8 +32,8 @@ class RbacDemoAccountSeeder extends Seeder
             return;
         }
 
-        $mati = Municipality::query()->where('code', 'MATI')->first();
-        $baganga = Municipality::query()->where('code', 'BAG')->first();
+        $mati = Municipality::query()->where('mun_code', 'MATI')->first();
+        $baganga = Municipality::query()->where('mun_code', 'BAG')->first();
 
         if (! $mati || ! $baganga) {
             $this->command?->warn('RbacDemoAccountSeeder: skipped — run MunicipalitySeeder first.');
@@ -55,73 +55,73 @@ class RbacDemoAccountSeeder extends Seeder
         // Establishment account can still manage its own listing regardless
         // of status, same as any real not-yet-verified establishment.
         $matiEstablishment = Listing::query()->updateOrCreate(
-            ['slug' => 'itour-demo-establishment-mati'],
+            ['lst_slug' => 'itour-demo-establishment-mati'],
             [
-                'name' => 'iTOUR Demo Establishment (Mati)',
-                'category' => 'accommodation',
-                'municipality' => 'City of Mati',
-                'municipality_id' => $mati->id,
-                'barangay' => 'Poblacion',
-                'description' => 'RBAC demo/test fixture — not a real establishment.',
-                'status' => 'Pending Review',
+                'lst_name' => 'iTOUR Demo Establishment (Mati)',
+                'lst_category' => 'accommodation',
+                'lst_municipality' => 'City of Mati',
+                'mun_id' => $mati->mun_id,
+                'lst_barangay' => 'Poblacion',
+                'lst_description' => 'RBAC demo/test fixture — not a real establishment.',
+                'lst_status' => 'Pending Review',
             ]
         );
 
         Listing::query()->updateOrCreate(
-            ['slug' => 'itour-demo-establishment-baganga'],
+            ['lst_slug' => 'itour-demo-establishment-baganga'],
             [
-                'name' => 'iTOUR Demo Establishment (Baganga)',
-                'category' => 'accommodation',
-                'municipality' => 'Baganga',
-                'municipality_id' => $baganga->id,
-                'barangay' => 'Poblacion',
-                'description' => 'RBAC demo/test fixture — not a real establishment. Used to verify cross-municipality access denial.',
-                'status' => 'Pending Review',
+                'lst_name' => 'iTOUR Demo Establishment (Baganga)',
+                'lst_category' => 'accommodation',
+                'lst_municipality' => 'Baganga',
+                'mun_id' => $baganga->mun_id,
+                'lst_barangay' => 'Poblacion',
+                'lst_description' => 'RBAC demo/test fixture — not a real establishment. Used to verify cross-municipality access denial.',
+                'lst_status' => 'Pending Review',
             ]
         );
 
         User::query()->updateOrCreate(
-            ['email' => 'tourism@itourdavor.gov.ph'],
+            ['usr_email' => 'tourism@itourdavor.gov.ph'],
             [
-                'name' => 'iTOUR PTO Demo Account',
-                'password' => $password,
-                'email_verified_at' => now(),
-                'role' => UserRole::PtoAdministrator,
-                'organization_name' => 'Provincial Tourism Office',
-                'organization_subtitle' => 'Province of Davao Oriental',
-                'municipality_id' => null,
-                'establishment_id' => null,
-                'status' => 'Active',
+                'usr_name' => 'iTOUR PTO Demo Account',
+                'usr_password' => $password,
+                'usr_email_verified_at' => now(),
+                'usr_role' => UserRole::PtoAdministrator,
+                'usr_organization_name' => 'Provincial Tourism Office',
+                'usr_organization_subtitle' => 'Province of Davao Oriental',
+                'mun_id' => null,
+                'lst_id' => null,
+                'usr_status' => 'Active',
             ]
         );
 
         User::query()->updateOrCreate(
-            ['email' => 'tourism.mati@itourdavor.gov.ph'],
+            ['usr_email' => 'tourism.mati@itourdavor.gov.ph'],
             [
-                'name' => 'iTOUR LGU Demo Account (Mati)',
-                'password' => $password,
-                'email_verified_at' => now(),
-                'role' => UserRole::Lgu,
-                'organization_name' => 'Mati City Tourism Office',
-                'organization_subtitle' => 'City of Mati',
-                'municipality_id' => $mati->id,
-                'establishment_id' => null,
-                'status' => 'Active',
+                'usr_name' => 'iTOUR LGU Demo Account (Mati)',
+                'usr_password' => $password,
+                'usr_email_verified_at' => now(),
+                'usr_role' => UserRole::Lgu,
+                'usr_organization_name' => 'Mati City Tourism Office',
+                'usr_organization_subtitle' => 'City of Mati',
+                'mun_id' => $mati->mun_id,
+                'lst_id' => null,
+                'usr_status' => 'Active',
             ]
         );
 
         User::query()->updateOrCreate(
-            ['email' => 'establishments@itourdavor.gov.ph'],
+            ['usr_email' => 'establishments@itourdavor.gov.ph'],
             [
-                'name' => 'iTOUR Establishment Demo Account',
-                'password' => $password,
-                'email_verified_at' => now(),
-                'role' => UserRole::Establishment,
-                'organization_name' => $matiEstablishment->name,
-                'organization_subtitle' => "{$matiEstablishment->barangay}, {$matiEstablishment->municipality}",
-                'municipality_id' => $mati->id,
-                'establishment_id' => $matiEstablishment->id,
-                'status' => 'Active',
+                'usr_name' => 'iTOUR Establishment Demo Account',
+                'usr_password' => $password,
+                'usr_email_verified_at' => now(),
+                'usr_role' => UserRole::Establishment,
+                'usr_organization_name' => $matiEstablishment->lst_name,
+                'usr_organization_subtitle' => "{$matiEstablishment->lst_barangay}, {$matiEstablishment->lst_municipality}",
+                'mun_id' => $mati->mun_id,
+                'lst_id' => $matiEstablishment->lst_id,
+                'usr_status' => 'Active',
             ]
         );
     }

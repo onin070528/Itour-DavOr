@@ -55,45 +55,45 @@
                     @foreach ($users as $u)
                         @php
                             $listing = $u->establishment;
-                            $hours = \App\Support\BusinessHours::parse($listing?->hours);
+                            $hours = \App\Support\BusinessHours::parse($listing?->lst_hours);
                             $editValues = json_encode([
-                                'name' => $listing?->name ?? $u->organization_name,
-                                'category' => $listing?->category,
-                                'barangay' => $listing?->barangay,
-                                'ownerName' => $listing?->owner_name ?? $u->name,
-                                'contactPhone' => $listing?->contact_phone,
-                                'email' => $u->email,
+                                'name' => $listing?->lst_name ?? $u->usr_organization_name,
+                                'category' => $listing?->lst_category,
+                                'barangay' => $listing?->lst_barangay,
+                                'ownerName' => $listing?->lst_owner_name ?? $u->usr_name,
+                                'contactPhone' => $listing?->lst_contact_phone,
+                                'email' => $u->usr_email,
                                 'hoursDays' => $hours['days'] ?? '',
                                 'hoursOpen' => $hours['opens'] ?? '',
                                 'hoursClose' => $hours['closes'] ?? '',
-                                'website' => $listing?->website,
-                                'description' => $listing?->description,
+                                'website' => $listing?->lst_website,
+                                'description' => $listing?->lst_description,
                             ]);
-                            $establishmentName = $listing?->name ?? $u->organization_name;
-                            $ownerName = $listing?->owner_name ?? $u->name;
+                            $establishmentName = $listing?->lst_name ?? $u->usr_organization_name;
+                            $ownerName = $listing?->lst_owner_name ?? $u->usr_name;
                         @endphp
                         <tr
                             data-row
-                            data-status="{{ $u->status }}"
-                            data-category="{{ $listing?->category }}"
-                            data-search-text="{{ strtolower($establishmentName.' '.$ownerName.' '.$u->email.' '.$listing?->barangay) }}"
+                            data-status="{{ $u->usr_status }}"
+                            data-category="{{ $listing?->lst_category }}"
+                            data-search-text="{{ strtolower($establishmentName.' '.$ownerName.' '.$u->usr_email.' '.$listing?->lst_barangay) }}"
                             class="hover:bg-sand-50"
                         >
                             <td class="px-4 py-3">
                                 <p class="font-medium text-sand-900">{{ $establishmentName }}</p>
                                 @if ($listing)
-                                    <p class="text-xs text-sand-500">{{ \App\Support\TourismCatalog::categoryLabel($listing->category) }}</p>
+                                    <p class="text-xs text-sand-500">{{ \App\Support\TourismCatalog::categoryLabel($listing->lst_category) }}</p>
                                 @endif
                             </td>
-                            <td class="px-4 py-3 text-sand-700">{{ $listing?->barangay ?? '—' }}</td>
+                            <td class="px-4 py-3 text-sand-700">{{ $listing?->lst_barangay ?? '—' }}</td>
                             <td class="px-4 py-3 text-sand-700">{{ $ownerName }}</td>
                             <td class="px-4 py-3">
-                                <p class="text-sand-700">{{ $u->email }}</p>
-                                @if ($listing?->contact_phone)
-                                    <p class="text-xs text-sand-500">{{ $listing->contact_phone }}</p>
+                                <p class="text-sand-700">{{ $u->usr_email }}</p>
+                                @if ($listing?->lst_contact_phone)
+                                    <p class="text-xs text-sand-500">{{ $listing->lst_contact_phone }}</p>
                                 @endif
                             </td>
-                            <td class="px-4 py-3"><x-dashboard.status-badge :tone="$statusTone($u->status)">{{ $u->status }}</x-dashboard.status-badge></td>
+                            <td class="px-4 py-3"><x-dashboard.status-badge :tone="$statusTone($u->usr_status)">{{ $u->usr_status }}</x-dashboard.status-badge></td>
                             <td class="px-4 py-3 text-right">
                                 <div class="relative inline-block">
                                     <button type="button" data-dropdown-toggle class="text-sand-500 hover:text-sand-800">
@@ -105,19 +105,19 @@
                                             data-modal-open="user-form-modal"
                                             data-edit-trigger="user-form-modal"
                                             data-edit-values="{{ $editValues }}"
-                                            data-edit-action="{{ route('lgu.users.update', $u->id) }}"
+                                            data-edit-action="{{ route('lgu.users.update', $u->usr_id) }}"
                                             class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-sand-700 hover:bg-sand-50"
                                         >
                                             <i class="ti ti-pencil" aria-hidden="true"></i> Edit
                                         </button>
-                                        <form method="POST" action="{{ route('lgu.users.toggleStatus', $u->id) }}">
+                                        <form method="POST" action="{{ route('lgu.users.toggleStatus', $u->usr_id) }}">
                                             @csrf
                                             @method('PATCH')
-                                            @if ($u->status === 'Active')
+                                            @if ($u->usr_status === 'Active')
                                                 <button
                                                     type="button"
                                                     data-confirm-trigger
-                                                    data-confirm-title="Disable {{ $u->name }}?"
+                                                    data-confirm-title="Disable {{ $u->usr_name }}?"
                                                     data-confirm-message="They will immediately lose access to their iTOUR account."
                                                     data-confirm-label="Disable Account"
                                                     data-confirm-tone="danger"
@@ -129,7 +129,7 @@
                                                 <button
                                                     type="button"
                                                     data-confirm-trigger
-                                                    data-confirm-title="Enable {{ $u->name }}?"
+                                                    data-confirm-title="Enable {{ $u->usr_name }}?"
                                                     data-confirm-message="They will regain access to their iTOUR account."
                                                     data-confirm-label="Enable Account"
                                                     data-confirm-tone="success"

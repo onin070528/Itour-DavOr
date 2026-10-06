@@ -13,23 +13,27 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['user_id', 'action', 'target_type', 'target_id', 'ip_address', 'user_agent', 'metadata'])]
+#[Table('tbl_audit_logs', key: 'aud_id')]
+#[Fillable(['usr_id', 'aud_action', 'aud_target_type', 'aud_target_id', 'aud_ip_address', 'aud_user_agent', 'aud_metadata'])]
 class AuditLog extends Model
 {
+    public const CREATED_AT = 'aud_created_at';
+
     public const UPDATED_AT = null;
 
     protected function casts(): array
     {
         return [
-            'metadata' => 'array',
+            'aud_metadata' => 'array',
         ];
     }
 
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class, 'usr_id', 'usr_id');
     }
 }

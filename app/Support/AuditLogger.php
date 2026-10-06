@@ -27,25 +27,25 @@ class AuditLogger
     public static function record(?User $actor, string $action, ?Model $target = null, array $metadata = []): AuditLog
     {
         return AuditLog::query()->create([
-            'user_id' => $actor?->id,
-            'action' => $action,
-            'target_type' => $target?->getMorphClass(),
-            'target_id' => $target?->getKey(),
-            'ip_address' => Request::ip(),
-            'user_agent' => Request::userAgent(),
-            'metadata' => $metadata ?: null,
+            'usr_id' => $actor?->usr_id,
+            'aud_action' => $action,
+            'aud_target_type' => $target?->getMorphClass(),
+            'aud_target_id' => $target?->getKey(),
+            'aud_ip_address' => Request::ip(),
+            'aud_user_agent' => Request::userAgent(),
+            'aud_metadata' => $metadata ?: null,
         ]);
     }
 
     /**
-     * Logs only the RBAC-sensitive fields (role, municipality_id,
-     * establishment_id, status) that actually changed between $before and
+     * Logs only the RBAC-sensitive fields (role, mun_id,
+     * lst_id, status) that actually changed between $before and
      * the target's current values — call after ->update() so $target
      * reflects the new state. No-ops (returns null) if none changed.
      */
     public static function recordUserScopeChange(User $actor, User $target, array $before): ?AuditLog
     {
-        $watched = ['role', 'municipality_id', 'establishment_id', 'status'];
+        $watched = ['usr_role', 'mun_id', 'lst_id', 'usr_status'];
         $changes = [];
 
         foreach ($watched as $field) {

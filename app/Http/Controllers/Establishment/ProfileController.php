@@ -30,7 +30,7 @@ class ProfileController extends EstablishmentController
      */
     public function edit(Request $request): View
     {
-        $name = $request->user()->organization_name;
+        $name = $request->user()->usr_organization_name;
 
         return $this->renderEstablishment($request, 'establishment.profile', 'establishment.profile', 'Establishment Profile', [
             'profile' => EstablishmentMockData::profile($name),
@@ -56,25 +56,25 @@ class ProfileController extends EstablishmentController
 
         try {
             $listing->update([
-                'name' => $data['name'],
-                'category' => $data['category'],
-                'barangay' => $data['address'],
-                'description' => $data['description'] ?? null,
-                'contact_phone' => $data['phone'],
-                'hours' => $data['hours'],
-                'email' => $data['email'] ?? null,
-                'website' => $data['website'] ?? null,
+                'lst_name' => $data['name'],
+                'lst_category' => $data['category'],
+                'lst_barangay' => $data['address'],
+                'lst_description' => $data['description'] ?? null,
+                'lst_contact_phone' => $data['phone'],
+                'lst_hours' => $data['hours'],
+                'lst_email' => $data['email'] ?? null,
+                'lst_website' => $data['website'] ?? null,
             ]);
 
-            // The account's organization_name is a display label only (the
-            // join to $listing is via establishment_id, not this string) —
+            // The account's usr_organization_name is a display label only (the
+            // join to $listing is via lst_id, not this string) —
             // still kept in sync so EstablishmentMockData's name-keyed
             // lookups (profile/gallery/arrivals reads) don't go stale.
-            if ($data['name'] !== $request->user()->organization_name) {
-                $request->user()->update(['organization_name' => $data['name']]);
+            if ($data['name'] !== $request->user()->usr_organization_name) {
+                $request->user()->update(['usr_organization_name' => $data['name']]);
             }
         } catch (\Throwable $e) {
-            Log::error('Failed to update establishment profile.', ['exception' => $e, 'listing_id' => $listing->id]);
+            Log::error('Failed to update establishment profile.', ['exception' => $e, 'lst_id' => $listing->lst_id]);
 
             return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
@@ -94,13 +94,13 @@ class ProfileController extends EstablishmentController
             $path = $request->file('image')->store('itour-images', 'public');
 
             $listing->images()->create([
-                'path' => basename($path),
-                'caption' => null,
-                'is_primary' => ! $listing->images()->exists(),
-                'sort_order' => $listing->images()->count(),
+                'lsi_path' => basename($path),
+                'lsi_caption' => null,
+                'lsi_is_primary' => ! $listing->images()->exists(),
+                'lsi_sort_order' => $listing->images()->count(),
             ]);
         } catch (\Throwable $e) {
-            Log::error('Failed to store establishment photo.', ['exception' => $e, 'listing_id' => $listing->id]);
+            Log::error('Failed to store establishment photo.', ['exception' => $e, 'lst_id' => $listing->lst_id]);
 
             return back()->with('toast', 'Something went wrong while uploading the photo. Please try again.')->with('toast_tone', 'danger');
         }
@@ -111,13 +111,13 @@ class ProfileController extends EstablishmentController
     public function setPrimaryImage(Request $request, ListingImage $image): RedirectResponse
     {
         $listing = $this->ownListing($request);
-        abort_unless($image->listing_id === $listing->id, 403);
+        abort_unless($image->lst_id === $listing->lst_id, 403);
 
         try {
-            $listing->images()->update(['is_primary' => false]);
-            $image->update(['is_primary' => true]);
+            $listing->images()->update(['lsi_is_primary' => false]);
+            $image->update(['lsi_is_primary' => true]);
         } catch (\Throwable $e) {
-            Log::error('Failed to set primary establishment photo.', ['exception' => $e, 'listing_id' => $listing->id, 'image_id' => $image->id]);
+            Log::error('Failed to set primary establishment photo.', ['exception' => $e, 'lst_id' => $listing->lst_id, 'image_id' => $image->lsi_id]);
 
             return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
@@ -128,21 +128,21 @@ class ProfileController extends EstablishmentController
     public function destroyImage(Request $request, ListingImage $image): RedirectResponse
     {
         $listing = $this->ownListing($request);
-        abort_unless($image->listing_id === $listing->id, 403);
+        abort_unless($image->lst_id === $listing->lst_id, 403);
 
-        $wasPrimary = $image->is_primary;
+        $wasPrimary = $image->lsi_is_primary;
 
         try {
-            Storage::disk('public')->delete('itour-images/'.$image->path);
+            Storage::disk('public')->delete('itour-images/'.$image->lsi_path);
             $image->delete();
 
             // Removing the featured photo shouldn't leave the gallery with none
             // — promote whatever's left, if anything.
             if ($wasPrimary) {
-                $listing->images()->orderBy('sort_order')->first()?->update(['is_primary' => true]);
+                $listing->images()->orderBy('lsi_sort_order')->first()?->update(['lsi_is_primary' => true]);
             }
         } catch (\Throwable $e) {
-            Log::error('Failed to remove establishment photo.', ['exception' => $e, 'listing_id' => $listing->id, 'image_id' => $image->id]);
+            Log::error('Failed to remove establishment photo.', ['exception' => $e, 'lst_id' => $listing->lst_id, 'image_id' => $image->lsi_id]);
 
             return back()->with('toast', 'Something went wrong while removing the photo. Please try again.')->with('toast_tone', 'danger');
         }
@@ -159,7 +159,7 @@ class ProfileController extends EstablishmentController
      */
     public function qr(Request $request): View
     {
-        $name = $request->user()->organization_name;
+        $name = $request->user()->usr_organization_name;
         $profile = EstablishmentMockData::profile($name);
 
         return $this->renderEstablishment($request, 'establishment.qr', 'establishment.qr', 'QR Code', [
@@ -169,14 +169,14 @@ class ProfileController extends EstablishmentController
     }
 
     /**
-     * Resolved via the account's establishment_id FK — not by matching
-     * Listing.name against organization_name, which is a mutable display
+     * Resolved via the account's lst_id FK — not by matching
+     * Listing.name against usr_organization_name, which is a mutable display
      * string an account could otherwise rename to collide with a different
      * establishment's listing.
      */
     private function ownListing(Request $request): Listing
     {
-        abort_if($request->user()->establishment_id === null, 403, 'Your account is not linked to an establishment yet.');
+        abort_if($request->user()->lst_id === null, 403, 'Your account is not linked to an establishment yet.');
 
         return $request->user()->establishment()->firstOrFail();
     }

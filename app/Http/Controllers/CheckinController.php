@@ -49,7 +49,7 @@ class CheckinController extends Controller
      */
     public function store(Request $request, string $establishment): JsonResponse
     {
-        $listing = Listing::query()->where('slug', $establishment)->firstOrFail();
+        $listing = Listing::query()->where('lst_slug', $establishment)->firstOrFail();
 
         $data = $request->validate([
             'visitorName' => ['required', 'string', 'max:255'],
@@ -68,19 +68,19 @@ class CheckinController extends Controller
 
         try {
             $listing->arrivals()->create([
-                'source' => 'self_checkin',
-                'date' => now()->toDateString(),
-                'visitor_name' => $data['visitorName'],
-                'visitor_contact' => $data['visitorContact'],
-                'party_male' => $companions['male'],
-                'party_female' => $companions['female'],
-                'party_adults' => $companions['adults'],
-                'party_children' => $companions['children'],
-                'party_seniors' => $companions['seniors'],
-                'party_local' => $companions['local'],
-                'party_foreign' => $companions['foreign'],
-                'party_size' => 1 + $companions['male'] + $companions['female'],
-                'status' => 'Recorded',
+                'arr_source' => 'self_checkin',
+                'arr_date' => now()->toDateString(),
+                'arr_visitor_name' => $data['visitorName'],
+                'arr_visitor_contact' => $data['visitorContact'],
+                'arr_party_male' => $companions['male'],
+                'arr_party_female' => $companions['female'],
+                'arr_party_adults' => $companions['adults'],
+                'arr_party_children' => $companions['children'],
+                'arr_party_seniors' => $companions['seniors'],
+                'arr_party_local' => $companions['local'],
+                'arr_party_foreign' => $companions['foreign'],
+                'arr_party_size' => 1 + $companions['male'] + $companions['female'],
+                'arr_status' => 'Recorded',
             ]);
         } catch (\Throwable $e) {
             Log::error('Failed to record self check-in.', ['exception' => $e, 'establishment' => $establishment]);

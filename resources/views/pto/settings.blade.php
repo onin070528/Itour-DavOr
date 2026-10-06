@@ -12,11 +12,11 @@
             <div data-tab-panel="profile" class="max-w-lg">
                 <div class="flex items-center gap-4">
                     <span class="flex h-16 w-16 items-center justify-center rounded-full bg-primary-100 font-display text-xl font-bold text-primary-700">
-                        {{ collect(explode(' ', $user->name))->map(fn ($part) => mb_substr($part, 0, 1))->take(2)->implode('') }}
+                        {{ collect(explode(' ', $user->usr_name))->map(fn ($part) => mb_substr($part, 0, 1))->take(2)->implode('') }}
                     </span>
                     <div>
-                        <p class="font-display text-base font-bold text-sand-900">{{ $user->name }}</p>
-                        <p class="text-sm text-sand-500">{{ $user->role->title() }}</p>
+                        <p class="font-display text-base font-bold text-sand-900">{{ $user->usr_name }}</p>
+                        <p class="text-sm text-sand-500">{{ $user->usr_role->title() }}</p>
                     </div>
                 </div>
 
@@ -24,11 +24,11 @@
                     @csrf
                     <div>
                         <label class="mb-1 block text-xs font-semibold text-sand-700">Full Name <span class="text-danger" aria-hidden="true">*</span></label>
-                        <input name="name" type="text" value="{{ $user->name }}" required class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                        <input name="name" type="text" value="{{ $user->usr_name }}" required class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
                     </div>
                     <div>
                         <label class="mb-1 block text-xs font-semibold text-sand-700">Email <span class="text-danger" aria-hidden="true">*</span></label>
-                        <input name="email" type="email" value="{{ $user->email }}" required class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                        <input name="email" type="email" value="{{ $user->usr_email }}" required class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
                     </div>
                     <div>
                         <button type="submit" class="rounded-sm bg-primary-700 px-4 py-2 text-sm font-semibold text-sand-0 hover:bg-primary-900">
@@ -40,10 +40,10 @@
 
             <div data-tab-panel="account" class="hidden max-w-lg">
                 <dl class="flex flex-col gap-3 text-sm">
-                    <div class="flex items-center justify-between border-b border-sand-100 pb-3"><dt class="text-sand-500">Organization</dt><dd class="font-medium text-sand-900">{{ $user->organization_name }}</dd></div>
-                    <div class="flex items-center justify-between border-b border-sand-100 pb-3"><dt class="text-sand-500">Coverage</dt><dd class="font-medium text-sand-900">{{ $user->organization_subtitle }}</dd></div>
-                    <div class="flex items-center justify-between border-b border-sand-100 pb-3"><dt class="text-sand-500">Role</dt><dd class="font-medium text-sand-900">{{ $user->role->title() }}</dd></div>
-                    <div class="flex items-center justify-between pb-3"><dt class="text-sand-500">Account Created</dt><dd class="font-medium text-sand-900">{{ $user->created_at?->format('M j, Y') ?? '—' }}</dd></div>
+                    <div class="flex items-center justify-between border-b border-sand-100 pb-3"><dt class="text-sand-500">Organization</dt><dd class="font-medium text-sand-900">{{ $user->usr_organization_name }}</dd></div>
+                    <div class="flex items-center justify-between border-b border-sand-100 pb-3"><dt class="text-sand-500">Coverage</dt><dd class="font-medium text-sand-900">{{ $user->usr_organization_subtitle }}</dd></div>
+                    <div class="flex items-center justify-between border-b border-sand-100 pb-3"><dt class="text-sand-500">Role</dt><dd class="font-medium text-sand-900">{{ $user->usr_role->title() }}</dd></div>
+                    <div class="flex items-center justify-between pb-3"><dt class="text-sand-500">Account Created</dt><dd class="font-medium text-sand-900">{{ $user->usr_created_at?->format('M j, Y') ?? '—' }}</dd></div>
                 </dl>
 
                 <button type="button" data-modal-open="change-password-modal" class="mt-5 rounded-sm border border-sand-300 px-4 py-2 text-sm font-semibold text-sand-800 hover:border-primary-300">

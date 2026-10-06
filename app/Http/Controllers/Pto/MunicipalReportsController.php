@@ -34,7 +34,7 @@ class MunicipalReportsController extends PtoController
     {
         $reports = MunicipalReport::query()
             ->with(['submitter', 'reviewer'])
-            ->orderByDesc('period_start')
+            ->orderByDesc('mrp_period_start')
             ->get();
 
         return $this->renderPto($request, 'pto.municipal-reports.index', 'municipalReports', 'Municipal Reports', [
@@ -64,32 +64,32 @@ class MunicipalReportsController extends PtoController
 
     public function approve(Request $request, MunicipalReport $municipalReport): RedirectResponse
     {
-        abort_if($municipalReport->status === MunicipalReport::STATUS_APPROVED, 403, 'This report has already been approved.');
+        abort_if($municipalReport->mrp_status === MunicipalReport::STATUS_APPROVED, 403, 'This report has already been approved.');
 
         $municipalReport->update([
-            'status' => MunicipalReport::STATUS_APPROVED,
-            'reviewed_by' => $request->user()->id,
-            'reviewed_at' => now(),
+            'mrp_status' => MunicipalReport::STATUS_APPROVED,
+            'mrp_reviewed_by' => $request->user()->usr_id,
+            'mrp_reviewed_at' => now(),
         ]);
 
-        return back()->with('toast', "{$municipalReport->municipality}'s report was approved.");
+        return back()->with('toast', "{$municipalReport->mrp_municipality}'s report was approved.");
     }
 
     public function return(Request $request, MunicipalReport $municipalReport): RedirectResponse
     {
-        abort_if($municipalReport->status === MunicipalReport::STATUS_APPROVED, 403, 'An approved report cannot be returned.');
+        abort_if($municipalReport->mrp_status === MunicipalReport::STATUS_APPROVED, 403, 'An approved report cannot be returned.');
 
         $data = $request->validate([
             'remarks' => ['required', 'string', 'max:2000'],
         ]);
 
         $municipalReport->update([
-            'status' => MunicipalReport::STATUS_RETURNED,
-            'reviewed_by' => $request->user()->id,
-            'reviewed_at' => now(),
-            'remarks' => $data['remarks'],
+            'mrp_status' => MunicipalReport::STATUS_RETURNED,
+            'mrp_reviewed_by' => $request->user()->usr_id,
+            'mrp_reviewed_at' => now(),
+            'mrp_remarks' => $data['remarks'],
         ]);
 
-        return back()->with('toast', "{$municipalReport->municipality}'s report was returned for revision.");
+        return back()->with('toast', "{$municipalReport->mrp_municipality}'s report was returned for revision.");
     }
 }

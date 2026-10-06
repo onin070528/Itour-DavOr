@@ -146,7 +146,7 @@
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="mb-1 block text-xs font-semibold text-sand-700">Contact Office</label>
-                    <input name="contactOffice" type="text" value="{{ $user->organization_name }}" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                    <input name="contactOffice" type="text" value="{{ $user->usr_organization_name }}" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
                 </div>
                 <div>
                     <label class="mb-1 block text-xs font-semibold text-sand-700">Contact Phone</label>

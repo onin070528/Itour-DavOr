@@ -40,22 +40,22 @@ class ListingSeeder extends Seeder
             };
 
             $model = Listing::query()->updateOrCreate(
-                ['slug' => $listing['id']],
+                ['lst_slug' => $listing['id']],
                 [
-                    'name' => $listing['name'],
-                    'category' => $listing['category'],
-                    'municipality' => $listing['municipality'],
-                    'barangay' => $listing['barangay'],
-                    'lat' => $listing['lat'] ?? null,
-                    'lng' => $listing['lng'] ?? null,
-                    'description' => $listing['description'],
-                    'rating' => $listing['rating'],
-                    'tags' => $listing['tags'],
-                    'image' => $listing['image'],
-                    'contact_office' => $listing['contactOffice'],
-                    'contact_phone' => $listing['contactPhone'],
-                    'hours' => $listing['hours'],
-                    'status' => $status,
+                    'lst_name' => $listing['name'],
+                    'lst_category' => $listing['category'],
+                    'lst_municipality' => $listing['municipality'],
+                    'lst_barangay' => $listing['barangay'],
+                    'lst_lat' => $listing['lat'] ?? null,
+                    'lst_lng' => $listing['lng'] ?? null,
+                    'lst_description' => $listing['description'],
+                    'lst_rating' => $listing['rating'],
+                    'lst_tags' => $listing['tags'],
+                    'lst_image' => $listing['image'],
+                    'lst_contact_office' => $listing['contactOffice'],
+                    'lst_contact_phone' => $listing['contactPhone'],
+                    'lst_hours' => $listing['hours'],
+                    'lst_status' => $status,
                 ]
             );
 
@@ -71,12 +71,12 @@ class ListingSeeder extends Seeder
             return;
         }
 
-        $extras = array_values(array_diff(self::GALLERY_EXTRAS, [$listing->image]));
+        $extras = array_values(array_diff(self::GALLERY_EXTRAS, [$listing->lst_image]));
 
         $listing->images()->createMany([
-            ['path' => $listing->image, 'caption' => 'Featured photo', 'is_primary' => true, 'sort_order' => 0],
-            ['path' => $extras[0], 'caption' => 'Grounds & surroundings', 'is_primary' => false, 'sort_order' => 1],
-            ['path' => $extras[1], 'caption' => 'Nearby view', 'is_primary' => false, 'sort_order' => 2],
+            ['lsi_path' => $listing->lst_image, 'lsi_caption' => 'Featured photo', 'lsi_is_primary' => true, 'lsi_sort_order' => 0],
+            ['lsi_path' => $extras[0], 'lsi_caption' => 'Grounds & surroundings', 'lsi_is_primary' => false, 'lsi_sort_order' => 1],
+            ['lsi_path' => $extras[1], 'lsi_caption' => 'Nearby view', 'lsi_is_primary' => false, 'lsi_sort_order' => 2],
         ]);
     }
 }

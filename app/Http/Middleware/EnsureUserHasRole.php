@@ -28,7 +28,7 @@ class EnsureUserHasRole
 
         $allowed = collect($roles)
             ->map(fn (string $role) => UserRole::from($role))
-            ->contains($user?->role);
+            ->contains($user?->usr_role);
 
         abort_unless($allowed, 403);
 

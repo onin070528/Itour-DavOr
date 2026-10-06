@@ -31,7 +31,7 @@ abstract class EstablishmentController extends Controller
 
         return view($view, array_merge([
             'user' => $user,
-            'establishmentName' => $user->organization_name,
+            'establishmentName' => $user->usr_organization_name,
             'navSections' => EstablishmentNavigation::sections($activeKey),
             'pageTitle' => $pageTitle,
             'accountHeading' => 'System',

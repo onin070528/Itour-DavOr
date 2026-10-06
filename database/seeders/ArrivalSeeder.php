@@ -15,24 +15,24 @@ class ArrivalSeeder extends Seeder
      */
     public function run(): void
     {
-        $listing = Listing::query()->where('name', 'Botanika Nature Resort')->first();
+        $listing = Listing::query()->where('lst_name', 'Botanika Nature Resort')->first();
 
         if (! $listing) {
             return;
         }
 
-        $listing->arrivals()->where('source', 'staff')->delete();
+        $listing->arrivals()->where('arr_source', 'staff')->delete();
 
         $listing->arrivals()->createMany(
-            collect(EstablishmentMockData::seedArrivals($listing->name))->map(fn (array $row) => [
-                'source' => 'staff',
-                'date' => $row['date'],
-                'visitor_name' => $row['visitorName'],
-                'gender' => $row['gender'],
-                'classification' => $row['classification'],
-                'remarks' => $row['remarks'],
-                'status' => $row['status'],
-                'party_size' => 1,
+            collect(EstablishmentMockData::seedArrivals($listing->lst_name))->map(fn (array $row) => [
+                'arr_source' => 'staff',
+                'arr_date' => $row['date'],
+                'arr_visitor_name' => $row['visitorName'],
+                'arr_gender' => $row['gender'],
+                'arr_classification' => $row['classification'],
+                'arr_remarks' => $row['remarks'],
+                'arr_status' => $row['status'],
+                'arr_party_size' => 1,
             ])->all()
         );
     }

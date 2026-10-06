@@ -23,7 +23,7 @@ class DashboardController extends LguController
      */
     public function index(Request $request): View
     {
-        $municipality = $request->user()->organization_subtitle;
+        $municipality = $request->user()->usr_organization_subtitle;
 
         return $this->renderLgu($request, 'lgu.dashboard', 'dashboard', 'Dashboard', [
             'summary' => LguMockData::dashboardSummary($municipality),

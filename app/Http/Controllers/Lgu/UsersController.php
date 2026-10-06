@@ -42,7 +42,7 @@ class UsersController extends LguController
         $users = User::query()
             ->visibleTo($request->user())
             ->with('establishment')
-            ->orderBy('name')
+            ->orderBy('usr_name')
             ->get();
 
         return $this->renderLgu($request, 'lgu.users', 'users', 'Users', [
@@ -57,7 +57,7 @@ class UsersController extends LguController
      */
     public function store(Request $request): RedirectResponse
     {
-        $data = $this->validatedEstablishmentFields($request, Rule::unique('users', 'email'));
+        $data = $this->validatedEstablishmentFields($request, Rule::unique('tbl_users', 'usr_email'));
         $lgu = $request->user();
 
         try {
@@ -67,25 +67,25 @@ class UsersController extends LguController
                 // inside its own jurisdiction.
                 $listing = Listing::query()->create([
                     ...$data['listing'],
-                    'slug' => $this->uniqueDestinationSlug($data['listing']['name']),
-                    'municipality' => $lgu->organization_subtitle,
-                    'municipality_id' => $lgu->municipality_id,
-                    'status' => 'Active',
+                    'lst_slug' => $this->uniqueDestinationSlug($data['listing']['lst_name']),
+                    'lst_municipality' => $lgu->usr_organization_subtitle,
+                    'mun_id' => $lgu->mun_id,
+                    'lst_status' => 'Active',
                 ]);
 
                 return User::query()->create([
-                    'name' => $data['account']['name'],
-                    'email' => $data['account']['email'],
+                    'usr_name' => $data['account']['usr_name'],
+                    'usr_email' => $data['account']['usr_email'],
                     // Random password nobody knows — the account holder sets
                     // their own via "Forgot password?" on the sign-in page.
-                    'password' => Str::password(32),
-                    'email_verified_at' => now(),
-                    'role' => UserRole::Establishment,
-                    'organization_name' => $listing->name,
-                    'organization_subtitle' => "{$listing->barangay}, {$listing->municipality}",
-                    'municipality_id' => $lgu->municipality_id,
-                    'establishment_id' => $listing->id,
-                    'status' => 'Active',
+                    'usr_password' => Str::password(32),
+                    'usr_email_verified_at' => now(),
+                    'usr_role' => UserRole::Establishment,
+                    'usr_organization_name' => $listing->lst_name,
+                    'usr_organization_subtitle' => "{$listing->lst_barangay}, {$listing->lst_municipality}",
+                    'mun_id' => $lgu->mun_id,
+                    'lst_id' => $listing->lst_id,
+                    'usr_status' => 'Active',
                 ]);
             });
         } catch (\Throwable $e) {
@@ -95,21 +95,21 @@ class UsersController extends LguController
         }
 
         AuditLogger::record($lgu, 'user.created', $user, [
-            'role' => $user->role?->value,
-            'municipality_id' => $user->municipality_id,
-            'establishment_id' => $user->establishment_id,
+            'usr_role' => $user->usr_role?->value,
+            'mun_id' => $user->mun_id,
+            'lst_id' => $user->lst_id,
         ]);
 
-        return back()->with('toast', "{$user->organization_name} was registered. They can set their password using \"Forgot password?\" on the sign-in page.");
+        return back()->with('toast', "{$user->usr_organization_name} was registered. They can set their password using \"Forgot password?\" on the sign-in page.");
     }
 
     public function update(Request $request, User $user): RedirectResponse
     {
         $this->authorizeOwnEstablishmentUser($request, $user);
 
-        // Role, municipality_id, establishment_id, and status are never
+        // Role, mun_id, lst_id, and status are never
         // accepted from this endpoint.
-        $data = $this->validatedEstablishmentFields($request, Rule::unique('users', 'email')->ignore($user));
+        $data = $this->validatedEstablishmentFields($request, Rule::unique('tbl_users', 'usr_email')->ignore($user));
         $listing = $user->establishment;
 
         try {
@@ -118,14 +118,14 @@ class UsersController extends LguController
 
                 if ($listing) {
                     $listing->update($data['listing']);
-                    $userFields['organization_name'] = $listing->name;
-                    $userFields['organization_subtitle'] = "{$listing->barangay}, {$listing->municipality}";
+                    $userFields['usr_organization_name'] = $listing->lst_name;
+                    $userFields['usr_organization_subtitle'] = "{$listing->lst_barangay}, {$listing->lst_municipality}";
                 }
 
                 $user->update($userFields);
             });
         } catch (\Throwable $e) {
-            Log::error('Failed to update establishment and its user account.', ['exception' => $e, 'user_id' => $user->id]);
+            Log::error('Failed to update establishment and its user account.', ['exception' => $e, 'usr_id' => $user->usr_id]);
 
             return back()->withInput()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
@@ -136,17 +136,17 @@ class UsersController extends LguController
     public function toggleStatus(Request $request, User $user): RedirectResponse
     {
         $this->authorizeOwnEstablishmentUser($request, $user);
-        abort_if($user->id === $request->user()->id, 403, 'You cannot change the status of your own account.');
+        abort_if($user->usr_id === $request->user()->usr_id, 403, 'You cannot change the status of your own account.');
 
-        $before = $user->only(['role', 'municipality_id', 'establishment_id', 'status']);
-        $before['role'] = $before['role']?->value;
+        $before = $user->only(['usr_role', 'mun_id', 'lst_id', 'usr_status']);
+        $before['usr_role'] = $before['usr_role']?->value;
 
-        $next = $user->status === 'Active' ? 'Inactive' : 'Active';
+        $next = $user->usr_status === 'Active' ? 'Inactive' : 'Active';
 
         try {
-            $user->update(['status' => $next]);
+            $user->update(['usr_status' => $next]);
         } catch (\Throwable $e) {
-            Log::error('Failed to toggle establishment user account status.', ['exception' => $e, 'user_id' => $user->id]);
+            Log::error('Failed to toggle establishment user account status.', ['exception' => $e, 'usr_id' => $user->usr_id]);
 
             return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
@@ -155,13 +155,13 @@ class UsersController extends LguController
 
         $verb = $next === 'Active' ? 'enabled' : 'disabled';
 
-        return back()->with('toast', "{$user->name}'s account was {$verb}.");
+        return back()->with('toast', "{$user->usr_name}'s account was {$verb}.");
     }
 
     /**
      * @return array{
-     *     listing: array{name: string, category: string, barangay: string, owner_name: string, contact_phone: string, email: string, hours: ?string, website: ?string, description: ?string},
-     *     account: array{name: string, email: string}
+     *     listing: array{lst_name: string, lst_category: string, lst_barangay: string, lst_owner_name: string, lst_contact_phone: string, lst_email: string, lst_hours: ?string, lst_website: ?string, lst_description: ?string},
+     *     account: array{usr_name: string, usr_email: string}
      * }
      */
     private function validatedEstablishmentFields(Request $request, Unique $uniqueEmail): array
@@ -192,19 +192,19 @@ class UsersController extends LguController
 
         return [
             'listing' => [
-                'name' => $data['name'],
-                'category' => $data['category'],
-                'barangay' => $data['barangay'],
-                'owner_name' => $data['ownerName'],
-                'contact_phone' => $data['contactPhone'],
-                'email' => $data['email'],
-                'hours' => BusinessHours::format($data['hoursDays'] ?? null, $data['hoursOpen'] ?? null, $data['hoursClose'] ?? null),
-                'website' => $data['website'] ?? null,
-                'description' => $data['description'] ?? null,
+                'lst_name' => $data['name'],
+                'lst_category' => $data['category'],
+                'lst_barangay' => $data['barangay'],
+                'lst_owner_name' => $data['ownerName'],
+                'lst_contact_phone' => $data['contactPhone'],
+                'lst_email' => $data['email'],
+                'lst_hours' => BusinessHours::format($data['hoursDays'] ?? null, $data['hoursOpen'] ?? null, $data['hoursClose'] ?? null),
+                'lst_website' => $data['website'] ?? null,
+                'lst_description' => $data['description'] ?? null,
             ],
             'account' => [
-                'name' => $data['ownerName'],
-                'email' => $data['email'],
+                'usr_name' => $data['ownerName'],
+                'usr_email' => $data['email'],
             ],
         ];
     }
@@ -226,7 +226,7 @@ class UsersController extends LguController
     private function authorizeOwnEstablishmentUser(Request $request, User $user): void
     {
         abort_unless(
-            $user->role === UserRole::Establishment && $user->municipality_id === $request->user()->municipality_id,
+            $user->usr_role === UserRole::Establishment && $user->mun_id === $request->user()->mun_id,
             403
         );
     }

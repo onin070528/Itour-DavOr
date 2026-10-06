@@ -12,15 +12,21 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+#[Table('tbl_municipal_reports', key: 'mrp_id')]
 #[Fillable([
-    'municipality', 'submitted_by', 'period_start', 'period_end',
-    'total_arrivals', 'status', 'reviewed_by', 'reviewed_at', 'remarks',
+    'mrp_municipality', 'mrp_submitted_by', 'mrp_period_start', 'mrp_period_end',
+    'mrp_total_arrivals', 'mrp_status', 'mrp_reviewed_by', 'mrp_reviewed_at', 'mrp_remarks',
 ])]
 class MunicipalReport extends Model
 {
+    public const CREATED_AT = 'mrp_created_at';
+
+    public const UPDATED_AT = 'mrp_updated_at';
+
     public const STATUS_DRAFT = 'DRAFT';
 
     public const STATUS_SUBMITTED = 'SUBMITTED';
@@ -34,10 +40,10 @@ class MunicipalReport extends Model
     protected function casts(): array
     {
         return [
-            'period_start' => 'date',
-            'period_end' => 'date',
-            'reviewed_at' => 'datetime',
-            'total_arrivals' => 'integer',
+            'mrp_period_start' => 'date',
+            'mrp_period_end' => 'date',
+            'mrp_reviewed_at' => 'datetime',
+            'mrp_total_arrivals' => 'integer',
         ];
     }
 
@@ -46,7 +52,7 @@ class MunicipalReport extends Model
      */
     public function submitter(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'submitted_by');
+        return $this->belongsTo(User::class, 'mrp_submitted_by', 'usr_id');
     }
 
     /**
@@ -54,6 +60,6 @@ class MunicipalReport extends Model
      */
     public function reviewer(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'reviewed_by');
+        return $this->belongsTo(User::class, 'mrp_reviewed_by', 'usr_id');
     }
 }

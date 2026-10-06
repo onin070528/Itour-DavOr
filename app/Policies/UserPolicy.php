@@ -21,15 +21,15 @@ class UserPolicy
 {
     public function viewAny(User $user): bool
     {
-        return in_array($user->role, [UserRole::PtoAdministrator, UserRole::Lgu], true);
+        return in_array($user->usr_role, [UserRole::PtoAdministrator, UserRole::Lgu], true);
     }
 
     public function view(User $user, User $target): bool
     {
-        return match ($user->role) {
+        return match ($user->usr_role) {
             UserRole::PtoAdministrator => true,
-            UserRole::Lgu => $target->role === UserRole::Establishment && $target->municipality_id === $user->municipality_id,
-            UserRole::Establishment => $target->id === $user->id,
+            UserRole::Lgu => $target->usr_role === UserRole::Establishment && $target->mun_id === $user->mun_id,
+            UserRole::Establishment => $target->usr_id === $user->usr_id,
             default => false,
         };
     }
@@ -46,13 +46,13 @@ class UserPolicy
      */
     public function deactivate(User $user, User $target): bool
     {
-        if ($target->id === $user->id) {
+        if ($target->usr_id === $user->usr_id) {
             return false;
         }
 
-        return match ($user->role) {
+        return match ($user->usr_role) {
             UserRole::PtoAdministrator => true,
-            UserRole::Lgu => $target->role === UserRole::Establishment && $target->municipality_id === $user->municipality_id,
+            UserRole::Lgu => $target->usr_role === UserRole::Establishment && $target->mun_id === $user->mun_id,
             default => false,
         };
     }

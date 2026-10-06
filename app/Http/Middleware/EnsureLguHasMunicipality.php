@@ -18,7 +18,7 @@ class EnsureLguHasMunicipality
 {
     /**
      * Every LGU page is scoped to the account's assigned municipality
-     * (municipality_id — the RBAC-authoritative FK; organization_subtitle
+     * (mun_id — the RBAC-authoritative FK; usr_organization_subtitle
      * stays as the display label only). If that's somehow missing — an
      * incomplete account setup rather than anything the user did — fail
      * with a clear message instead of a 500 from a null municipality
@@ -27,7 +27,7 @@ class EnsureLguHasMunicipality
     public function handle(Request $request, Closure $next): Response
     {
         abort_if(
-            blank($request->user()?->municipality_id),
+            blank($request->user()?->mun_id),
             403,
             'Your account has no assigned municipality yet. Contact your Provincial Tourism Office administrator.'
         );

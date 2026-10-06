@@ -48,20 +48,20 @@ class DirectoryController extends PtoController
             return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
 
-        return back()->with('toast', "{$listing->name} was added.");
+        return back()->with('toast', "{$listing->lst_name} was added.");
     }
 
     public function updateDestination(Request $request, Listing $listing): RedirectResponse
     {
-        abort_if($listing->category !== 'destinations', 404);
+        abort_if($listing->lst_category !== 'destinations', 404);
 
         $fields = $this->validatedDestinationFields($request);
         $municipality = $this->validatedMunicipality($request);
 
         try {
-            $listing->update([...$fields, 'municipality' => $municipality]);
+            $listing->update([...$fields, 'lst_municipality' => $municipality]);
         } catch (\Throwable $e) {
-            Log::error('Failed to update PTO destination.', ['exception' => $e, 'listing_id' => $listing->id]);
+            Log::error('Failed to update PTO destination.', ['exception' => $e, 'lst_id' => $listing->lst_id]);
 
             return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
@@ -71,17 +71,17 @@ class DirectoryController extends PtoController
 
     public function archiveDestination(Listing $listing): RedirectResponse
     {
-        abort_if($listing->category !== 'destinations', 404);
+        abort_if($listing->lst_category !== 'destinations', 404);
 
         try {
-            $listing->update(['status' => 'Archived']);
+            $listing->update(['lst_status' => 'Archived']);
         } catch (\Throwable $e) {
-            Log::error('Failed to archive PTO destination.', ['exception' => $e, 'listing_id' => $listing->id]);
+            Log::error('Failed to archive PTO destination.', ['exception' => $e, 'lst_id' => $listing->lst_id]);
 
             return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
 
-        return back()->with('toast', "{$listing->name} was archived.");
+        return back()->with('toast', "{$listing->lst_name} was archived.");
     }
 
     /**

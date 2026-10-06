@@ -22,7 +22,7 @@ class MonitoringController extends LguController
      */
     public function arrivals(Request $request): View
     {
-        $municipality = $request->user()->organization_subtitle;
+        $municipality = $request->user()->usr_organization_subtitle;
 
         return $this->renderLgu($request, 'lgu.monitoring.arrivals', 'monitoring.arrivals', 'Tourist Arrivals', [
             'municipality' => $municipality,
@@ -36,7 +36,7 @@ class MonitoringController extends LguController
      */
     public function statistics(Request $request): View
     {
-        $municipality = $request->user()->organization_subtitle;
+        $municipality = $request->user()->usr_organization_subtitle;
         $arrivals = collect(LguMockData::arrivals($municipality));
 
         return $this->renderLgu($request, 'lgu.monitoring.statistics', 'monitoring.statistics', 'Visitation Statistics', [
@@ -53,7 +53,7 @@ class MonitoringController extends LguController
      */
     public function destinations(Request $request): View
     {
-        $municipality = $request->user()->organization_subtitle;
+        $municipality = $request->user()->usr_organization_subtitle;
 
         return $this->renderLgu($request, 'lgu.monitoring.destinations', 'monitoring.destinations', 'Destination Performance', [
             'municipality' => $municipality,

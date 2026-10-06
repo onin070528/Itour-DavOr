@@ -5,9 +5,9 @@ use App\Models\User;
 
 test('every PTO page renders for an authenticated PTO administrator', function (string $routeName) {
     $user = User::factory()->create([
-        'role' => UserRole::PtoAdministrator,
-        'organization_name' => 'Provincial Tourism Office',
-        'organization_subtitle' => 'Province of Davao Oriental',
+        'usr_role' => UserRole::PtoAdministrator,
+        'usr_organization_name' => 'Provincial Tourism Office',
+        'usr_organization_subtitle' => 'Province of Davao Oriental',
     ]);
 
     $this->actingAs($user)->get(route($routeName))->assertOk();

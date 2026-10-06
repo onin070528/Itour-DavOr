@@ -7,27 +7,27 @@ use App\Models\User;
 function actingAsPtoAdministrator(): User
 {
     return User::factory()->create([
-        'role' => UserRole::PtoAdministrator,
-        'organization_name' => 'Provincial Tourism Office',
-        'organization_subtitle' => 'Province of Davao Oriental',
+        'usr_role' => UserRole::PtoAdministrator,
+        'usr_organization_name' => 'Provincial Tourism Office',
+        'usr_organization_subtitle' => 'Province of Davao Oriental',
     ]);
 }
 
 function makeMunicipalReport(array $overrides = []): MunicipalReport
 {
     $submitter = User::factory()->create([
-        'role' => UserRole::Lgu,
-        'organization_name' => 'City of Mati Tourism Office',
-        'organization_subtitle' => 'City of Mati',
+        'usr_role' => UserRole::Lgu,
+        'usr_organization_name' => 'City of Mati Tourism Office',
+        'usr_organization_subtitle' => 'City of Mati',
     ]);
 
     return MunicipalReport::query()->create(array_merge([
-        'municipality' => 'City of Mati',
-        'submitted_by' => $submitter->id,
-        'period_start' => '2026-08-01',
-        'period_end' => '2026-08-31',
-        'total_arrivals' => 1000,
-        'status' => MunicipalReport::STATUS_SUBMITTED,
+        'mrp_municipality' => 'City of Mati',
+        'mrp_submitted_by' => $submitter->usr_id,
+        'mrp_period_start' => '2026-08-01',
+        'mrp_period_end' => '2026-08-31',
+        'mrp_total_arrivals' => 1000,
+        'mrp_status' => MunicipalReport::STATUS_SUBMITTED,
     ], $overrides));
 }
 
@@ -50,20 +50,20 @@ test('the municipal report detail page renders for a PTO administrator', functio
 });
 
 test('a PTO administrator can approve a submitted municipal report', function () {
-    $report = makeMunicipalReport(['status' => MunicipalReport::STATUS_SUBMITTED]);
+    $report = makeMunicipalReport(['mrp_status' => MunicipalReport::STATUS_SUBMITTED]);
     $pto = actingAsPtoAdministrator();
 
     $response = test()->actingAs($pto)->patch(route('pto.municipalReports.approve', $report));
 
     $response->assertRedirect();
     $report->refresh();
-    expect($report->status)->toBe(MunicipalReport::STATUS_APPROVED);
-    expect($report->reviewed_by)->toBe($pto->id);
-    expect($report->reviewed_at)->not->toBeNull();
+    expect($report->mrp_status)->toBe(MunicipalReport::STATUS_APPROVED);
+    expect($report->mrp_reviewed_by)->toBe($pto->usr_id);
+    expect($report->mrp_reviewed_at)->not->toBeNull();
 });
 
 test('a PTO administrator can return a municipal report for revision with remarks', function () {
-    $report = makeMunicipalReport(['status' => MunicipalReport::STATUS_SUBMITTED]);
+    $report = makeMunicipalReport(['mrp_status' => MunicipalReport::STATUS_SUBMITTED]);
     $pto = actingAsPtoAdministrator();
 
     $response = test()->actingAs($pto)->patch(route('pto.municipalReports.return', $report), [
@@ -72,23 +72,23 @@ test('a PTO administrator can return a municipal report for revision with remark
 
     $response->assertRedirect();
     $report->refresh();
-    expect($report->status)->toBe(MunicipalReport::STATUS_RETURNED);
-    expect($report->reviewed_by)->toBe($pto->id);
-    expect($report->reviewed_at)->not->toBeNull();
-    expect($report->remarks)->toBe('Please recheck the August totals.');
+    expect($report->mrp_status)->toBe(MunicipalReport::STATUS_RETURNED);
+    expect($report->mrp_reviewed_by)->toBe($pto->usr_id);
+    expect($report->mrp_reviewed_at)->not->toBeNull();
+    expect($report->mrp_remarks)->toBe('Please recheck the August totals.');
 });
 
 test('returning a municipal report requires remarks', function () {
-    $report = makeMunicipalReport(['status' => MunicipalReport::STATUS_SUBMITTED]);
+    $report = makeMunicipalReport(['mrp_status' => MunicipalReport::STATUS_SUBMITTED]);
 
     $response = test()->actingAs(actingAsPtoAdministrator())->patch(route('pto.municipalReports.return', $report), []);
 
     $response->assertSessionHasErrors('remarks');
-    expect($report->fresh()->status)->toBe(MunicipalReport::STATUS_SUBMITTED);
+    expect($report->fresh()->mrp_status)->toBe(MunicipalReport::STATUS_SUBMITTED);
 });
 
 test('an approved municipal report cannot be approved or returned again', function () {
-    $report = makeMunicipalReport(['status' => MunicipalReport::STATUS_APPROVED]);
+    $report = makeMunicipalReport(['mrp_status' => MunicipalReport::STATUS_APPROVED]);
     $pto = actingAsPtoAdministrator();
 
     test()->actingAs($pto)->patch(route('pto.municipalReports.approve', $report))->assertForbidden();
@@ -99,14 +99,14 @@ test('a non-PTO user cannot access municipal reports routes', function () {
     $report = makeMunicipalReport();
 
     $lgu = User::factory()->create([
-        'role' => UserRole::Lgu,
-        'organization_name' => 'City of Mati Tourism Office',
-        'organization_subtitle' => 'City of Mati',
+        'usr_role' => UserRole::Lgu,
+        'usr_organization_name' => 'City of Mati Tourism Office',
+        'usr_organization_subtitle' => 'City of Mati',
     ]);
     $establishment = User::factory()->create([
-        'role' => UserRole::Establishment,
-        'organization_name' => 'Botanika Nature Resort',
-        'organization_subtitle' => 'Brgy. Dahican, City of Mati',
+        'usr_role' => UserRole::Establishment,
+        'usr_organization_name' => 'Botanika Nature Resort',
+        'usr_organization_subtitle' => 'Brgy. Dahican, City of Mati',
     ]);
 
     test()->actingAs($lgu)->get(route('pto.municipalReports.index'))->assertForbidden();

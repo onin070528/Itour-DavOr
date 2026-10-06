@@ -23,12 +23,12 @@ test('RbacDemoAccountSeeder is idempotent', function () {
     $emails = ['tourism@itourdavor.gov.ph', 'tourism.mati@itourdavor.gov.ph', 'establishments@itourdavor.gov.ph'];
 
     (new RbacDemoAccountSeeder)->run();
-    $first = User::whereIn('email', $emails)->count();
-    $firstListings = Listing::where('slug', 'like', 'itour-demo-establishment-%')->count();
+    $first = User::whereIn('usr_email', $emails)->count();
+    $firstListings = Listing::where('lst_slug', 'like', 'itour-demo-establishment-%')->count();
 
     (new RbacDemoAccountSeeder)->run();
-    $second = User::whereIn('email', $emails)->count();
-    $secondListings = Listing::where('slug', 'like', 'itour-demo-establishment-%')->count();
+    $second = User::whereIn('usr_email', $emails)->count();
+    $secondListings = Listing::where('lst_slug', 'like', 'itour-demo-establishment-%')->count();
 
     expect($first)->toBe(3);
     expect($second)->toBe(3);
@@ -45,5 +45,5 @@ test('RbacDemoAccountSeeder refuses to run in production', function () {
 
     $this->app->instance('env', 'testing');
 
-    expect(User::where('email', 'tourism@itourdavor.gov.ph')->exists())->toBeFalse();
+    expect(User::where('usr_email', 'tourism@itourdavor.gov.ph')->exists())->toBeFalse();
 });

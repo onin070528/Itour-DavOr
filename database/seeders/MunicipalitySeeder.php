@@ -32,7 +32,7 @@ class MunicipalitySeeder extends Seeder
         ];
 
         foreach ($rows as [$name, $code]) {
-            Municipality::query()->updateOrCreate(['code' => $code], ['name' => $name]);
+            Municipality::query()->updateOrCreate(['mun_code' => $code], ['mun_name' => $name]);
         }
     }
 }

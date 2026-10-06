@@ -18,7 +18,7 @@ class MunicipalReportSeeder extends Seeder
      */
     public function run(): void
     {
-        $pto = User::query()->where('email', 'ebautista@davaooriental.gov.ph')->first();
+        $pto = User::query()->where('usr_email', 'ebautista@davaooriental.gov.ph')->first();
 
         $rows = [
             ['adizon@mati.gov.ph', 'City of Mati', '2026-08-01', '2026-08-31', 1240, MunicipalReport::STATUS_SUBMITTED, null, null],
@@ -29,21 +29,21 @@ class MunicipalReportSeeder extends Seeder
         ];
 
         foreach ($rows as [$email, $municipality, $periodStart, $periodEnd, $totalArrivals, $status, $remarks, $reviewedAt]) {
-            $submitter = User::query()->where('email', $email)->first();
+            $submitter = User::query()->where('usr_email', $email)->first();
 
             if (! $submitter) {
                 continue;
             }
 
             MunicipalReport::query()->updateOrCreate(
-                ['municipality' => $municipality, 'period_start' => $periodStart, 'period_end' => $periodEnd],
+                ['mrp_municipality' => $municipality, 'mrp_period_start' => $periodStart, 'mrp_period_end' => $periodEnd],
                 [
-                    'submitted_by' => $submitter->id,
-                    'total_arrivals' => $totalArrivals,
-                    'status' => $status,
-                    'reviewed_by' => $reviewedAt ? $pto?->id : null,
-                    'reviewed_at' => $reviewedAt,
-                    'remarks' => $remarks,
+                    'mrp_submitted_by' => $submitter->usr_id,
+                    'mrp_total_arrivals' => $totalArrivals,
+                    'mrp_status' => $status,
+                    'mrp_reviewed_by' => $reviewedAt ? $pto?->usr_id : null,
+                    'mrp_reviewed_at' => $reviewedAt,
+                    'mrp_remarks' => $remarks,
                 ]
             );
         }

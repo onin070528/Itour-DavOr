@@ -23,25 +23,25 @@ class MunicipalityPolicy
 
     public function view(User $user, Municipality $municipality): bool
     {
-        return match ($user->role) {
+        return match ($user->usr_role) {
             UserRole::PtoAdministrator => true,
-            UserRole::Lgu, UserRole::Establishment => $municipality->id === $user->municipality_id,
+            UserRole::Lgu, UserRole::Establishment => $municipality->mun_id === $user->mun_id,
             default => false,
         };
     }
 
     public function create(User $user): bool
     {
-        return $user->role === UserRole::PtoAdministrator;
+        return $user->usr_role === UserRole::PtoAdministrator;
     }
 
     public function update(User $user, Municipality $municipality): bool
     {
-        return $user->role === UserRole::PtoAdministrator;
+        return $user->usr_role === UserRole::PtoAdministrator;
     }
 
     public function delete(User $user, Municipality $municipality): bool
     {
-        return $user->role === UserRole::PtoAdministrator;
+        return $user->usr_role === UserRole::PtoAdministrator;
     }
 }

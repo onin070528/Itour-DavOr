@@ -22,7 +22,7 @@ class ReportsController extends EstablishmentController
      */
     public function index(Request $request): View
     {
-        $name = $request->user()->organization_name;
+        $name = $request->user()->usr_organization_name;
 
         return $this->renderEstablishment($request, 'establishment.reports', 'reports', 'Reports', [
             'reportTypes' => EstablishmentMockData::reportTypes(),

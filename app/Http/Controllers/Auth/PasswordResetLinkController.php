@@ -45,7 +45,7 @@ class PasswordResetLinkController extends Controller
         ]);
 
         try {
-            $status = Password::sendResetLink($request->only('email'));
+            $status = Password::sendResetLink(['usr_email' => $request->input('email')]);
         } catch (TransportExceptionInterface $e) {
             // Mail server unreachable or rejected the login (e.g. wrong
             // MAIL_* settings in .env) — show a friendly error, not a 500.
@@ -63,7 +63,7 @@ class PasswordResetLinkController extends Controller
         }
 
         if ($status === Password::RESET_LINK_SENT) {
-            AuditLogger::record(User::query()->where('email', $request->input('email'))->first(), 'password.reset_link_sent');
+            AuditLogger::record(User::query()->where('usr_email', $request->input('email'))->first(), 'password.reset_link_sent');
         }
 
         return back()->withInput()->with('status', __('If an account exists for that email, a password reset link has been sent. Check your inbox.'));

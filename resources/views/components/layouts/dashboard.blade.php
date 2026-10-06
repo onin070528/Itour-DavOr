@@ -11,7 +11,7 @@
     // Establishment has a dedicated profile page; PTO and LGU manage their
     // profile from within Settings, so "My Profile" points there instead
     // unless a page explicitly overrides it.
-    $profileHref ??= $user->role === \App\Enums\UserRole::Establishment
+    $profileHref ??= $user->usr_role === \App\Enums\UserRole::Establishment
         ? route('establishment.profile')
         : $settingsHref;
 @endphp
@@ -32,8 +32,8 @@
         @vite(array_filter([
             'resources/css/app.css',
             'resources/js/app.js',
-            in_array($user->role, [\App\Enums\UserRole::PtoAdministrator, \App\Enums\UserRole::Lgu, \App\Enums\UserRole::Establishment], true) ? 'resources/js/dashboard.js' : null,
-            $user->role === \App\Enums\UserRole::Establishment ? 'resources/js/establishment.js' : null,
+            in_array($user->usr_role, [\App\Enums\UserRole::PtoAdministrator, \App\Enums\UserRole::Lgu, \App\Enums\UserRole::Establishment], true) ? 'resources/js/dashboard.js' : null,
+            $user->usr_role === \App\Enums\UserRole::Establishment ? 'resources/js/establishment.js' : null,
         ]))
     </head>
     <body
@@ -59,12 +59,12 @@
                 <a href="{{ url('/') }}" class="flex items-center gap-2">
                     <x-logo :dark="true" class="text-lg" />
                 </a>
-                <span class="rounded-sm bg-white/10 px-2 py-1 text-[10px] font-bold tracking-widest">{{ $user->role->badge() }}</span>
+                <span class="rounded-sm bg-white/10 px-2 py-1 text-[10px] font-bold tracking-widest">{{ $user->usr_role->badge() }}</span>
             </div>
 
             <div class="mx-4 mb-5 rounded-md bg-white/10 px-3.5 py-3">
-                <p class="text-sm font-semibold text-sand-0">{{ $user->organization_name }}</p>
-                <p class="text-xs text-white/65">{{ $user->organization_subtitle }}</p>
+                <p class="text-sm font-semibold text-sand-0">{{ $user->usr_organization_name }}</p>
+                <p class="text-xs text-white/65">{{ $user->usr_organization_subtitle }}</p>
             </div>
 
             <nav class="flex-1 overflow-y-auto px-3 pb-4 [scrollbar-gutter:stable]" aria-label="Dashboard" data-nav>
@@ -190,7 +190,7 @@
                     </button>
 
                     <p class="min-w-0 truncate text-sm text-sand-500">
-                        {{ $user->role->title() }} <span class="mx-1 text-sand-300">/</span> <span class="font-semibold text-sand-900">{{ $pageTitle }}</span>
+                        {{ $user->usr_role->title() }} <span class="mx-1 text-sand-300">/</span> <span class="font-semibold text-sand-900">{{ $pageTitle }}</span>
                     </p>
                 </div>
 
@@ -202,11 +202,11 @@
 
                     <div class="flex items-center gap-2.5">
                         <span class="flex h-9 w-9 items-center justify-center rounded-full bg-primary-100 font-display text-sm font-bold text-primary-700">
-                            {{ collect(explode(' ', $user->name))->map(fn ($part) => mb_substr($part, 0, 1))->take(2)->implode('') }}
+                            {{ collect(explode(' ', $user->usr_name))->map(fn ($part) => mb_substr($part, 0, 1))->take(2)->implode('') }}
                         </span>
                         <span class="hidden leading-tight sm:block">
-                            <span class="block text-sm font-semibold text-sand-900">{{ $user->name }}</span>
-                            <span class="block text-xs text-sand-500">{{ $user->role->title() }}</span>
+                            <span class="block text-sm font-semibold text-sand-900">{{ $user->usr_name }}</span>
+                            <span class="block text-xs text-sand-500">{{ $user->usr_role->title() }}</span>
                         </span>
                     </div>
                 </div>

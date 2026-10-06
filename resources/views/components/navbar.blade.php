@@ -7,8 +7,8 @@
         ['label' => 'About', 'href' => url('/').'#about', 'active' => false],
     ];
 
-    $authedDashboardRoute = auth()->check() && auth()->user()->role
-        ? route(auth()->user()->role->dashboardRouteName())
+    $authedDashboardRoute = auth()->check() && auth()->user()->usr_role
+        ? route(auth()->user()->usr_role->dashboardRouteName())
         : null;
 @endphp
 

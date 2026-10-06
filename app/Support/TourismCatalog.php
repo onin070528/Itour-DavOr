@@ -10,6 +10,8 @@
 
 namespace App\Support;
 
+use App\Models\Listing;
+
 /**
  * Shared mock tourism data for the public site.
  *
@@ -85,28 +87,28 @@ class TourismCatalog
      */
     public static function listings(): array
     {
-        return \App\Models\Listing::query()
-            ->orderBy('id')
+        return Listing::query()
+            ->orderBy('lst_id')
             ->get()
             ->map(fn ($listing) => [
-                'id' => $listing->slug,
-                'name' => $listing->name,
-                'category' => $listing->category,
-                'municipality' => $listing->municipality,
-                'barangay' => $listing->barangay,
-                'lat' => $listing->lat,
-                'lng' => $listing->lng,
-                'description' => $listing->description,
-                'rating' => $listing->rating !== null ? (float) $listing->rating : null,
-                'tags' => $listing->tags ?? [],
-                'image' => $listing->image,
-                'contactOffice' => $listing->contact_office,
-                'contactPhone' => $listing->contact_phone,
-                'hours' => $listing->hours,
+                'id' => $listing->lst_slug,
+                'name' => $listing->lst_name,
+                'category' => $listing->lst_category,
+                'municipality' => $listing->lst_municipality,
+                'barangay' => $listing->lst_barangay,
+                'lat' => $listing->lst_lat,
+                'lng' => $listing->lst_lng,
+                'description' => $listing->lst_description,
+                'rating' => $listing->lst_rating !== null ? (float) $listing->lst_rating : null,
+                'tags' => $listing->lst_tags ?? [],
+                'image' => $listing->lst_image,
+                'contactOffice' => $listing->lst_contact_office,
+                'contactPhone' => $listing->lst_contact_phone,
+                'hours' => $listing->lst_hours,
                 'href' => '#',
-                'status' => $listing->status,
-                'email' => $listing->email,
-                'website' => $listing->website,
+                'status' => $listing->lst_status,
+                'email' => $listing->lst_email,
+                'website' => $listing->lst_website,
             ])
             ->all();
     }

@@ -25,7 +25,7 @@ class SettingsController extends LguController
     public function index(Request $request): View
     {
         return $this->renderLgu($request, 'lgu.settings', 'settings', 'Settings', [
-            'preferences' => $this->notificationPreferencesFor($request->user()->id),
+            'preferences' => $this->notificationPreferencesFor($request->user()->usr_id),
         ]);
     }
 

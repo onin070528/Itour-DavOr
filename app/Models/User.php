@@ -15,27 +15,36 @@ use App\Enums\UserRole;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Notifications\Notification;
 
-/**
- * `municipality_id`/`establishment_id` stay in #[Fillable] for legitimate
- * admin-initiated create/update calls (Pto\UsersController,
- * Lgu\UsersController), but no controller ever mass-assigns them from raw
- * request input — every write path is an explicit, role-checked field
- * assignment. Self-service settings (Concerns\UpdatesAccountSettings)
- * validate by an allow-list that excludes role/status/municipality_id/
- * establishment_id entirely, so a user can never change their own scope.
- */
-#[Fillable(['name', 'email', 'password', 'role', 'organization_name', 'organization_subtitle', 'status', 'municipality_id', 'establishment_id'])]
-#[Hidden(['password', 'remember_token'])]
+#[Table('tbl_users', key: 'usr_id')]
+#[Fillable(['usr_name', 'usr_email', 'usr_password', 'usr_role', 'usr_organization_name', 'usr_organization_subtitle', 'usr_status', 'mun_id', 'lst_id'])]
+#[Hidden(['usr_password', 'usr_remember_token'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
+
+    public const CREATED_AT = 'usr_created_at';
+
+    public const UPDATED_AT = 'usr_updated_at';
+
+    /**
+     * Column holding the hashed password (read by the auth guard and the
+     * `current_password` validation rule).
+     */
+    protected $authPasswordName = 'usr_password';
+
+    /**
+     * Column holding the "remember me" token.
+     */
+    protected $rememberTokenName = 'usr_remember_token';
 
     /**
      * Get the attributes that should be cast.
@@ -45,26 +54,42 @@ class User extends Authenticatable
     protected function casts(): array
     {
         return [
-            'email_verified_at' => 'datetime',
-            'last_login_at' => 'datetime',
-            'password' => 'hashed',
-            'role' => UserRole::class,
+            'usr_email_verified_at' => 'datetime',
+            'usr_last_login_at' => 'datetime',
+            'usr_password' => 'hashed',
+            'usr_role' => UserRole::class,
         ];
+    }
+
+    /**
+     * The address password reset links are stored against and sent to.
+     */
+    public function getEmailForPasswordReset(): string
+    {
+        return $this->usr_email;
+    }
+
+    /**
+     * Mail notifications (e.g. the password reset link) go to usr_email.
+     */
+    public function routeNotificationForMail(Notification $notification): string
+    {
+        return $this->usr_email;
     }
 
     public function municipality(): BelongsTo
     {
-        return $this->belongsTo(Municipality::class);
+        return $this->belongsTo(Municipality::class, 'mun_id', 'mun_id');
     }
 
     /**
      * The single establishment (Listing) this account is linked to — only
      * ever set for role === Establishment. Establishments and destinations
-     * share the `listings` table (see Listing's `category` column).
+     * share the `tbl_listings` table (see Listing's `lst_category` column).
      */
     public function establishment(): BelongsTo
     {
-        return $this->belongsTo(Listing::class, 'establishment_id');
+        return $this->belongsTo(Listing::class, 'lst_id', 'lst_id');
     }
 
     /**
@@ -73,11 +98,11 @@ class User extends Authenticatable
      */
     public function scopeVisibleTo(Builder $query, self $user): Builder
     {
-        return match ($user->role) {
+        return match ($user->usr_role) {
             UserRole::PtoAdministrator => $query,
-            UserRole::Lgu => $query->where('role', UserRole::Establishment)
-                ->where('municipality_id', $user->municipality_id),
-            UserRole::Establishment => $query->where('id', $user->id),
+            UserRole::Lgu => $query->where('usr_role', UserRole::Establishment)
+                ->where('mun_id', $user->mun_id),
+            UserRole::Establishment => $query->where('usr_id', $user->usr_id),
             default => $query->whereRaw('1 = 0'),
         };
     }

@@ -22,7 +22,7 @@ class FeedbackController extends EstablishmentController
      */
     public function index(Request $request): View
     {
-        $name = $request->user()->organization_name;
+        $name = $request->user()->usr_organization_name;
 
         return $this->renderEstablishment($request, 'establishment.feedback.index', 'feedback.index', 'Tourist Feedback', [
             'feedback' => EstablishmentMockData::feedback($name),
@@ -34,7 +34,7 @@ class FeedbackController extends EstablishmentController
      */
     public function analytics(Request $request): View
     {
-        $name = $request->user()->organization_name;
+        $name = $request->user()->usr_organization_name;
 
         return $this->renderEstablishment($request, 'establishment.feedback.analytics', 'feedback.analytics', 'Experience Analytics', [
             'sentiment' => EstablishmentMockData::sentimentBreakdown($name),

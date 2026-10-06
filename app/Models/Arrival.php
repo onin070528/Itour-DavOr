@@ -11,33 +11,32 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-/**
- * A visitor-arrival submission, one party per row — either `staff`
- * (establishment front-desk "Record Arrival" wizard, used when a guest
- * can't scan the QR) or `self_checkin` (public QR self-registration). See
- * the create_arrivals_table migration for the legacy single-visitor columns
- * still on this table but no longer written by either form.
- */
+#[Table('tbl_arrivals', key: 'arr_id')]
 #[Fillable([
-    'listing_id', 'source', 'date', 'visitor_name', 'visitor_contact',
-    'gender', 'classification', 'visit_type', 'remarks', 'party_male',
-    'party_female', 'party_adults', 'party_children', 'party_seniors',
-    'party_local', 'party_foreign', 'party_size', 'status',
+    'lst_id', 'arr_source', 'arr_date', 'arr_visitor_name', 'arr_visitor_contact',
+    'arr_gender', 'arr_classification', 'arr_visit_type', 'arr_remarks', 'arr_party_male',
+    'arr_party_female', 'arr_party_adults', 'arr_party_children', 'arr_party_seniors',
+    'arr_party_local', 'arr_party_foreign', 'arr_party_size', 'arr_status',
 ])]
 class Arrival extends Model
 {
+    public const CREATED_AT = 'arr_created_at';
+
+    public const UPDATED_AT = 'arr_updated_at';
+
     protected function casts(): array
     {
         return [
-            'date' => 'date',
+            'arr_date' => 'date',
         ];
     }
 
     public function listing(): BelongsTo
     {
-        return $this->belongsTo(Listing::class);
+        return $this->belongsTo(Listing::class, 'lst_id', 'lst_id');
     }
 }

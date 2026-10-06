@@ -22,7 +22,7 @@ class FeedbackController extends LguController
      */
     public function index(Request $request): View
     {
-        $municipality = $request->user()->organization_subtitle;
+        $municipality = $request->user()->usr_organization_subtitle;
 
         return $this->renderLgu($request, 'lgu.feedback.index', 'feedback.index', 'Tourist Feedback', [
             'municipality' => $municipality,
@@ -35,7 +35,7 @@ class FeedbackController extends LguController
      */
     public function analytics(Request $request): View
     {
-        $municipality = $request->user()->organization_subtitle;
+        $municipality = $request->user()->usr_organization_subtitle;
         $feedback = collect(LguMockData::feedback($municipality));
         $destinationNames = collect(LguMockData::destinations($municipality))->pluck('name');
 

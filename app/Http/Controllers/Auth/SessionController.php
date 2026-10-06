@@ -42,9 +42,9 @@ class SessionController extends Controller
             'password' => ['required', 'string'],
         ]);
 
-        if (! Auth::attempt($credentials, $request->boolean('remember'))) {
+        if (! Auth::attempt(['usr_email' => $credentials['email'], 'password' => $credentials['password']], $request->boolean('remember'))) {
             AuditLogger::record(
-                User::query()->where('email', $credentials['email'])->first(),
+                User::query()->where('usr_email', $credentials['email'])->first(),
                 'login.failed'
             );
 
@@ -58,7 +58,7 @@ class SessionController extends Controller
 
         // PTO's "Disable Account" action (Pto\UsersController::toggleStatus)
         // is documented as immediate loss of access — enforce that here.
-        if ($user->status === 'Inactive') {
+        if ($user->usr_status === 'Inactive') {
             Auth::guard('web')->logout();
 
             AuditLogger::record($user, 'login.blocked_suspended');
@@ -69,12 +69,12 @@ class SessionController extends Controller
         }
 
         $request->session()->regenerate();
-        $user->forceFill(['last_login_at' => now()])->save();
+        $user->forceFill(['usr_last_login_at' => now()])->save();
 
         AuditLogger::record($user, 'login.success');
 
         return redirect()->intended(
-            $user->role ? route($user->role->dashboardRouteName()) : route('home')
+            $user->usr_role ? route($user->usr_role->dashboardRouteName()) : route('home')
         );
     }
 

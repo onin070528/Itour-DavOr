@@ -12,11 +12,11 @@
             <div data-tab-panel="profile" class="max-w-lg">
                 <div class="flex items-center gap-4">
                     <span class="flex h-16 w-16 items-center justify-center rounded-full bg-primary-100 font-display text-xl font-bold text-primary-700">
-                        {{ collect(explode(' ', $user->name))->map(fn ($part) => mb_substr($part, 0, 1))->take(2)->implode('') }}
+                        {{ collect(explode(' ', $user->usr_name))->map(fn ($part) => mb_substr($part, 0, 1))->take(2)->implode('') }}
                     </span>
                     <div>
-                        <p class="font-display text-base font-bold text-sand-900">{{ $user->name }}</p>
-                        <p class="text-sm text-sand-500">{{ $user->role->title() }} · {{ $establishmentName }}</p>
+                        <p class="font-display text-base font-bold text-sand-900">{{ $user->usr_name }}</p>
+                        <p class="text-sm text-sand-500">{{ $user->usr_role->title() }} · {{ $establishmentName }}</p>
                     </div>
                 </div>
 
@@ -24,11 +24,11 @@
                     @csrf
                     <div>
                         <label class="mb-1 block text-xs font-semibold text-sand-700">Full Name <span class="text-danger" aria-hidden="true">*</span></label>
-                        <input name="name" type="text" value="{{ $user->name }}" required class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                        <input name="name" type="text" value="{{ $user->usr_name }}" required class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
                     </div>
                     <div>
                         <label class="mb-1 block text-xs font-semibold text-sand-700">Login Email <span class="text-danger" aria-hidden="true">*</span></label>
-                        <input name="email" type="email" value="{{ $user->email }}" required class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                        <input name="email" type="email" value="{{ $user->usr_email }}" required class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
                     </div>
                     <div>
                         <button type="submit" class="rounded-sm bg-primary-700 px-4 py-2 text-sm font-semibold text-sand-0 hover:bg-primary-900">

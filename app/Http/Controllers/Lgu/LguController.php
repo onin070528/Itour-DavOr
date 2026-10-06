@@ -31,7 +31,7 @@ abstract class LguController extends Controller
 
         return view($view, array_merge([
             'user' => $user,
-            'municipality' => $user->organization_subtitle,
+            'municipality' => $user->usr_organization_subtitle,
             'navSections' => LguNavigation::sections($activeKey),
             'pageTitle' => $pageTitle,
             'accountHeading' => 'System',

@@ -55,29 +55,29 @@ class ArrivalsController extends EstablishmentController
         $companions = collect(['male', 'female', 'adults', 'children', 'seniors', 'local', 'foreign'])
             ->mapWithKeys(fn ($key) => [$key => (int) ($data[$key] ?? 0)]);
 
-        // Resolved via establishment_id, not a Listing.name match against
-        // organization_name — see Establishment\ProfileController::ownListing().
-        abort_if($request->user()->establishment_id === null, 403, 'Your account is not linked to an establishment yet.');
+        // Resolved via lst_id, not a Listing.name match against
+        // usr_organization_name — see Establishment\ProfileController::ownListing().
+        abort_if($request->user()->lst_id === null, 403, 'Your account is not linked to an establishment yet.');
         $listing = $request->user()->establishment()->firstOrFail();
 
         try {
             $listing->arrivals()->create([
-                'source' => 'staff',
-                'date' => $data['date'],
-                'visitor_name' => $data['visitorName'] ?? null,
-                'visit_type' => $data['visitType'],
-                'party_male' => $companions['male'],
-                'party_female' => $companions['female'],
-                'party_adults' => $companions['adults'],
-                'party_children' => $companions['children'],
-                'party_seniors' => $companions['seniors'],
-                'party_local' => $companions['local'],
-                'party_foreign' => $companions['foreign'],
-                'party_size' => 1 + $companions['male'] + $companions['female'],
-                'status' => 'Recorded',
+                'arr_source' => 'staff',
+                'arr_date' => $data['date'],
+                'arr_visitor_name' => $data['visitorName'] ?? null,
+                'arr_visit_type' => $data['visitType'],
+                'arr_party_male' => $companions['male'],
+                'arr_party_female' => $companions['female'],
+                'arr_party_adults' => $companions['adults'],
+                'arr_party_children' => $companions['children'],
+                'arr_party_seniors' => $companions['seniors'],
+                'arr_party_local' => $companions['local'],
+                'arr_party_foreign' => $companions['foreign'],
+                'arr_party_size' => 1 + $companions['male'] + $companions['female'],
+                'arr_status' => 'Recorded',
             ]);
         } catch (\Throwable $e) {
-            Log::error('Failed to record arrival.', ['exception' => $e, 'listing_id' => $listing->id]);
+            Log::error('Failed to record arrival.', ['exception' => $e, 'lst_id' => $listing->lst_id]);
 
             return response()->json(['message' => 'Something went wrong while recording the arrival. Please try again.'], 500);
         }
@@ -90,7 +90,7 @@ class ArrivalsController extends EstablishmentController
      */
     public function index(Request $request): View
     {
-        $name = $request->user()->organization_name;
+        $name = $request->user()->usr_organization_name;
 
         return $this->renderEstablishment($request, 'establishment.arrivals.index', 'arrivals.index', 'Arrival Records', [
             'arrivals' => EstablishmentMockData::arrivals($name),

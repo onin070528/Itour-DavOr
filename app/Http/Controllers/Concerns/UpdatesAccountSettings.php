@@ -29,7 +29,7 @@ trait UpdatesAccountSettings
 {
     /**
      * The notification toggles shown on this role's Settings > Notifications
-     * tab: key (stable, used as the DB row's `key` and the form field name),
+     * tab: key (stable, used as the DB row's `npf_key` and the form field name),
      * label (exact on-screen text), default (its checked state when no row
      * has been saved yet). Implemented per controller/role.
      *
@@ -43,8 +43,8 @@ trait UpdatesAccountSettings
     protected function notificationPreferencesFor(int $userId): array
     {
         $saved = NotificationPreference::query()
-            ->where('user_id', $userId)
-            ->pluck('enabled', 'key');
+            ->where('usr_id', $userId)
+            ->pluck('npf_enabled', 'npf_key');
 
         return collect($this->notificationPreferenceDefinitions())
             ->map(fn (array $pref) => [
@@ -61,13 +61,13 @@ trait UpdatesAccountSettings
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user)],
+            'email' => ['required', 'email', 'max:255', Rule::unique('tbl_users', 'usr_email')->ignore($user)],
         ]);
 
         try {
-            $user->update($data);
+            $user->update(['usr_name' => $data['name'], 'usr_email' => $data['email']]);
         } catch (\Throwable $e) {
-            Log::error('Failed to update account profile.', ['exception' => $e, 'user_id' => $user->id]);
+            Log::error('Failed to update account profile.', ['exception' => $e, 'usr_id' => $user->usr_id]);
 
             return back()->with('toast', 'Something went wrong while saving your profile. Please try again.')->with('toast_tone', 'danger');
         }
@@ -83,9 +83,9 @@ trait UpdatesAccountSettings
         ]);
 
         try {
-            $request->user()->update(['password' => $data['password']]);
+            $request->user()->update(['usr_password' => $data['password']]);
         } catch (\Throwable $e) {
-            Log::error('Failed to update account password.', ['exception' => $e, 'user_id' => $request->user()->id]);
+            Log::error('Failed to update account password.', ['exception' => $e, 'usr_id' => $request->user()->usr_id]);
 
             return back()->with('toast', 'Something went wrong while updating your password. Please try again.')->with('toast_tone', 'danger');
         }
@@ -101,12 +101,12 @@ trait UpdatesAccountSettings
         try {
             foreach ($keys as $key) {
                 NotificationPreference::query()->updateOrCreate(
-                    ['user_id' => $user->id, 'key' => $key],
-                    ['enabled' => $request->boolean("preferences.{$key}")],
+                    ['usr_id' => $user->usr_id, 'npf_key' => $key],
+                    ['npf_enabled' => $request->boolean("preferences.{$key}")],
                 );
             }
         } catch (\Throwable $e) {
-            Log::error('Failed to update notification preferences.', ['exception' => $e, 'user_id' => $user->id]);
+            Log::error('Failed to update notification preferences.', ['exception' => $e, 'usr_id' => $user->usr_id]);
 
             return back()->with('toast', 'Something went wrong while saving your preferences. Please try again.')->with('toast_tone', 'danger');
         }

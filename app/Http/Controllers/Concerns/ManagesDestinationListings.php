@@ -12,6 +12,7 @@
 namespace App\Http\Controllers\Concerns;
 
 use App\Models\Listing;
+use App\Support\TourismCatalog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -25,7 +26,7 @@ use Illuminate\Validation\Rule;
 trait ManagesDestinationListings
 {
     /**
-     * @return array{name: string, barangay: string, description: ?string, contactOffice: ?string, contactPhone: ?string}
+     * @return array{lst_name: string, lst_barangay: string, lst_description: ?string, lst_contact_office: ?string, lst_contact_phone: ?string}
      */
     protected function validatedDestinationFields(Request $request): array
     {
@@ -38,11 +39,11 @@ trait ManagesDestinationListings
         ]);
 
         return [
-            'name' => $data['name'],
-            'barangay' => $data['barangay'],
-            'description' => $data['description'] ?? null,
-            'contact_office' => $data['contactOffice'] ?? null,
-            'contact_phone' => $data['contactPhone'] ?? null,
+            'lst_name' => $data['name'],
+            'lst_barangay' => $data['barangay'],
+            'lst_description' => $data['description'] ?? null,
+            'lst_contact_office' => $data['contactOffice'] ?? null,
+            'lst_contact_phone' => $data['contactPhone'] ?? null,
         ];
     }
 
@@ -50,10 +51,10 @@ trait ManagesDestinationListings
     {
         return Listing::query()->create([
             ...$fields,
-            'slug' => $this->uniqueDestinationSlug($fields['name']),
-            'category' => 'destinations',
-            'municipality' => $municipality,
-            'status' => 'Active',
+            'lst_slug' => $this->uniqueDestinationSlug($fields['lst_name']),
+            'lst_category' => 'destinations',
+            'lst_municipality' => $municipality,
+            'lst_status' => 'Active',
         ]);
     }
 
@@ -63,7 +64,7 @@ trait ManagesDestinationListings
         $slug = $base;
         $suffix = 2;
 
-        while (Listing::query()->where('slug', $slug)->exists()) {
+        while (Listing::query()->where('lst_slug', $slug)->exists()) {
             $slug = "{$base}-{$suffix}";
             $suffix++;
         }
@@ -78,7 +79,7 @@ trait ManagesDestinationListings
     protected function validatedMunicipality(Request $request): string
     {
         return $request->validate([
-            'municipality' => ['required', 'string', Rule::in(collect(\App\Support\TourismCatalog::municipalities())->pluck('name'))],
+            'municipality' => ['required', 'string', Rule::in(collect(TourismCatalog::municipalities())->pluck('name'))],
         ])['municipality'];
     }
 }

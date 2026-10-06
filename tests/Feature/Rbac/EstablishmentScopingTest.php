@@ -10,29 +10,29 @@ use Illuminate\Support\Str;
 function makeEstablishmentListing(string $municipalityName, string $municipalityCode, string $name): Listing
 {
     $municipality = Municipality::query()->firstOrCreate(
-        ['code' => $municipalityCode],
-        ['name' => $municipalityName]
+        ['mun_code' => $municipalityCode],
+        ['mun_name' => $municipalityName]
     );
 
     return Listing::query()->create([
-        'slug' => Str::slug($name.'-'.Str::random(6)),
-        'name' => $name,
-        'category' => 'accommodation',
-        'municipality' => $municipality->name,
-        'municipality_id' => $municipality->id,
-        'barangay' => 'Poblacion',
-        'status' => 'Active',
+        'lst_slug' => Str::slug($name.'-'.Str::random(6)),
+        'lst_name' => $name,
+        'lst_category' => 'accommodation',
+        'lst_municipality' => $municipality->mun_name,
+        'mun_id' => $municipality->mun_id,
+        'lst_barangay' => 'Poblacion',
+        'lst_status' => 'Active',
     ]);
 }
 
 function makeEstablishmentUser(Listing $listing): User
 {
     return User::factory()->create([
-        'role' => UserRole::Establishment,
-        'organization_name' => $listing->name,
-        'organization_subtitle' => "{$listing->barangay}, {$listing->municipality}",
-        'municipality_id' => $listing->municipality_id,
-        'establishment_id' => $listing->id,
+        'usr_role' => UserRole::Establishment,
+        'usr_organization_name' => $listing->lst_name,
+        'usr_organization_subtitle' => "{$listing->lst_barangay}, {$listing->lst_municipality}",
+        'mun_id' => $listing->mun_id,
+        'lst_id' => $listing->lst_id,
     ]);
 }
 
@@ -48,17 +48,17 @@ test('an establishment user can update only its own listing', function () {
         'hours' => '24/7',
     ])->assertRedirect();
 
-    expect($own->fresh()->name)->toBe('My Own Inn — Renamed');
+    expect($own->fresh()->lst_name)->toBe('My Own Inn — Renamed');
 });
 
 test('an establishment user cannot touch another establishment\'s photo via a guessed image id', function () {
     $own = makeEstablishmentListing('City of Mati', 'MATI', 'My Own Inn');
     $other = makeEstablishmentListing('City of Mati', 'MATI', 'A Different Inn');
     $otherImage = ListingImage::query()->create([
-        'listing_id' => $other->id,
-        'path' => 'fixture.jpg',
-        'is_primary' => true,
-        'sort_order' => 0,
+        'lst_id' => $other->lst_id,
+        'lsi_path' => 'fixture.jpg',
+        'lsi_is_primary' => true,
+        'lsi_sort_order' => 0,
     ]);
 
     $user = makeEstablishmentUser($own);
@@ -81,7 +81,7 @@ test('an establishment user in one municipality cannot reach another establishme
     $matiUser = makeEstablishmentUser($mati);
 
     // The establishment routes never take a listing id from the client —
-    // "my establishment" always resolves from establishment_id on the
+    // "my establishment" always resolves from lst_id on the
     // authenticated user. Renaming via the account's own update endpoint
     // must never affect a different establishment, in-municipality or not.
     test()->actingAs($matiUser)->put(route('establishment.profile.update'), [
@@ -92,16 +92,16 @@ test('an establishment user in one municipality cannot reach another establishme
         'hours' => '24/7',
     ]);
 
-    expect($baganga->fresh()->name)->toBe('Baganga Inn');
+    expect($baganga->fresh()->lst_name)->toBe('Baganga Inn');
 });
 
 test('an establishment account with no linked listing is blocked from profile actions, not crashed', function () {
     $user = User::factory()->create([
-        'role' => UserRole::Establishment,
-        'organization_name' => 'Unlinked Establishment',
-        'organization_subtitle' => 'Nowhere',
-        'municipality_id' => null,
-        'establishment_id' => null,
+        'usr_role' => UserRole::Establishment,
+        'usr_organization_name' => 'Unlinked Establishment',
+        'usr_organization_subtitle' => 'Nowhere',
+        'mun_id' => null,
+        'lst_id' => null,
     ]);
 
     test()->actingAs($user)->put(route('establishment.profile.update'), [

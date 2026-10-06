@@ -10,6 +10,8 @@
 
 namespace App\Support;
 
+use App\Models\Arrival;
+use App\Models\Listing;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -48,15 +50,15 @@ class EstablishmentMockData
             return [];
         }
 
-        return \App\Models\Listing::query()
-            ->where('slug', $profile['id'])
+        return Listing::query()
+            ->where('lst_slug', $profile['id'])
             ->firstOrFail()
             ->images
             ->map(fn ($image) => [
-                'id' => $image->id,
-                'path' => $image->path,
-                'caption' => $image->caption,
-                'primary' => $image->is_primary,
+                'id' => $image->lsi_id,
+                'path' => $image->lsi_path,
+                'caption' => $image->lsi_caption,
+                'primary' => $image->lsi_is_primary,
             ])
             ->all();
     }
@@ -80,20 +82,20 @@ class EstablishmentMockData
             return [];
         }
 
-        return \App\Models\Arrival::query()
-            ->whereHas('listing', fn ($q) => $q->where('slug', $listing['id']))
-            ->where('source', 'staff')
-            ->orderByDesc('date')
-            ->orderByDesc('id')
+        return Arrival::query()
+            ->whereHas('listing', fn ($q) => $q->where('lst_slug', $listing['id']))
+            ->where('arr_source', 'staff')
+            ->orderByDesc('arr_date')
+            ->orderByDesc('arr_id')
             ->get()
             ->map(fn ($arrival) => [
-                'id' => 'GR-'.$arrival->id,
-                'date' => $arrival->date->toDateString(),
-                'visitorName' => $arrival->visitor_name,
-                'gender' => $arrival->gender,
-                'classification' => $arrival->classification,
-                'remarks' => $arrival->remarks,
-                'status' => $arrival->status,
+                'id' => 'GR-'.$arrival->arr_id,
+                'date' => $arrival->arr_date->toDateString(),
+                'visitorName' => $arrival->arr_visitor_name,
+                'gender' => $arrival->arr_gender,
+                'classification' => $arrival->arr_classification,
+                'remarks' => $arrival->arr_remarks,
+                'status' => $arrival->arr_status,
             ])
             ->all();
     }

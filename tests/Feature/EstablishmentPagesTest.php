@@ -6,9 +6,9 @@ use App\Models\User;
 function actingAsEstablishment(string $name, string $subtitle = 'Somewhere, Davao Oriental'): User
 {
     return User::factory()->create([
-        'role' => UserRole::Establishment,
-        'organization_name' => $name,
-        'organization_subtitle' => $subtitle,
+        'usr_role' => UserRole::Establishment,
+        'usr_organization_name' => $name,
+        'usr_organization_subtitle' => $subtitle,
     ]);
 }
 

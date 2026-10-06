@@ -65,17 +65,17 @@
                     @foreach ($reports as $report)
                         <tr
                             data-row
-                            data-municipality="{{ $report->municipality }}"
-                            data-status="{{ $report->status }}"
-                            data-search-text="{{ strtolower($report->municipality.' '.($report->submitter->name ?? '')) }}"
+                            data-municipality="{{ $report->mrp_municipality }}"
+                            data-status="{{ $report->mrp_status }}"
+                            data-search-text="{{ strtolower($report->mrp_municipality.' '.($report->submitter->usr_name ?? '')) }}"
                             class="hover:bg-sand-50"
                         >
-                            <td class="px-4 py-3 font-medium text-sand-900">{{ $report->municipality }}</td>
-                            <td class="px-4 py-3 text-sand-700">{{ $report->period_start->format('M j') }} – {{ $report->period_end->format('M j, Y') }}</td>
-                            <td class="px-4 py-3 text-right font-semibold text-sand-800">{{ number_format($report->total_arrivals) }}</td>
-                            <td class="px-4 py-3"><x-dashboard.status-badge :tone="$statusTone($report->status)">{{ $statusLabel($report->status) }}</x-dashboard.status-badge></td>
-                            <td class="px-4 py-3 text-sand-700">{{ $report->submitter->name ?? '—' }}</td>
-                            <td class="px-4 py-3 text-sand-700">{{ $report->created_at->format('M j, Y') }}</td>
+                            <td class="px-4 py-3 font-medium text-sand-900">{{ $report->mrp_municipality }}</td>
+                            <td class="px-4 py-3 text-sand-700">{{ $report->mrp_period_start->format('M j') }} – {{ $report->mrp_period_end->format('M j, Y') }}</td>
+                            <td class="px-4 py-3 text-right font-semibold text-sand-800">{{ number_format($report->mrp_total_arrivals) }}</td>
+                            <td class="px-4 py-3"><x-dashboard.status-badge :tone="$statusTone($report->mrp_status)">{{ $statusLabel($report->mrp_status) }}</x-dashboard.status-badge></td>
+                            <td class="px-4 py-3 text-sand-700">{{ $report->submitter->usr_name ?? '—' }}</td>
+                            <td class="px-4 py-3 text-sand-700">{{ $report->mrp_created_at->format('M j, Y') }}</td>
                             <td class="px-4 py-3 text-right">
                                 <a href="{{ route('pto.municipalReports.show', $report) }}" class="rounded-sm border border-sand-300 px-3 py-1.5 text-xs font-semibold text-sand-800 hover:border-primary-300">
                                     Review

@@ -12,6 +12,7 @@ namespace App\Models;
 
 use App\Enums\UserRole;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -21,28 +22,33 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * A tourism destination or establishment — the real, DB-backed replacement
- * for App\Support\TourismCatalog::listings(). `category` is 'destinations'
- * for destinations, or one of the non-destination category slugs
- * (TourismCatalog::categories()) for establishments. There is no separate
- * Establishment/Destination model or table — RBAC (see ListingPolicy)
- * branches on `category` instead.
+ * for App\Support\TourismCatalog::listings(). `lst_category` is
+ * 'destinations' for destinations, or one of the non-destination category
+ * slugs (TourismCatalog::categories()) for establishments. There is no
+ * separate Establishment/Destination model or table — RBAC (see
+ * ListingPolicy) branches on `lst_category` instead.
  */
+#[Table('tbl_listings', key: 'lst_id')]
 #[Fillable([
-    'slug', 'name', 'owner_name', 'category', 'municipality', 'municipality_id', 'barangay', 'lat', 'lng', 'description',
-    'rating', 'tags', 'image', 'contact_office', 'contact_phone', 'hours',
-    'email', 'website', 'status',
+    'lst_slug', 'lst_name', 'lst_owner_name', 'lst_category', 'lst_municipality', 'mun_id', 'lst_barangay', 'lst_lat', 'lst_lng', 'lst_description',
+    'lst_rating', 'lst_tags', 'lst_image', 'lst_contact_office', 'lst_contact_phone', 'lst_hours',
+    'lst_email', 'lst_website', 'lst_status',
 ])]
 class Listing extends Model
 {
     use HasFactory;
 
+    public const CREATED_AT = 'lst_created_at';
+
+    public const UPDATED_AT = 'lst_updated_at';
+
     protected function casts(): array
     {
         return [
-            'tags' => 'array',
-            'rating' => 'decimal:1',
-            'lat' => 'float',
-            'lng' => 'float',
+            'lst_tags' => 'array',
+            'lst_rating' => 'decimal:1',
+            'lst_lat' => 'float',
+            'lst_lng' => 'float',
         ];
     }
 
@@ -52,32 +58,32 @@ class Listing extends Model
      */
     public function getRouteKeyName(): string
     {
-        return 'slug';
+        return 'lst_slug';
     }
 
     public function images(): HasMany
     {
-        return $this->hasMany(ListingImage::class)->orderBy('sort_order');
+        return $this->hasMany(ListingImage::class, 'lst_id', 'lst_id')->orderBy('lsi_sort_order');
     }
 
     public function arrivals(): HasMany
     {
-        return $this->hasMany(Arrival::class);
+        return $this->hasMany(Arrival::class, 'lst_id', 'lst_id');
     }
 
     public function municipalityRecord(): BelongsTo
     {
-        return $this->belongsTo(Municipality::class, 'municipality_id');
+        return $this->belongsTo(Municipality::class, 'mun_id', 'mun_id');
     }
 
     /**
-     * The single User account linked to this listing via establishment_id
+     * The single User account linked to this listing via tbl_users.lst_id
      * (only ever set when this listing is an establishment, not a
-     * destination — see users.establishment_id's unique constraint).
+     * destination — see that column's unique constraint).
      */
     public function establishmentUser(): HasOne
     {
-        return $this->hasOne(User::class, 'establishment_id');
+        return $this->hasOne(User::class, 'lst_id', 'lst_id');
     }
 
     /**
@@ -89,13 +95,13 @@ class Listing extends Model
      */
     public function scopeVisibleTo(Builder $query, User $user): Builder
     {
-        return match ($user->role) {
+        return match ($user->usr_role) {
             UserRole::PtoAdministrator => $query,
-            UserRole::Lgu => $query->where('municipality_id', $user->municipality_id),
+            UserRole::Lgu => $query->where('mun_id', $user->mun_id),
             UserRole::Establishment => $query->where(function (Builder $q) use ($user) {
-                $q->where('id', $user->establishment_id)
+                $q->where('lst_id', $user->lst_id)
                     ->orWhere(function (Builder $q2) use ($user) {
-                        $q2->where('category', 'destinations')->where('municipality_id', $user->municipality_id);
+                        $q2->where('lst_category', 'destinations')->where('mun_id', $user->mun_id);
                     });
             }),
             default => $query->whereRaw('1 = 0'),

@@ -8,29 +8,29 @@ use Illuminate\Support\Str;
 
 function makeMunicipality(string $name, string $code): Municipality
 {
-    return Municipality::query()->create(['name' => $name, 'code' => $code]);
+    return Municipality::query()->create(['mun_name' => $name, 'mun_code' => $code]);
 }
 
 function makeLguUser(Municipality $municipality): User
 {
     return User::factory()->create([
-        'role' => UserRole::Lgu,
-        'organization_name' => "{$municipality->name} Tourism Office",
-        'organization_subtitle' => $municipality->name,
-        'municipality_id' => $municipality->id,
+        'usr_role' => UserRole::Lgu,
+        'usr_organization_name' => "{$municipality->mun_name} Tourism Office",
+        'usr_organization_subtitle' => $municipality->mun_name,
+        'mun_id' => $municipality->mun_id,
     ]);
 }
 
 function makeListing(Municipality $municipality, string $category = 'destinations'): Listing
 {
     return Listing::query()->create([
-        'slug' => Str::slug($municipality->name.'-'.$category.'-'.Str::random(6)),
-        'name' => "{$municipality->name} Test {$category}",
-        'category' => $category,
-        'municipality' => $municipality->name,
-        'municipality_id' => $municipality->id,
-        'barangay' => 'Poblacion',
-        'status' => 'Active',
+        'lst_slug' => Str::slug($municipality->mun_name.'-'.$category.'-'.Str::random(6)),
+        'lst_name' => "{$municipality->mun_name} Test {$category}",
+        'lst_category' => $category,
+        'lst_municipality' => $municipality->mun_name,
+        'mun_id' => $municipality->mun_id,
+        'lst_barangay' => 'Poblacion',
+        'lst_status' => 'Active',
     ]);
 }
 
@@ -42,7 +42,7 @@ test('PTO can reach the province-wide directory regardless of municipality', fun
     makeListing($baganga);
     makeListing($cateel);
 
-    $pto = User::factory()->create(['role' => UserRole::PtoAdministrator]);
+    $pto = User::factory()->create(['usr_role' => UserRole::PtoAdministrator]);
 
     test()->actingAs($pto)->get(route('pto.directory.destinations'))->assertOk();
 });
@@ -56,7 +56,7 @@ test('an LGU can manage a destination inside its own municipality', function () 
         ->patch(route('lgu.directory.destinations.archive', $matiDestination))
         ->assertRedirect();
 
-    expect($matiDestination->fresh()->status)->toBe('Archived');
+    expect($matiDestination->fresh()->lst_status)->toBe('Archived');
 });
 
 test('an LGU cannot update or archive a destination belonging to another municipality', function () {
@@ -74,22 +74,22 @@ test('an LGU cannot update or archive a destination belonging to another municip
         ->patch(route('lgu.directory.destinations.archive', $baganganDestination))
         ->assertForbidden();
 
-    expect($baganganDestination->fresh()->status)->toBe('Active');
-    expect($baganganDestination->fresh()->name)->not->toBe('Hijacked Name');
+    expect($baganganDestination->fresh()->lst_status)->toBe('Active');
+    expect($baganganDestination->fresh()->lst_name)->not->toBe('Hijacked Name');
 });
 
 test('an LGU cannot verify an establishment belonging to another municipality', function () {
     $mati = makeMunicipality('City of Mati', 'MATI');
     $baganga = makeMunicipality('Baganga', 'BAG');
     $baganganEstablishment = makeListing($baganga, 'accommodation');
-    $baganganEstablishment->update(['status' => 'Pending Review']);
+    $baganganEstablishment->update(['lst_status' => 'Pending Review']);
     $matiLgu = makeLguUser($mati);
 
     test()->actingAs($matiLgu)
         ->patch(route('lgu.directory.establishments.verify', $baganganEstablishment))
         ->assertForbidden();
 
-    expect($baganganEstablishment->fresh()->status)->toBe('Pending Review');
+    expect($baganganEstablishment->fresh()->lst_status)->toBe('Pending Review');
 });
 
 test('direct listing id manipulation across municipalities never returns 200', function () {
@@ -106,9 +106,9 @@ test('direct listing id manipulation across municipalities never returns 200', f
 
 test('an LGU with no assigned municipality cannot reach LGU-scoped pages', function () {
     $unassigned = User::factory()->create([
-        'role' => UserRole::Lgu,
-        'organization_subtitle' => null,
-        'municipality_id' => null,
+        'usr_role' => UserRole::Lgu,
+        'usr_organization_subtitle' => null,
+        'mun_id' => null,
     ]);
 
     test()->actingAs($unassigned)->get(route('lgu.dashboard'))->assertForbidden();

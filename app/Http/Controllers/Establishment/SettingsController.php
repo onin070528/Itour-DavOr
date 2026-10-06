@@ -26,7 +26,7 @@ class SettingsController extends EstablishmentController
     public function index(Request $request): View
     {
         return $this->renderEstablishment($request, 'establishment.settings', 'settings', 'Settings', [
-            'preferences' => $this->notificationPreferencesFor($request->user()->id),
+            'preferences' => $this->notificationPreferencesFor($request->user()->usr_id),
         ]);
     }
 

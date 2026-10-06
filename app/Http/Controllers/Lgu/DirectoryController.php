@@ -30,7 +30,7 @@ class DirectoryController extends LguController
      */
     public function destinations(Request $request): View
     {
-        $municipality = $request->user()->organization_subtitle;
+        $municipality = $request->user()->usr_organization_subtitle;
 
         return $this->renderLgu($request, 'lgu.directory.destinations', 'directory.destinations', 'Destinations', [
             'municipality' => $municipality,
@@ -41,7 +41,7 @@ class DirectoryController extends LguController
     public function storeDestination(Request $request): RedirectResponse
     {
         $fields = $this->validatedDestinationFields($request);
-        $municipality = $request->user()->organization_subtitle;
+        $municipality = $request->user()->usr_organization_subtitle;
 
         try {
             $listing = $this->createDestination($fields, $municipality);
@@ -51,20 +51,20 @@ class DirectoryController extends LguController
             return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
 
-        return back()->with('toast', "{$listing->name} was added.");
+        return back()->with('toast', "{$listing->lst_name} was added.");
     }
 
     public function updateDestination(Request $request, Listing $listing): RedirectResponse
     {
         $this->authorizeOwnMunicipality($request, $listing);
-        abort_if($listing->category !== 'destinations', 404);
+        abort_if($listing->lst_category !== 'destinations', 404);
 
         $fields = $this->validatedDestinationFields($request);
 
         try {
             $listing->update($fields);
         } catch (\Throwable $e) {
-            Log::error('Failed to update LGU destination.', ['exception' => $e, 'listing_id' => $listing->id]);
+            Log::error('Failed to update LGU destination.', ['exception' => $e, 'lst_id' => $listing->lst_id]);
 
             return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
@@ -75,17 +75,17 @@ class DirectoryController extends LguController
     public function archiveDestination(Request $request, Listing $listing): RedirectResponse
     {
         $this->authorizeOwnMunicipality($request, $listing);
-        abort_if($listing->category !== 'destinations', 404);
+        abort_if($listing->lst_category !== 'destinations', 404);
 
         try {
-            $listing->update(['status' => 'Archived']);
+            $listing->update(['lst_status' => 'Archived']);
         } catch (\Throwable $e) {
-            Log::error('Failed to archive LGU destination.', ['exception' => $e, 'listing_id' => $listing->id]);
+            Log::error('Failed to archive LGU destination.', ['exception' => $e, 'lst_id' => $listing->lst_id]);
 
             return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
 
-        return back()->with('toast', "{$listing->name} was archived.");
+        return back()->with('toast', "{$listing->lst_name} was archived.");
     }
 
     /**
@@ -93,7 +93,7 @@ class DirectoryController extends LguController
      */
     public function establishments(Request $request): View
     {
-        $municipality = $request->user()->organization_subtitle;
+        $municipality = $request->user()->usr_organization_subtitle;
 
         return $this->renderLgu($request, 'lgu.directory.establishments', 'directory.establishments', 'Establishments', [
             'municipality' => $municipality,
@@ -105,31 +105,31 @@ class DirectoryController extends LguController
     {
         $this->authorizeOwnMunicipality($request, $listing);
 
-        abort_if($listing->category === 'destinations', 404);
+        abort_if($listing->lst_category === 'destinations', 404);
 
         try {
-            $listing->update(['status' => 'Active']);
+            $listing->update(['lst_status' => 'Active']);
         } catch (\Throwable $e) {
-            Log::error('Failed to verify establishment.', ['exception' => $e, 'listing_id' => $listing->id]);
+            Log::error('Failed to verify establishment.', ['exception' => $e, 'lst_id' => $listing->lst_id]);
 
             return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
 
-        return back()->with('toast', "{$listing->name} marked as verified.");
+        return back()->with('toast', "{$listing->lst_name} marked as verified.");
     }
 
     /**
      * Every write here must stay inside the account's own municipality —
      * this is the LGU directory's whole reason for having a separate
      * controller from PTO's (province-wide) equivalent. Compares the real
-     * municipality_id FK, not the display-only municipality/organization_subtitle
+     * mun_id FK, not the display-only municipality/usr_organization_subtitle
      * strings, so this can't be fooled by a name mismatch or a listing whose
      * FK backfill didn't resolve.
      */
     private function authorizeOwnMunicipality(Request $request, Listing $listing): void
     {
         abort_unless(
-            $listing->municipality_id !== null && $listing->municipality_id === $request->user()->municipality_id,
+            $listing->mun_id !== null && $listing->mun_id === $request->user()->mun_id,
             403
         );
     }
