@@ -1,3 +1,10 @@
+{{--
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: Establishment Arrival Records page.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+--}}
 @php
     $statusTone = fn ($status) => $status === 'Recorded' ? 'success' : 'warning';
     $classifications = collect($arrivals)->pluck('classification')->unique()->sort()->values();

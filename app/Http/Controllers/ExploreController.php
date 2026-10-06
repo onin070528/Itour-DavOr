@@ -30,15 +30,15 @@ class ExploreController extends Controller
     public function index(): View
     {
         return view('explore', [
-            // Only Active listings are publicly visible — Archived
+            // Only publicly visible listings show here — Archived
             // destinations (Lgu/Pto\DirectoryController@archiveDestination)
-            // and un-verified establishments (Pending Review/Inactive,
-            // Lgu\DirectoryController@verifyEstablishment) are meant to
-            // disappear from the public site, not the LGU/PTO management
-            // tables — so the filter lives here, not in
+            // and not-yet-published establishments (DRAFT/FOR_PTO_REVIEW/
+            // UNPUBLISHED/Archived, see App\Services\ListingPublishWorkflow)
+            // are meant to disappear from the public site, not the LGU/PTO
+            // management tables — so the filter lives here, not in
             // TourismCatalog::listings() itself.
-            'listings' => collect(TourismCatalog::listings())->where('status', 'Active')->values()->all(),
-            'categories' => TourismCatalog::categories(),
+            'listings' => collect(TourismCatalog::listings())->where('isPubliclyVisible', true)->values()->all(),
+            'categories' => TourismCatalog::exploreCategories(),
             'municipalities' => TourismCatalog::municipalities(),
         ]);
     }

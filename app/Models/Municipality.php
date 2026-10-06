@@ -55,12 +55,12 @@ class Municipality extends Model
      * PTO sees every municipality; LGU and Establishment users see only
      * their own assigned municipality.
      */
-    public function scopeVisibleTo(Builder $query, User $user): Builder
+    public function scopeVisibleTo(Builder $objQuery, User $objUser): Builder
     {
-        if ($user->usr_role === UserRole::PtoAdministrator) {
-            return $query;
+        if ($objUser->usr_role === UserRole::PtoAdministrator) {
+            return $objQuery;
         }
 
-        return $query->where('mun_id', $user->mun_id);
+        return $objQuery->where('mun_id', $objUser->mun_id);
     }
 }

@@ -26,11 +26,11 @@ class LguMockData
     /**
      * @return array<int, array<string, mixed>>
      */
-    public static function destinations(string $municipality): array
+    public static function destinations(string $strMunicipality): array
     {
         return collect(TourismCatalog::listings())
             ->where('category', 'destinations')
-            ->where('municipality', $municipality)
+            ->where('municipality', $strMunicipality)
             ->values()
             ->all();
     }
@@ -38,14 +38,14 @@ class LguMockData
     /**
      * @return array<int, array<string, mixed>>
      */
-    public static function establishments(string $municipality): array
+    public static function establishments(string $strMunicipality): array
     {
         // `status` now comes straight from the listings table (real
-        // accreditation state, editable via Lgu\DirectoryController
-        // @verifyEstablishment) instead of a hardcoded pending/inactive id list.
+        // publish-workflow state, see App\Services\ListingPublishWorkflow)
+        // instead of a hardcoded pending/inactive id list.
         return collect(TourismCatalog::listings())
             ->where('category', '!=', 'destinations')
-            ->where('municipality', $municipality)
+            ->where('municipality', $strMunicipality)
             ->values()
             ->all();
     }
@@ -53,10 +53,10 @@ class LguMockData
     /**
      * @return array<int, array<string, mixed>>
      */
-    public static function arrivals(string $municipality): array
+    public static function arrivals(string $strMunicipality): array
     {
         return collect(PtoMockData::arrivals())
-            ->where('municipality', $municipality)
+            ->where('municipality', $strMunicipality)
             ->values()
             ->all();
     }
@@ -64,13 +64,13 @@ class LguMockData
     /**
      * @return array<int, array<string, mixed>>
      */
-    public static function feedback(string $municipality): array
+    public static function feedback(string $strMunicipality): array
     {
-        $subjects = collect(self::destinations($municipality))->pluck('name')
-            ->merge(collect(self::establishments($municipality))->pluck('name'));
+        $objSubjects = collect(self::destinations($strMunicipality))->pluck('name')
+            ->merge(collect(self::establishments($strMunicipality))->pluck('name'));
 
         return collect(PtoMockData::feedback())
-            ->whereIn('subject', $subjects)
+            ->whereIn('subject', $objSubjects)
             ->values()
             ->all();
     }
@@ -78,12 +78,12 @@ class LguMockData
     /**
      * @return array<int, array<string, mixed>>
      */
-    public static function destinationPerformance(string $municipality): array
+    public static function destinationPerformance(string $strMunicipality): array
     {
         return collect(PtoMockData::destinationPerformance())
-            ->where('municipality', $municipality)
+            ->where('municipality', $strMunicipality)
             ->values()
-            ->map(fn (array $row, int $i) => [...$row, 'rank' => $i + 1])
+            ->map(fn (array $arrRow, int $intIndex) => [...$arrRow, 'rank' => $intIndex + 1])
             ->all();
     }
 
@@ -92,18 +92,18 @@ class LguMockData
      *
      * @return array<int, array{label: string, value: string, delta: string, tone: string}>
      */
-    public static function dashboardSummary(string $municipality): array
+    public static function dashboardSummary(string $strMunicipality): array
     {
-        $arrivals = collect(self::arrivals($municipality));
-        $destinations = self::destinations($municipality);
-        $establishments = self::establishments($municipality);
-        $feedback = self::feedback($municipality);
+        $objArrivals = collect(self::arrivals($strMunicipality));
+        $arrDestinations = self::destinations($strMunicipality);
+        $arrEstablishments = self::establishments($strMunicipality);
+        $arrFeedback = self::feedback($strMunicipality);
 
         return [
-            ['label' => 'Tourist Arrivals (30 days)', 'value' => number_format($arrivals->sum('visitors')), 'delta' => $arrivals->count().' records logged', 'tone' => 'neutral'],
-            ['label' => 'Tourism Destinations', 'value' => (string) count($destinations), 'delta' => 'Managed by your office', 'tone' => 'neutral'],
-            ['label' => 'Tourism Establishments', 'value' => (string) count($establishments), 'delta' => collect($establishments)->where('status', 'Active')->count().' active', 'tone' => 'success'],
-            ['label' => 'Tourist Feedback', 'value' => (string) count($feedback), 'delta' => 'This period', 'tone' => 'neutral'],
+            ['label' => 'Tourist Arrivals (30 days)', 'value' => number_format($objArrivals->sum('visitors')), 'delta' => $objArrivals->count().' records logged', 'tone' => 'neutral'],
+            ['label' => 'Tourism Destinations', 'value' => (string) count($arrDestinations), 'delta' => 'Managed by your office', 'tone' => 'neutral'],
+            ['label' => 'Tourism Establishments', 'value' => (string) count($arrEstablishments), 'delta' => collect($arrEstablishments)->where('isPubliclyVisible', true)->count().' published', 'tone' => 'success'],
+            ['label' => 'Tourist Feedback', 'value' => (string) count($arrFeedback), 'delta' => 'This period', 'tone' => 'neutral'],
         ];
     }
 
@@ -113,13 +113,13 @@ class LguMockData
      *
      * @return array<string, array<int, array{label: string, value: int}>>
      */
-    public static function arrivalTrend(string $municipality): array
+    public static function arrivalTrend(string $strMunicipality): array
     {
-        $share = self::municipalityShare($municipality);
+        $fltShare = self::municipalityShare($strMunicipality);
 
         return collect(PtoMockData::arrivalTrend())
-            ->map(fn (array $series) => collect($series)
-                ->map(fn (array $point) => ['label' => $point['label'], 'value' => max(1, (int) round($point['value'] * $share))])
+            ->map(fn (array $arrSeries) => collect($arrSeries)
+                ->map(fn (array $arrPoint) => ['label' => $arrPoint['label'], 'value' => max(1, (int) round($arrPoint['value'] * $fltShare))])
                 ->all())
             ->all();
     }
@@ -130,13 +130,13 @@ class LguMockData
      *
      * @return array<string, array<int, array{label: string, value: int}>>
      */
-    public static function sentimentTrend(string $municipality): array
+    public static function sentimentTrend(string $strMunicipality): array
     {
-        $offset = (crc32($municipality) % 11) - 5;
+        $intOffset = (crc32($strMunicipality) % 11) - 5;
 
         return collect(PtoMockData::sentimentTrend())
-            ->map(fn (array $series) => collect($series)
-                ->map(fn (array $point) => ['label' => $point['label'], 'value' => max(0, min(100, $point['value'] + $offset))])
+            ->map(fn (array $arrSeries) => collect($arrSeries)
+                ->map(fn (array $arrPoint) => ['label' => $arrPoint['label'], 'value' => max(0, min(100, $arrPoint['value'] + $intOffset))])
                 ->all())
             ->all();
     }
@@ -144,14 +144,14 @@ class LguMockData
     /**
      * @return array{positive: int, neutral: int, negative: int}
      */
-    public static function sentimentBreakdown(string $municipality): array
+    public static function sentimentBreakdown(string $strMunicipality): array
     {
-        $feedback = collect(self::feedback($municipality));
+        $objFeedback = collect(self::feedback($strMunicipality));
 
         return [
-            'positive' => $feedback->where('sentiment', 'Positive')->count(),
-            'neutral' => $feedback->where('sentiment', 'Neutral')->count(),
-            'negative' => $feedback->where('sentiment', 'Negative')->count(),
+            'positive' => $objFeedback->where('sentiment', 'Positive')->count(),
+            'neutral' => $objFeedback->where('sentiment', 'Neutral')->count(),
+            'negative' => $objFeedback->where('sentiment', 'Negative')->count(),
         ];
     }
 
@@ -161,11 +161,11 @@ class LguMockData
      *
      * @return array<int, array{label: string, count: int}>
      */
-    public static function establishmentCategories(string $municipality): array
+    public static function establishmentCategories(string $strMunicipality): array
     {
-        return collect(self::establishments($municipality))
+        return collect(self::establishments($strMunicipality))
             ->groupBy('category')
-            ->map(fn ($group, $category) => ['label' => TourismCatalog::categoryLabel($category), 'count' => $group->count()])
+            ->map(fn ($objGroup, $category) => ['label' => TourismCatalog::categoryLabel($category), 'count' => $objGroup->count()])
             ->values()
             ->all();
     }
@@ -176,13 +176,13 @@ class LguMockData
      *
      * @return array<int, array{type: string, title: string, description: string, icon: string, time: string}>
      */
-    public static function recentActivity(string $municipality): array
+    public static function recentActivity(string $strMunicipality): array
     {
-        $names = collect(self::destinations($municipality))->pluck('name')
-            ->merge(collect(self::establishments($municipality))->pluck('name'));
+        $objNames = collect(self::destinations($strMunicipality))->pluck('name')
+            ->merge(collect(self::establishments($strMunicipality))->pluck('name'));
 
         return collect(PtoMockData::recentActivity())
-            ->filter(fn (array $activity) => $names->contains(fn ($name) => str_contains($activity['description'], $name)))
+            ->filter(fn (array $arrActivity) => $objNames->contains(fn ($strName) => str_contains($arrActivity['description'], $strName)))
             ->values()
             ->all();
     }
@@ -208,12 +208,12 @@ class LguMockData
      *
      * @return array<int, array{name: string, typeKey: string, type: string, range: string, generatedAt: string, generatedBy: string}>
      */
-    public static function reportHistory(string $municipality): array
+    public static function reportHistory(string $strMunicipality): array
     {
         return [
-            ['name' => "Tourist Arrival Report — {$municipality}, July 2026", 'typeKey' => 'arrivals', 'type' => 'Tourist Arrival Report', 'range' => 'Jul 1 – Jul 31, 2026', 'generatedAt' => '2026-08-02', 'generatedBy' => 'Arnel Dizon'],
-            ['name' => "Municipal Tourism Statistics Report — {$municipality}, Q2 2026", 'typeKey' => 'statistics', 'type' => 'Municipal Tourism Statistics Report', 'range' => 'Apr 1 – Jun 30, 2026', 'generatedAt' => '2026-07-05', 'generatedBy' => 'Arnel Dizon'],
-            ['name' => "Tourist Feedback Report — {$municipality}, July 2026", 'typeKey' => 'feedback', 'type' => 'Tourist Feedback Report', 'range' => 'Jul 1 – Jul 31, 2026', 'generatedAt' => '2026-08-01', 'generatedBy' => 'Arnel Dizon'],
+            ['name' => "Tourist Arrival Report — {$strMunicipality}, July 2026", 'typeKey' => 'arrivals', 'type' => 'Tourist Arrival Report', 'range' => 'Jul 1 – Jul 31, 2026', 'generatedAt' => '2026-08-02', 'generatedBy' => 'Arnel Dizon'],
+            ['name' => "Municipal Tourism Statistics Report — {$strMunicipality}, Q2 2026", 'typeKey' => 'statistics', 'type' => 'Municipal Tourism Statistics Report', 'range' => 'Apr 1 – Jun 30, 2026', 'generatedAt' => '2026-07-05', 'generatedBy' => 'Arnel Dizon'],
+            ['name' => "Tourist Feedback Report — {$strMunicipality}, July 2026", 'typeKey' => 'feedback', 'type' => 'Tourist Feedback Report', 'range' => 'Jul 1 – Jul 31, 2026', 'generatedAt' => '2026-08-01', 'generatedBy' => 'Arnel Dizon'],
         ];
     }
 
@@ -225,65 +225,65 @@ class LguMockData
      *
      * @return array<string, array{summary: array<int, array{label: string, value: string}>, chart: array<string, mixed>|null, breakdown: array{label: string, columns: array<int, string>, rows: array<int, array<int, string>>}|null, columns: array<int, string>, rows: array<int, array<int, string>>, filterable: bool, empty: bool}>
      */
-    public static function reportPreviewData(string $municipality): array
+    public static function reportPreviewData(string $strMunicipality): array
     {
-        $arrivals = self::arrivals($municipality);
-        $destinations = self::destinationPerformance($municipality);
-        $feedback = self::feedback($municipality);
-        $sentiment = self::sentimentBreakdown($municipality);
-        $sentimentTotal = array_sum($sentiment);
+        $arrArrivals = self::arrivals($strMunicipality);
+        $arrDestinations = self::destinationPerformance($strMunicipality);
+        $arrFeedback = self::feedback($strMunicipality);
+        $arrSentiment = self::sentimentBreakdown($strMunicipality);
+        $intSentimentTotal = array_sum($arrSentiment);
 
-        $arrivalsTotal = collect($arrivals)->sum('visitors');
-        $foreignTotal = collect($arrivals)->where('classification', 'Foreign')->sum('visitors');
-        $classificationTotals = collect($arrivals)->groupBy('classification')
-            ->map(fn ($rows) => $rows->sum('visitors'));
+        $intArrivalsTotal = collect($arrArrivals)->sum('visitors');
+        $intForeignTotal = collect($arrArrivals)->where('classification', 'Foreign')->sum('visitors');
+        $objClassificationTotals = collect($arrArrivals)->groupBy('classification')
+            ->map(fn ($objRows) => $objRows->sum('visitors'));
 
         // Arrivals are recorded per establishment, not per destination, so the
         // arrivals-report breakdown groups by establishment (self-consistent
         // with the arrivals total above); the statistics-report breakdown
         // uses destination performance instead, a separate real metric.
-        $establishmentBreakdown = collect($arrivals)->groupBy('establishment')
-            ->map(fn ($rows, $establishment) => [$establishment, number_format($rows->sum('visitors')), (string) $rows->count()])
-            ->sortByDesc(fn ($row) => (int) str_replace(',', '', $row[1]))
+        $arrEstablishmentBreakdown = collect($arrArrivals)->groupBy('establishment')
+            ->map(fn ($objRows, $establishment) => [$establishment, number_format($objRows->sum('visitors')), (string) $objRows->count()])
+            ->sortByDesc(fn ($arrRow) => (int) str_replace(',', '', $arrRow[1]))
             ->values()->all();
 
-        $destinationBreakdown = collect($destinations)
-            ->map(fn ($row) => [$row['destination'], number_format($row['visits']), ucfirst($row['trend'])])
+        $arrDestinationBreakdown = collect($arrDestinations)
+            ->map(fn ($arrRow) => [$arrRow['destination'], number_format($arrRow['visits']), ucfirst($arrRow['trend'])])
             ->all();
 
         return [
             'arrivals' => [
                 'summary' => [
-                    ['label' => 'Total Arrivals', 'value' => number_format($arrivalsTotal)],
-                    ['label' => 'Domestic Visitors', 'value' => number_format($arrivalsTotal - $foreignTotal)],
-                    ['label' => 'Foreign Visitors', 'value' => number_format($foreignTotal)],
+                    ['label' => 'Total Arrivals', 'value' => number_format($intArrivalsTotal)],
+                    ['label' => 'Domestic Visitors', 'value' => number_format($intArrivalsTotal - $intForeignTotal)],
+                    ['label' => 'Foreign Visitors', 'value' => number_format($intForeignTotal)],
                 ],
                 'chart' => [
                     'type' => 'bar',
                     'title' => 'Visitor Classification Distribution',
-                    'items' => $classificationTotals->map(fn ($value, $label) => ['label' => $label, 'value' => $value])->values()->all(),
+                    'items' => $objClassificationTotals->map(fn ($value, $strLabel) => ['label' => $strLabel, 'value' => $value])->values()->all(),
                 ],
-                'breakdown' => ['label' => 'Establishment', 'columns' => ['Establishment', 'Arrivals', 'Records'], 'rows' => $establishmentBreakdown],
+                'breakdown' => ['label' => 'Establishment', 'columns' => ['Establishment', 'Arrivals', 'Records'], 'rows' => $arrEstablishmentBreakdown],
                 'columns' => ['Date', 'Establishment', 'Classification', 'Gender', 'Visitors'],
-                'rows' => collect($arrivals)->map(fn ($row) => [
-                    Carbon::parse($row['date'])->format('M j, Y'),
-                    $row['establishment'], $row['classification'], $row['gender'], number_format($row['visitors']),
+                'rows' => collect($arrArrivals)->map(fn ($arrRow) => [
+                    Carbon::parse($arrRow['date'])->format('M j, Y'),
+                    $arrRow['establishment'], $arrRow['classification'], $arrRow['gender'], number_format($arrRow['visitors']),
                 ])->all(),
                 'filterable' => true,
-                'empty' => $arrivalsTotal === 0,
+                'empty' => $intArrivalsTotal === 0,
             ],
             'statistics' => [
                 'summary' => [
-                    ['label' => 'Total Arrivals', 'value' => number_format($arrivalsTotal)],
-                    ['label' => 'Destinations Tracked', 'value' => (string) count($destinations)],
+                    ['label' => 'Total Arrivals', 'value' => number_format($intArrivalsTotal)],
+                    ['label' => 'Destinations Tracked', 'value' => (string) count($arrDestinations)],
                 ],
                 'chart' => [
                     'type' => 'trend',
                     'title' => 'Visitor Trend',
-                    'labels' => collect(self::arrivalTrend($municipality)['month'])->pluck('label')->all(),
-                    'values' => collect(self::arrivalTrend($municipality)['month'])->pluck('value')->all(),
+                    'labels' => collect(self::arrivalTrend($strMunicipality)['month'])->pluck('label')->all(),
+                    'values' => collect(self::arrivalTrend($strMunicipality)['month'])->pluck('value')->all(),
                 ],
-                'breakdown' => ['label' => 'Destination', 'columns' => ['Destination', 'Visits', 'Trend'], 'rows' => $destinationBreakdown],
+                'breakdown' => ['label' => 'Destination', 'columns' => ['Destination', 'Visits', 'Trend'], 'rows' => $arrDestinationBreakdown],
                 'columns' => [],
                 'rows' => [],
                 'filterable' => false,
@@ -291,50 +291,50 @@ class LguMockData
             ],
             'destinations' => [
                 'summary' => [
-                    ['label' => 'Destinations Tracked', 'value' => (string) count($destinations)],
-                    ['label' => 'Top Destination', 'value' => $destinations[0]['destination'] ?? '—'],
+                    ['label' => 'Destinations Tracked', 'value' => (string) count($arrDestinations)],
+                    ['label' => 'Top Destination', 'value' => $arrDestinations[0]['destination'] ?? '—'],
                 ],
                 'chart' => [
                     'type' => 'bar',
                     'title' => 'Visits per Destination',
-                    'items' => collect($destinations)->map(fn ($row) => ['label' => $row['destination'], 'value' => $row['visits']])->all(),
+                    'items' => collect($arrDestinations)->map(fn ($arrRow) => ['label' => $arrRow['destination'], 'value' => $arrRow['visits']])->all(),
                 ],
                 'breakdown' => null,
                 'columns' => ['#', 'Destination', 'Visits', 'Trend'],
-                'rows' => collect($destinations)->map(fn ($row) => [
-                    (string) $row['rank'], $row['destination'], number_format($row['visits']), ucfirst($row['trend']),
+                'rows' => collect($arrDestinations)->map(fn ($arrRow) => [
+                    (string) $arrRow['rank'], $arrRow['destination'], number_format($arrRow['visits']), ucfirst($arrRow['trend']),
                 ])->all(),
                 'filterable' => false,
-                'empty' => count($destinations) === 0,
+                'empty' => count($arrDestinations) === 0,
             ],
             'feedback' => [
                 'summary' => [
-                    ['label' => 'Feedback Entries', 'value' => (string) count($feedback)],
-                    ['label' => 'Positive', 'value' => (string) collect($feedback)->where('sentiment', 'Positive')->count()],
-                    ['label' => 'Negative', 'value' => (string) collect($feedback)->where('sentiment', 'Negative')->count()],
+                    ['label' => 'Feedback Entries', 'value' => (string) count($arrFeedback)],
+                    ['label' => 'Positive', 'value' => (string) collect($arrFeedback)->where('sentiment', 'Positive')->count()],
+                    ['label' => 'Negative', 'value' => (string) collect($arrFeedback)->where('sentiment', 'Negative')->count()],
                 ],
-                'chart' => ['type' => 'donut', 'positive' => $sentiment['positive'], 'neutral' => $sentiment['neutral'], 'negative' => $sentiment['negative']],
+                'chart' => ['type' => 'donut', 'positive' => $arrSentiment['positive'], 'neutral' => $arrSentiment['neutral'], 'negative' => $arrSentiment['negative']],
                 'breakdown' => null,
                 'columns' => ['Date', 'Subject', 'Sentiment', 'Feedback'],
-                'rows' => collect($feedback)->map(fn ($row) => [
-                    Carbon::parse($row['date'])->format('M j, Y'),
-                    $row['subject'], $row['sentiment'], Str::limit($row['text'], 70),
+                'rows' => collect($arrFeedback)->map(fn ($arrRow) => [
+                    Carbon::parse($arrRow['date'])->format('M j, Y'),
+                    $arrRow['subject'], $arrRow['sentiment'], Str::limit($arrRow['text'], 70),
                 ])->all(),
                 'filterable' => true,
-                'empty' => count($feedback) === 0,
+                'empty' => count($arrFeedback) === 0,
             ],
             'experience' => [
                 'summary' => [
-                    ['label' => 'Feedback Analyzed', 'value' => number_format($sentimentTotal)],
-                    ['label' => 'Positive Share', 'value' => $sentimentTotal ? round(($sentiment['positive'] / $sentimentTotal) * 100).'%' : '—'],
-                    ['label' => 'Negative Entries', 'value' => number_format($sentiment['negative'])],
+                    ['label' => 'Feedback Analyzed', 'value' => number_format($intSentimentTotal)],
+                    ['label' => 'Positive Share', 'value' => $intSentimentTotal ? round(($arrSentiment['positive'] / $intSentimentTotal) * 100).'%' : '—'],
+                    ['label' => 'Negative Entries', 'value' => number_format($arrSentiment['negative'])],
                 ],
-                'chart' => ['type' => 'donut', 'positive' => $sentiment['positive'], 'neutral' => $sentiment['neutral'], 'negative' => $sentiment['negative']],
+                'chart' => ['type' => 'donut', 'positive' => $arrSentiment['positive'], 'neutral' => $arrSentiment['neutral'], 'negative' => $arrSentiment['negative']],
                 'breakdown' => null,
                 'columns' => [],
                 'rows' => [],
                 'filterable' => false,
-                'empty' => $sentimentTotal === 0,
+                'empty' => $intSentimentTotal === 0,
             ],
         ];
     }
@@ -343,12 +343,12 @@ class LguMockData
      * This municipality's approximate share of province-wide visits, used
      * to scale province-wide mock series down to a plausible municipal size.
      */
-    private static function municipalityShare(string $municipality): float
+    private static function municipalityShare(string $strMunicipality): float
     {
-        $comparison = collect(PtoMockData::municipalityComparison());
-        $total = $comparison->sum('visits') ?: 1;
-        $visits = $comparison->firstWhere('municipality', $municipality)['visits'] ?? 0;
+        $objComparison = collect(PtoMockData::municipalityComparison());
+        $intTotal = $objComparison->sum('visits') ?: 1;
+        $intVisits = $objComparison->firstWhere('municipality', $strMunicipality)['visits'] ?? 0;
 
-        return max(0.03, $visits / $total);
+        return max(0.03, $intVisits / $intTotal);
     }
 }

@@ -1,3 +1,10 @@
+{{--
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: PTO User Management page.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+--}}
 @php
     $roles = collect($users)->pluck('role')->unique()->sort()->values();
     $statusTone = fn ($status) => $status === 'Active' ? 'success' : 'danger';
@@ -58,8 +65,10 @@
                             $editValues = json_encode([
                                 'name' => $u['name'],
                                 'email' => $u['email'],
-                                'role' => $u['role'],
-                                'assignment' => $u['assignment'],
+                                'role' => $u['roleValue'],
+                                'municipality_id' => $u['municipalityId'],
+                                'establishment_id' => $u['establishmentId'],
+                                'phone' => $u['phone'],
                             ]);
                         @endphp
                         <tr
@@ -161,6 +170,7 @@
             action="{{ route('pto.users.store') }}"
             data-default-action="{{ route('pto.users.store') }}"
             data-default-method="POST"
+            data-establishments-url="{{ route('pto.users.availableEstablishments') }}"
             class="flex flex-col gap-4"
         >
             @csrf
@@ -175,14 +185,25 @@
             <div>
                 <label class="mb-1 block text-xs font-semibold text-sand-700">Role <span class="text-danger" aria-hidden="true">*</span></label>
                 <select name="role" required class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
-                    <option>PTO Administrator</option>
-                    <option>LGU Tourism Personnel</option>
-                    <option>Tourism Establishment</option>
+                    <option value="{{ \App\Enums\UserRole::Lgu->value }}">{{ \App\Enums\UserRole::Lgu->title() }}</option>
+                    <option value="{{ \App\Enums\UserRole::Establishment->value }}">{{ \App\Enums\UserRole::Establishment->title() }}</option>
+                    <option value="{{ \App\Enums\UserRole::PtoAdministrator->value }}">{{ \App\Enums\UserRole::PtoAdministrator->title() }}</option>
                 </select>
             </div>
-            <div>
-                <label class="mb-1 block text-xs font-semibold text-sand-700">Assigned Municipality / Establishment <span class="text-danger" aria-hidden="true">*</span></label>
-                <input name="assignment" type="text" required class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+            <div id="user-form-municipality-field">
+                <label class="mb-1 block text-xs font-semibold text-sand-700">Municipality <span class="text-danger" aria-hidden="true">*</span></label>
+                <select name="municipality_id" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                    <option value="">Select a municipality</option>
+                    @foreach ($municipalities as $m)
+                        <option value="{{ $m->mun_id }}">{{ $m->mun_name }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div id="user-form-establishment-field" hidden>
+                <label class="mb-1 block text-xs font-semibold text-sand-700">Establishment <span class="text-danger" aria-hidden="true">*</span></label>
+                <select name="establishment_id" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                    <option value="" disabled selected>Select a municipality first</option>
+                </select>
             </div>
         </form>
 
@@ -193,4 +214,55 @@
             </button>
         </x-slot:footer>
     </x-dashboard.modal>
+
+    {{--
+        One-time account-created confirmation panel. Opened automatically
+        by resources/js/user_account.js when `accountCreated` was flashed —
+        gone on the very next page load/reload, never stored client-side.
+    --}}
+    @if (session('accountCreated'))
+        @php($accountCreated = session('accountCreated'))
+        <x-dashboard.modal id="account-created-modal" title="Account Created">
+            <div class="flex flex-col gap-3">
+                <dl class="flex flex-col gap-2 text-sm">
+                    <div><dt class="text-xs font-semibold text-sand-500 uppercase">Name</dt><dd class="text-sand-800">{{ $accountCreated['name'] }}</dd></div>
+                    <div><dt class="text-xs font-semibold text-sand-500 uppercase">Role</dt><dd class="text-sand-800">{{ $accountCreated['role'] }}</dd></div>
+                    @if ($accountCreated['municipality'])
+                        <div><dt class="text-xs font-semibold text-sand-500 uppercase">Municipality</dt><dd class="text-sand-800">{{ $accountCreated['municipality'] }}</dd></div>
+                    @endif
+                </dl>
+
+                <div class="rounded-md border border-sand-300 bg-sand-50 p-3">
+                    <p class="text-xs font-semibold text-sand-700">Temporary Password</p>
+                    <div class="mt-1.5 flex items-center justify-between gap-2">
+                        <span id="account-created-passphrase" class="font-mono text-sm text-sand-900">{{ $accountCreated['passphrase'] }}</span>
+                        <button type="button" id="account-created-copy" class="shrink-0 rounded-sm border border-sand-300 bg-sand-0 px-2.5 py-1 text-xs font-semibold text-sand-800 hover:border-primary-300">Copy</button>
+                    </div>
+                </div>
+
+                <p class="text-xs text-sand-500">This password will not be shown again.</p>
+
+                <p id="account-created-email-status" @class(['rounded-sm px-3 py-2 text-xs', 'bg-warning-bg text-warning' => ! $accountCreated['emailSent'], 'hidden' => $accountCreated['emailSent']])>
+                    Email could not be sent. Please give the temporary password to the user directly.
+                </p>
+            </div>
+
+            <x-slot:footer>
+                @unless ($accountCreated['emailSent'])
+                    <button
+                        type="button"
+                        id="account-created-resend"
+                        data-user-id="{{ $accountCreated['userId'] }}"
+                        data-resend-url="{{ route('pto.users.resendWelcomeEmail') }}"
+                        class="rounded-sm border border-sand-300 bg-sand-0 px-4 py-2.5 text-sm font-semibold text-sand-800 hover:border-primary-300"
+                    >
+                        Send Welcome Email
+                    </button>
+                @endunless
+                <button type="button" data-modal-close class="rounded-sm bg-primary-700 px-4 py-2 text-sm font-semibold text-sand-0 hover:bg-primary-900">Done</button>
+            </x-slot:footer>
+        </x-dashboard.modal>
+    @endif
+
+    @vite(['resources/js/user_account.js'])
 </x-layouts.dashboard>

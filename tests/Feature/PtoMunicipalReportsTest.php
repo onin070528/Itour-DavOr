@@ -1,6 +1,15 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Tests — pto municipal reports.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 use App\Enums\UserRole;
+use App\Models\Municipality;
 use App\Models\MunicipalReport;
 use App\Models\User;
 
@@ -15,17 +24,20 @@ function actingAsPtoAdministrator(): User
 
 function makeMunicipalReport(array $overrides = []): MunicipalReport
 {
+    $municipality = Municipality::query()->firstOrCreate(['mun_code' => 'PTOMATI'], ['mun_name' => 'City of Mati']);
     $submitter = User::factory()->create([
         'usr_role' => UserRole::Lgu,
         'usr_organization_name' => 'City of Mati Tourism Office',
         'usr_organization_subtitle' => 'City of Mati',
+        'mun_id' => $municipality->mun_id,
     ]);
 
     return MunicipalReport::query()->create(array_merge([
         'mrp_municipality' => 'City of Mati',
+        'mun_id' => $municipality->mun_id,
         'mrp_submitted_by' => $submitter->usr_id,
-        'mrp_period_start' => '2026-08-01',
-        'mrp_period_end' => '2026-08-31',
+        'mrp_period_start' => now()->startOfMonth()->toDateString(),
+        'mrp_period_end' => now()->endOfMonth()->toDateString(),
         'mrp_total_arrivals' => 1000,
         'mrp_status' => MunicipalReport::STATUS_SUBMITTED,
     ], $overrides));
@@ -93,6 +105,28 @@ test('an approved municipal report cannot be approved or returned again', functi
 
     test()->actingAs($pto)->patch(route('pto.municipalReports.approve', $report))->assertForbidden();
     test()->actingAs($pto)->patch(route('pto.municipalReports.return', $report), ['remarks' => 'x'])->assertForbidden();
+});
+
+test('the LGU Submissions page uses the Not Submitted / For Review / For Clarification / Verified terminology', function () {
+    makeMunicipalReport(['mrp_status' => MunicipalReport::STATUS_SUBMITTED]);
+
+    $response = test()->actingAs(actingAsPtoAdministrator())->get(route('pto.municipalReports.index'));
+
+    $response->assertOk();
+    $response->assertSee('LGU Submissions');
+    $response->assertSee('For Review');
+});
+
+test('the LGU Submissions page lists every municipality for the selected period, flagging the ones with no report as Not Submitted', function () {
+    Municipality::query()->create(['mun_name' => 'City of Mati', 'mun_code' => 'PTOMATI']);
+    Municipality::query()->create(['mun_name' => 'Baganga', 'mun_code' => 'PTOBAG']);
+
+    $response = test()->actingAs(actingAsPtoAdministrator())->get(route('pto.municipalReports.index'));
+
+    $response->assertOk();
+    $response->assertSee('City of Mati');
+    $response->assertSee('Baganga');
+    $response->assertSee('Not Submitted');
 });
 
 test('a non-PTO user cannot access municipal reports routes', function () {

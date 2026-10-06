@@ -1,3 +1,10 @@
+{{--
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: Layout for the PTO, LGU and Establishment dashboards — sidebar, header and toasts.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+--}}
 @props([
     'user',
     'navSections' => [],
@@ -5,6 +12,7 @@
     'accountHeading' => 'Account',
     'profileHref' => null,
     'settingsHref' => '#',
+    'showBreadcrumb' => true,
 ])
 
 @php
@@ -55,17 +63,66 @@
             data-sidebar
             class="fixed inset-y-0 left-0 z-50 flex h-full w-64 max-w-[85vw] -translate-x-full flex-col overflow-hidden bg-primary-900 text-sand-0 transition-transform duration-200 standard:static standard:z-auto standard:max-w-none standard:min-w-64 standard:translate-x-0 standard:shrink-0 standard:transition-none"
         >
-            <div class="flex items-center justify-between px-5 pt-6 pb-4">
+            <div class="flex items-center px-5 pt-6 pb-4">
                 <a href="{{ url('/') }}" class="flex items-center gap-2">
                     <x-logo :dark="true" class="text-lg" />
                 </a>
-                <span class="rounded-sm bg-white/10 px-2 py-1 text-[10px] font-bold tracking-widest">{{ $user->usr_role->badge() }}</span>
             </div>
 
-            <div class="mx-4 mb-5 rounded-md bg-white/10 px-3.5 py-3">
-                <p class="text-sm font-semibold text-sand-0">{{ $user->usr_organization_name }}</p>
-                <p class="text-xs text-white/65">{{ $user->usr_organization_subtitle }}</p>
-            </div>
+            {{-- Role-based sidebar identity — one seal (the Provincial
+                 Tourism Office's own artwork, clipped into a circle on a
+                 white disc so it doesn't clash as a white square against
+                 the navy sidebar), but the title/subtitle and card treatment
+                 differ per role so PTO/LGU/Establishment each see their own
+                 identity instead of a generic province-wide label.
+                 bg-white/10 + border-white/10 is this app's own "card on the
+                 dark sidebar" idiom (already used by the nav's active-item
+                 state below) — used here in place of the slate/rounded-xl
+                 classes originally specified, since this codebase has no
+                 slate token and doesn't use rounded-xl anywhere. --}}
+            @if ($user->isPto())
+                <div class="flex items-center gap-3 px-5 pb-5">
+                    <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white p-0.5 shadow-sm">
+                        <img
+                            src="{{ asset('storage/itour-images/davor-tourism.jpg') }}"
+                            alt="Provincial Government of Davao Oriental — Tourism Office seal"
+                            class="h-full w-full rounded-full object-cover"
+                        >
+                    </span>
+                    <div class="min-w-0">
+                        <p class="truncate text-xs leading-tight font-semibold text-sand-0">Provincial Tourism Office</p>
+                        <p class="truncate text-[11px] leading-tight text-white/60">Davao Oriental</p>
+                    </div>
+                </div>
+            @elseif ($user->isLgu())
+                <div class="mx-4 mb-5 flex items-center gap-3 rounded-md border border-white/10 bg-white/10 p-3.5">
+                    <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white p-0.5 shadow-sm">
+                        <img
+                            src="{{ asset('storage/itour-images/davor-tourism.jpg') }}"
+                            alt="Provincial Government of Davao Oriental — Tourism Office seal"
+                            class="h-full w-full rounded-full object-cover"
+                        >
+                    </span>
+                    <div class="min-w-0">
+                        <p class="truncate text-sm leading-tight font-semibold text-sand-0">{{ $user->usr_organization_subtitle }} Tourism Office</p>
+                        <p class="truncate text-xs leading-tight text-white/65">Davao Oriental</p>
+                    </div>
+                </div>
+            @else
+                <div class="mx-4 mb-5 flex items-center gap-3 rounded-md border border-white/10 bg-white/10 p-3.5">
+                    <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white p-0.5 shadow-sm">
+                        <img
+                            src="{{ asset('storage/itour-images/davor-tourism.jpg') }}"
+                            alt="Provincial Government of Davao Oriental — Tourism Office seal"
+                            class="h-full w-full rounded-full object-cover"
+                        >
+                    </span>
+                    <div class="min-w-0">
+                        <p class="truncate text-sm leading-tight font-semibold text-sand-0">{{ $user->usr_organization_name }}</p>
+                        <p class="truncate text-xs leading-tight text-white/65">{{ $user->usr_organization_subtitle }}</p>
+                    </div>
+                </div>
+            @endif
 
             <nav class="flex-1 overflow-y-auto px-3 pb-4 [scrollbar-gutter:stable]" aria-label="Dashboard" data-nav>
                 @foreach ($navSections as $heading => $items)
@@ -136,7 +193,9 @@
                                             <i class="ti {{ $item['icon'] }} text-base" aria-hidden="true"></i>
                                             {{ $item['label'] }}
                                         </span>
-                                        @if ($item['soon'] ?? ! ($item['active'] ?? false))
+                                        @if (! empty($item['badge']))
+                                            <span class="rounded-full bg-accent-500 px-1.5 py-0.5 text-[10px] font-bold text-sand-0">{{ $item['badge'] }}</span>
+                                        @elseif ($item['soon'] ?? ! ($item['active'] ?? false))
                                             <span class="rounded-sm bg-white/10 px-1.5 py-0.5 text-[9px] font-semibold tracking-wide text-white/50 uppercase">Soon</span>
                                         @endif
                                     </a>
@@ -147,32 +206,6 @@
                 @endforeach
             </nav>
 
-            <div class="border-t border-white/10 px-3 py-4">
-                <p class="mb-1.5 px-2 text-[10px] font-bold tracking-widest text-white/45 uppercase">{{ $accountHeading }}</p>
-                <ul class="flex flex-col gap-0.5 text-sm text-white/78">
-                    <li>
-                        <a href="{{ $profileHref }}" class="flex items-center gap-2.5 rounded-sm px-2.5 py-2 hover:bg-white/10 hover:text-sand-0">
-                            <i class="ti ti-user-circle text-base" aria-hidden="true"></i>
-                            My Profile
-                        </a>
-                    </li>
-                    <li>
-                        <a href="{{ $settingsHref }}" class="flex items-center gap-2.5 rounded-sm px-2.5 py-2 hover:bg-white/10 hover:text-sand-0">
-                            <i class="ti ti-settings text-base" aria-hidden="true"></i>
-                            Settings
-                        </a>
-                    </li>
-                    <li>
-                        <form method="POST" action="{{ route('logout') }}">
-                            @csrf
-                            <button type="submit" class="flex w-full items-center gap-2.5 rounded-sm px-2.5 py-2 text-left hover:bg-white/10 hover:text-sand-0">
-                                <i class="ti ti-logout text-base" aria-hidden="true"></i>
-                                Log Out
-                            </button>
-                        </form>
-                    </li>
-                </ul>
-            </div>
         </aside>
 
         <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
@@ -189,9 +222,14 @@
                         <i class="ti ti-menu-2 text-lg" aria-hidden="true"></i>
                     </button>
 
-                    <p class="min-w-0 truncate text-sm text-sand-500">
-                        {{ $user->usr_role->title() }} <span class="mx-1 text-sand-300">/</span> <span class="font-semibold text-sand-900">{{ $pageTitle }}</span>
-                    </p>
+                    {{-- Provincial Reports already repeats the role/portal context shown
+                         in the sidebar header and account menu, so that page passes
+                         :show-breadcrumb="false" to skip it here. --}}
+                    @if ($showBreadcrumb)
+                        <p class="min-w-0 truncate text-sm text-sand-500">
+                            {{ $user->usr_role->title() }} <span class="mx-1 text-sand-300">/</span> <span class="font-semibold text-sand-900">{{ $pageTitle }}</span>
+                        </p>
+                    @endif
                 </div>
 
                 <div class="flex shrink-0 items-center gap-4">
@@ -200,14 +238,38 @@
                         <span class="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-accent-500"></span>
                     </button>
 
-                    <div class="flex items-center gap-2.5">
-                        <span class="flex h-9 w-9 items-center justify-center rounded-full bg-primary-100 font-display text-sm font-bold text-primary-700">
-                            {{ collect(explode(' ', $user->usr_name))->map(fn ($part) => mb_substr($part, 0, 1))->take(2)->implode('') }}
-                        </span>
-                        <span class="hidden leading-tight sm:block">
-                            <span class="block text-sm font-semibold text-sand-900">{{ $user->usr_name }}</span>
-                            <span class="block text-xs text-sand-500">{{ $user->usr_role->title() }}</span>
-                        </span>
+                    <div class="relative">
+                        <button type="button" data-dropdown-toggle class="flex cursor-pointer items-center gap-2.5 rounded-sm">
+                            <span class="flex h-9 w-9 items-center justify-center rounded-full bg-primary-100 font-display text-sm font-bold text-primary-700">
+                                {{ collect(explode(' ', $user->usr_name))->map(fn ($part) => mb_substr($part, 0, 1))->take(2)->implode('') }}
+                            </span>
+                            <span class="hidden leading-tight sm:block">
+                                <span class="block text-sm font-semibold text-sand-900">{{ $user->usr_name }}</span>
+                                <span class="block text-xs text-sand-500">{{ $user->usr_role->title() }}</span>
+                            </span>
+                            <i class="ti ti-chevron-down hidden text-sm text-sand-500 sm:block" aria-hidden="true"></i>
+                        </button>
+
+                        <div data-dropdown-menu class="absolute right-0 z-20 mt-2 hidden w-48 rounded-md border border-sand-200 bg-sand-0 py-1 shadow-md">
+                            <a href="{{ $profileHref }}" class="flex items-center gap-2.5 px-3.5 py-2 text-sm text-sand-700 hover:bg-sand-50">
+                                <i class="ti ti-user-circle text-base" aria-hidden="true"></i>
+                                My Profile
+                            </a>
+                            {{-- PTO keeps Settings as its own Administration nav item instead of here. --}}
+                            @unless ($user->isPto())
+                                <a href="{{ $settingsHref }}" class="flex items-center gap-2.5 px-3.5 py-2 text-sm text-sand-700 hover:bg-sand-50">
+                                    <i class="ti ti-settings text-base" aria-hidden="true"></i>
+                                    Settings
+                                </a>
+                            @endunless
+                            <form method="POST" action="{{ route('logout') }}">
+                                @csrf
+                                <button type="submit" class="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm text-sand-700 hover:bg-sand-50">
+                                    <i class="ti ti-logout text-base" aria-hidden="true"></i>
+                                    Log Out
+                                </button>
+                            </form>
+                        </div>
                     </div>
                 </div>
             </header>

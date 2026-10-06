@@ -1,5 +1,13 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Seeds sample municipal reports for the PTO review screens.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 namespace Database\Seeders;
 
 use App\Models\MunicipalReport;
@@ -18,9 +26,9 @@ class MunicipalReportSeeder extends Seeder
      */
     public function run(): void
     {
-        $pto = User::query()->where('usr_email', 'ebautista@davaooriental.gov.ph')->first();
+        $objPto = User::query()->where('usr_email', 'ebautista@davaooriental.gov.ph')->first();
 
-        $rows = [
+        $arrRows = [
             ['adizon@mati.gov.ph', 'City of Mati', '2026-08-01', '2026-08-31', 1240, MunicipalReport::STATUS_SUBMITTED, null, null],
             ['jreyes@cateel.gov.ph', 'Cateel', '2026-08-01', '2026-08-31', 410, MunicipalReport::STATUS_SUBMITTED, null, null],
             ['lmangubat@baganga.gov.ph', 'Baganga', '2026-07-01', '2026-07-31', 380, MunicipalReport::STATUS_APPROVED, 'Consistent with establishment-level totals.', '2026-08-05'],
@@ -28,20 +36,20 @@ class MunicipalReportSeeder extends Seeder
             ['adizon@mati.gov.ph', 'City of Mati', '2026-07-01', '2026-07-31', 1185, MunicipalReport::STATUS_APPROVED, 'Approved without changes.', '2026-08-03'],
         ];
 
-        foreach ($rows as [$email, $municipality, $periodStart, $periodEnd, $totalArrivals, $status, $remarks, $reviewedAt]) {
-            $submitter = User::query()->where('usr_email', $email)->first();
+        foreach ($arrRows as [$email, $objMunicipality, $periodStart, $periodEnd, $totalArrivals, $status, $remarks, $reviewedAt]) {
+            $objSubmitter = User::query()->where('usr_email', $email)->first();
 
-            if (! $submitter) {
+            if (! $objSubmitter) {
                 continue;
             }
 
             MunicipalReport::query()->updateOrCreate(
-                ['mrp_municipality' => $municipality, 'mrp_period_start' => $periodStart, 'mrp_period_end' => $periodEnd],
+                ['mrp_municipality' => $objMunicipality, 'mrp_period_start' => $periodStart, 'mrp_period_end' => $periodEnd],
                 [
-                    'mrp_submitted_by' => $submitter->usr_id,
+                    'mrp_submitted_by' => $objSubmitter->usr_id,
                     'mrp_total_arrivals' => $totalArrivals,
                     'mrp_status' => $status,
-                    'mrp_reviewed_by' => $reviewedAt ? $pto?->usr_id : null,
+                    'mrp_reviewed_by' => $reviewedAt ? $objPto?->usr_id : null,
                     'mrp_reviewed_at' => $reviewedAt,
                     'mrp_remarks' => $remarks,
                 ]

@@ -1,3 +1,10 @@
+{{--
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: Forgot-password page — requests a password reset link.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+--}}
 <x-layouts.auth title="Forgot Password">
     <h1 class="mt-6 text-xl sm:text-2xl">Forgot your password?</h1>
     <p class="mt-1.5 text-sm text-sand-600">Enter the email for your iTOUR account and we'll send you a link to set a new password. New accounts use this to set their password for the first time.</p>

@@ -11,11 +11,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\ArrivalOriginScope;
+use App\Enums\ArrivalSource;
 use App\Models\Listing;
-use App\Support\TourismCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class CheckinController extends Controller
@@ -23,20 +26,37 @@ class CheckinController extends Controller
     /**
      * Visitor self-registration form, reached by scanning the QR code
      * posted at a registered establishment. {establishment} is the
-     * listing's id slug (e.g. "dahican-surf-guides") — the same id every
-     * establishment's QR code encodes (see Establishment\ProfileController
-     * ::qr), so each establishment gets its own unique, stable check-in
-     * link and the form always knows which establishment it's for.
+     * listing's uuid — the same id every establishment's QR code encodes
+     * (see Establishment\ProfileController::qr), so each establishment gets
+     * its own unique, stable check-in link that survives the listing's
+     * slug changing later.
+     *
+     * Validates the QR identifier (a real, existing listing) and then
+     * Listing::isQrEnabled() before showing the form at all — a Tour Guide,
+     * an "Others" record, a suspended/inactive record, or a category with
+     * QR scanning switched off all show a refusal message instead, per the
+     * single QR rule.
      */
     public function show(string $establishment): View
     {
-        $listing = collect(TourismCatalog::listings())->firstWhere('id', $establishment);
+        $objListing = Listing::query()->where('lst_uuid', $establishment)->first();
 
-        abort_if(! $listing, 404);
+        abort_if(! $objListing, 404);
+
+        if (! $objListing->isQrEnabled()) {
+            return view('lgu.establishmentQR', [
+                'establishmentName' => $objListing->lst_name,
+                'checkinAction' => null,
+                'refusalMessage' => 'This establishment is not accepting registrations.',
+            ]);
+        }
 
         return view('lgu.establishmentQR', [
-            'establishmentName' => $listing['name'],
+            'establishmentName' => $objListing->lst_name,
+            'provinces' => config('ph_provinces'),
+            'countries' => config('countries'),
             'checkinAction' => route('checkin.store', $establishment),
+            'refusalMessage' => null,
         ]);
     }
 
@@ -47,11 +67,23 @@ class CheckinController extends Controller
      * Persists one `self_checkin` arrival row — a party, described by the
      * counters on the form — against the scanned establishment.
      */
-    public function store(Request $request, string $establishment): JsonResponse
+    public function store(Request $objRequest, string $establishment): JsonResponse
     {
-        $listing = Listing::query()->where('lst_slug', $establishment)->firstOrFail();
+        $objListing = Listing::query()->where('lst_uuid', $establishment)->firstOrFail();
 
-        $data = $request->validate([
+        // Defense in depth: show() already refuses the form, but the QR
+        // switch (Settings > Categories) or a status change could happen
+        // between the scan and the submit — never save in that case.
+        if (! $objListing->isQrEnabled()) {
+            return response()->json(['message' => 'This establishment is not accepting registrations.'], 422);
+        }
+
+        $arrData = Validator::make($objRequest->all(), [
+            // Honeypot: real visitors never see or fill this field (see
+            // resources/views/lgu/establishmentQR.blade.php). A filled value
+            // means a bot submitted the form, so the whole request fails
+            // validation and nothing is saved.
+            'website' => ['prohibited'],
             'visitorName' => ['required', 'string', 'max:255'],
             'visitorContact' => ['required', 'string', 'max:255'],
             'male' => ['nullable', 'integer', 'min:0'],
@@ -61,29 +93,54 @@ class CheckinController extends Controller
             'seniors' => ['nullable', 'integer', 'min:0'],
             'local' => ['nullable', 'integer', 'min:0'],
             'foreign' => ['nullable', 'integer', 'min:0'],
-        ]);
+            'localOriginScope' => [
+                'nullable',
+                Rule::enum(ArrivalOriginScope::class),
+                Rule::prohibitedIf((int) $objRequest->input('local', 0) <= 0),
+            ],
+            'localOriginPlace' => [
+                'nullable', 'string', 'max:100',
+                Rule::requiredIf($objRequest->input('localOriginScope') === ArrivalOriginScope::OutsideProvince->value),
+                Rule::prohibitedIf($objRequest->input('localOriginScope') !== ArrivalOriginScope::OutsideProvince->value),
+            ],
+            'foreignCountry' => [
+                'nullable', 'string', 'max:100',
+                Rule::prohibitedIf((int) $objRequest->input('foreign', 0) <= 0),
+            ],
+        ])->after(function ($objValidator) use ($objRequest) {
+            // Counting rule: the companion grid now includes the lead
+            // visitor (see resources/js/app.js's updateTotal()), so the
+            // group's total headcount is the grid sum itself — never 0.
+            $intTotal = (int) $objRequest->input('male', 0) + (int) $objRequest->input('female', 0);
+            if ($intTotal < 1) {
+                $objValidator->errors()->add('male', 'Add at least one guest to the headcount.');
+            }
+        })->validate();
 
-        $companions = collect(['male', 'female', 'adults', 'children', 'seniors', 'local', 'foreign'])
-            ->mapWithKeys(fn ($key) => [$key => (int) ($data[$key] ?? 0)]);
+        $objCompanions = collect(['male', 'female', 'adults', 'children', 'seniors', 'local', 'foreign'])
+            ->mapWithKeys(fn ($key) => [$key => (int) ($arrData[$key] ?? 0)]);
 
         try {
-            $listing->arrivals()->create([
-                'arr_source' => 'self_checkin',
+            $objListing->arrivals()->create([
+                'arr_source' => ArrivalSource::SelfCheckin,
                 'arr_date' => now()->toDateString(),
-                'arr_visitor_name' => $data['visitorName'],
-                'arr_visitor_contact' => $data['visitorContact'],
-                'arr_party_male' => $companions['male'],
-                'arr_party_female' => $companions['female'],
-                'arr_party_adults' => $companions['adults'],
-                'arr_party_children' => $companions['children'],
-                'arr_party_seniors' => $companions['seniors'],
-                'arr_party_local' => $companions['local'],
-                'arr_party_foreign' => $companions['foreign'],
-                'arr_party_size' => 1 + $companions['male'] + $companions['female'],
+                'arr_visitor_name' => $arrData['visitorName'],
+                'arr_visitor_contact' => $arrData['visitorContact'],
+                'arr_party_male' => $objCompanions['male'],
+                'arr_party_female' => $objCompanions['female'],
+                'arr_party_adults' => $objCompanions['adults'],
+                'arr_party_children' => $objCompanions['children'],
+                'arr_party_seniors' => $objCompanions['seniors'],
+                'arr_party_local' => $objCompanions['local'],
+                'arr_party_foreign' => $objCompanions['foreign'],
+                'arr_party_size' => $objCompanions['male'] + $objCompanions['female'],
+                'arr_local_origin_scope' => $arrData['localOriginScope'] ?? null,
+                'arr_local_origin_place' => $arrData['localOriginPlace'] ?? null,
+                'arr_foreign_country' => $arrData['foreignCountry'] ?? null,
                 'arr_status' => 'Recorded',
             ]);
-        } catch (\Throwable $e) {
-            Log::error('Failed to record self check-in.', ['exception' => $e, 'establishment' => $establishment]);
+        } catch (\Throwable $objException) {
+            Log::error('Failed to record self check-in.', ['exception' => $objException, 'establishment' => $establishment]);
 
             return response()->json(['message' => 'Something went wrong while submitting your check-in. Please try again.'], 500);
         }

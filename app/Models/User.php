@@ -23,8 +23,18 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Notifications\Notification;
 
+/**
+ * `mun_id`/`lst_id`/`usr_created_by` stay in #[Fillable] for legitimate
+ * admin-initiated create/update calls (Pto\UsersController,
+ * Lgu\UsersController), but no controller ever mass-assigns them from raw
+ * request input — every write path is an explicit, role-checked field
+ * assignment. Self-service settings (Concerns\UpdatesAccountSettings)
+ * validate by an allow-list that excludes usr_role/usr_status/mun_id/lst_id/
+ * usr_created_by entirely, so a user can never change their own scope or
+ * forge who created them.
+ */
 #[Table('tbl_users', key: 'usr_id')]
-#[Fillable(['usr_name', 'usr_email', 'usr_password', 'usr_role', 'usr_organization_name', 'usr_organization_subtitle', 'usr_status', 'mun_id', 'lst_id'])]
+#[Fillable(['usr_name', 'usr_email', 'usr_password', 'usr_role', 'usr_organization_name', 'usr_organization_subtitle', 'usr_status', 'mun_id', 'lst_id', 'usr_created_by', 'usr_must_change_password', 'usr_password_changed_at', 'usr_phone'])]
 #[Hidden(['usr_password', 'usr_remember_token'])]
 class User extends Authenticatable
 {
@@ -58,6 +68,8 @@ class User extends Authenticatable
             'usr_last_login_at' => 'datetime',
             'usr_password' => 'hashed',
             'usr_role' => UserRole::class,
+            'usr_must_change_password' => 'boolean',
+            'usr_password_changed_at' => 'datetime',
         ];
     }
 
@@ -72,9 +84,20 @@ class User extends Authenticatable
     /**
      * Mail notifications (e.g. the password reset link) go to usr_email.
      */
-    public function routeNotificationForMail(Notification $notification): string
+    public function routeNotificationForMail(Notification $objNotification): string
     {
         return $this->usr_email;
+    }
+
+    /**
+     * True for an account that must set its own password before reaching
+     * any other page — a brand-new account created with a temporary
+     * passphrase (see App\Http\Middleware\ForcePasswordChange). Always
+     * false for every account that existed before this feature shipped.
+     */
+    public function mustChangePassword(): bool
+    {
+        return (bool) $this->usr_must_change_password;
     }
 
     public function municipality(): BelongsTo
@@ -93,17 +116,41 @@ class User extends Authenticatable
     }
 
     /**
+     * The account that created this one (PTO creates LGU accounts, LGU
+     * creates Establishment accounts). Null for pre-existing seeded rows.
+     */
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'usr_created_by', 'usr_id');
+    }
+
+    public function isPto(): bool
+    {
+        return $this->usr_role === UserRole::PtoAdministrator;
+    }
+
+    public function isLgu(): bool
+    {
+        return $this->usr_role === UserRole::Lgu;
+    }
+
+    public function isEstablishment(): bool
+    {
+        return $this->usr_role === UserRole::Establishment;
+    }
+
+    /**
      * PTO sees every user; LGU sees only Establishment-role users in its
      * own municipality; Establishment sees only itself.
      */
-    public function scopeVisibleTo(Builder $query, self $user): Builder
+    public function scopeVisibleTo(Builder $objQuery, self $objUser): Builder
     {
-        return match ($user->usr_role) {
-            UserRole::PtoAdministrator => $query,
-            UserRole::Lgu => $query->where('usr_role', UserRole::Establishment)
-                ->where('mun_id', $user->mun_id),
-            UserRole::Establishment => $query->where('usr_id', $user->usr_id),
-            default => $query->whereRaw('1 = 0'),
+        return match ($objUser->usr_role) {
+            UserRole::PtoAdministrator => $objQuery,
+            UserRole::Lgu => $objQuery->where('usr_role', UserRole::Establishment)
+                ->where('mun_id', $objUser->mun_id),
+            UserRole::Establishment => $objQuery->where('usr_id', $objUser->usr_id),
+            default => $objQuery->whereRaw('1 = 0'),
         };
     }
 }

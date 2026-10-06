@@ -1,3 +1,10 @@
+{{--
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: Call-to-action band shown on the public pages.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+--}}
 <section class="bg-sand-100">
     <div class="mx-auto max-w-[1200px] px-4 py-16 sm:px-6 lg:px-8">
         <div class="overflow-hidden rounded-lg bg-primary-900 p-8 sm:flex sm:items-center sm:justify-between sm:gap-10 sm:p-12">

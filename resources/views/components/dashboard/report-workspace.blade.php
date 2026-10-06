@@ -1,3 +1,11 @@
+{{--
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: Tabbed report workspace — summary cards, charts and tables — shared by the role
+    dashboards.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+--}}
 @props([
     'user',
     'reportTypes',

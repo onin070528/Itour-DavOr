@@ -1,3 +1,10 @@
+{{--
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: Dashboard modal dialog wrapper.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+--}}
 @props(['id', 'title', 'maxWidth' => 'max-w-lg'])
 
 <div id="{{ $id }}" data-modal class="fixed inset-0 z-50 hidden">

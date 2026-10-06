@@ -1,5 +1,31 @@
+{{--
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: Public landing page.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+--}}
 <x-layouts.public>
     <x-hero-section />
+
+    @if ($announcements->isNotEmpty())
+        <section class="border-b border-sand-200 bg-primary-50">
+            <div class="mx-auto flex max-w-[1200px] flex-col gap-3 px-4 py-5 sm:px-6 lg:px-8">
+                @foreach ($announcements as $announcement)
+                    <div class="flex flex-wrap items-start gap-3 text-sm">
+                        <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-primary-700 px-2.5 py-1 text-xs font-semibold text-sand-0">
+                            <i class="ti ti-speakerphone" aria-hidden="true"></i>
+                            {{ $announcement->ann_type }}
+                        </span>
+                        <p class="text-sand-800">
+                            <span class="font-semibold text-sand-900">{{ $announcement->ann_title }}</span>
+                            — {{ $announcement->ann_body }}
+                        </p>
+                    </div>
+                @endforeach
+            </div>
+        </section>
+    @endif
 
     {{-- Signature Experiences: a curated mix of destinations and
          establishments in one showcase (see

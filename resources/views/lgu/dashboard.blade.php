@@ -1,3 +1,10 @@
+{{--
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: LGU dashboard for the account's municipality.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+--}}
 @php
     $trendLabels = ['week' => 'This Week', 'month' => 'This Month', 'year' => 'This Year'];
     $sentimentTotal = array_sum($sentiment);
@@ -10,9 +17,9 @@
         description="Tourist arrivals, destinations, establishments, and tourist experience for {{ $municipality }}."
     >
         <x-slot:actions>
-            <a href="{{ route('lgu.reports') }}" class="inline-flex items-center gap-2 rounded-sm border border-sand-300 bg-sand-0 px-4 py-2.5 text-sm font-semibold text-sand-800 hover:border-primary-300">
+            <a href="{{ route('lgu.monthlyReports.index') }}" class="inline-flex items-center gap-2 rounded-sm border border-sand-300 bg-sand-0 px-4 py-2.5 text-sm font-semibold text-sand-800 hover:border-primary-300">
                 <i class="ti ti-file-report" aria-hidden="true"></i>
-                Generate Report
+                Monthly Reports
             </a>
             <a href="{{ route('lgu.feedback.analytics') }}" class="inline-flex items-center gap-2 rounded-sm bg-accent-500 px-4 py-2.5 text-sm font-semibold text-sand-0 hover:bg-accent-600">
                 <i class="ti ti-heart-handshake" aria-hidden="true"></i>
@@ -92,7 +99,7 @@
         <div class="rounded-md border border-sand-200 bg-sand-0 p-5 lg:col-span-2">
             <div class="flex items-center justify-between">
                 <h2 class="font-display text-base font-bold text-sand-900">Top Destinations</h2>
-                <a href="{{ route('lgu.monitoring.destinations') }}" class="text-xs font-semibold text-primary-700 hover:text-primary-900">View all</a>
+                <a href="{{ route('lgu.directory.destinations') }}" class="text-xs font-semibold text-primary-700 hover:text-primary-900">View all</a>
             </div>
 
             @if (count($topDestinations))
@@ -172,13 +179,12 @@
     {{-- Quick Actions --}}
     <div class="mt-6 rounded-md border border-sand-200 bg-sand-0 p-5">
         <h2 class="font-display text-base font-bold text-sand-900">Quick Actions</h2>
-        <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             @foreach ([
-                ['icon' => 'ti-users', 'label' => 'View Tourist Arrivals', 'href' => route('lgu.monitoring.arrivals')],
+                ['icon' => 'ti-calendar-event', 'label' => 'Monthly Reports', 'href' => route('lgu.monthlyReports.index')],
                 ['icon' => 'ti-map-pin', 'label' => 'Manage Destinations', 'href' => route('lgu.directory.destinations')],
                 ['icon' => 'ti-building-store', 'label' => 'View Establishments', 'href' => route('lgu.directory.establishments')],
                 ['icon' => 'ti-message-2', 'label' => 'View Feedback', 'href' => route('lgu.feedback.index')],
-                ['icon' => 'ti-file-report', 'label' => 'Generate Report', 'href' => route('lgu.reports')],
             ] as $action)
                 <a href="{{ $action['href'] }}" class="flex items-center gap-2.5 rounded-md border border-sand-200 px-3.5 py-3 text-sm font-semibold text-sand-800 transition-colors hover:border-primary-300 hover:text-primary-700">
                     <i class="ti {{ $action['icon'] }} text-primary-700" aria-hidden="true"></i>

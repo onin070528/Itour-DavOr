@@ -13,12 +13,14 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use App\Support\AuditLogger;
+use App\Support\SessionSecurity;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rules\Password as PasswordRule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
@@ -27,40 +29,51 @@ class NewPasswordController extends Controller
     /**
      * Show the "Set a new password" form for the emailed token.
      */
-    public function create(Request $request, string $token): View
+    public function create(Request $objRequest, string $token): View
     {
         return view('auth.reset-password', [
             'token' => $token,
-            'email' => $request->query('email', ''),
+            'email' => $objRequest->query('email', ''),
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $objRequest): RedirectResponse
     {
-        $request->validate([
+        $objRequest->validate([
             'token' => ['required', 'string'],
             'email' => ['required', 'string', 'email'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'password' => ['required', 'confirmed', PasswordRule::default()],
         ]);
 
-        $status = Password::reset(
-            [
-                'usr_email' => $request->input('email'),
-                ...$request->only('password', 'password_confirmation', 'token'),
-            ],
-            function (User $user, string $password): void {
-                $user->forceFill([
-                    'usr_password' => $password,
-                    'usr_remember_token' => Str::random(60),
-                ])->save();
+        try {
+            $strStatus = Password::reset(
+                [
+                    'usr_email' => $objRequest->input('email'),
+                    ...$objRequest->only('password', 'password_confirmation', 'token'),
+                ],
+                function (User $objUser, string $strPassword): void {
+                    $objUser->forceFill([
+                        'usr_password' => $strPassword,
+                        'usr_remember_token' => Str::random(60),
+                    ])->save();
 
-                event(new PasswordReset($user));
+                    // Fires Illuminate\Auth\Events\PasswordReset, which
+                    // App\Listeners\LogPasswordResetCompleted turns into a
+                    // security_log row.
+                    event(new PasswordReset($objUser));
 
-                AuditLogger::record($user, 'password.reset');
-            }
-        );
+                    SessionSecurity::invalidateOtherSessionsFor($objUser);
+                }
+            );
+        } catch (\Throwable $objException) {
+            Log::error('Failed to reset a password.', ['exception' => $objException]);
 
-        if ($status !== Password::PASSWORD_RESET) {
+            throw ValidationException::withMessages([
+                'email' => __('Something went wrong while saving your new password. Please try again.'),
+            ]);
+        }
+
+        if ($strStatus !== Password::PASSWORD_RESET) {
             throw ValidationException::withMessages([
                 'email' => __('This password reset link is invalid or has expired. Request a new one.'),
             ]);

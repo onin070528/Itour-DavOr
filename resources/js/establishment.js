@@ -1,14 +1,12 @@
 import Alpine from 'alpinejs';
-import QRCode from 'qrcode';
 
 /**
  * Establishment-specific frontend interactions that don't belong in the
  * shared dashboard.js engine: the Record Arrival page's reactive
- * Alpine.js form (see arrivalForm() below), auto-submitting the
- * Establishment Profile image gallery's hidden upload form, and rendering
- * the establishment's QR code (resources/views/establishment/qr.blade.php)
- * client-side (via the `qrcode` package). Every action here is now backed
- * by a real endpoint — see App\Http\Controllers\Establishment.
+ * Alpine.js form (see arrivalForm() below), and the download/print actions
+ * on the establishment's QR code page (resources/views/establishment/qr.blade.php).
+ * The QR code itself is rendered server-side as SVG (simplesoftwareio/simple-qrcode)
+ * directly in the Blade view — this file only wires up its buttons.
  *
  * Alpine is scoped to this bundle only (not app.js/dashboard.js, which stay
  * on the rest of the app's plain data-attribute JS convention) since Record
@@ -19,17 +17,14 @@ Alpine.data('arrivalForm', arrivalForm);
 Alpine.start();
 
 document.addEventListener('DOMContentLoaded', () => {
-    initImageGallery();
     initQrActions();
 });
 
 function initQrActions() {
-    renderEstablishmentQr();
-
     document.getElementById('qr-print')?.addEventListener('click', () => window.print());
 
     document.getElementById('qr-download')?.addEventListener('click', (e) => {
-        const svg = document.getElementById('establishment-qr-svg');
+        const svg = document.getElementById('establishment-qr-svg')?.querySelector('svg');
         if (!svg) return;
 
         const source = new XMLSerializer().serializeToString(svg);
@@ -43,30 +38,6 @@ function initQrActions() {
         a.remove();
         URL.revokeObjectURL(url);
     });
-}
-
-/**
- * Renders a real, scannable SVG QR code into #establishment-qr-mount,
- * encoding that element's `data-qr-value` — this establishment's unique
- * check-in URL (routes/web.php's /checkin/{establishment}). Replaces the
- * old decorative placeholder pattern, which only ever looked like a QR
- * code and could never actually be scanned.
- */
-function renderEstablishmentQr() {
-    const mount = document.getElementById('establishment-qr-mount');
-    const value = mount?.dataset.qrValue;
-    if (!mount || !value) return;
-
-    QRCode.toString(value, { type: 'svg', margin: 1, width: 256 })
-        .then((svg) => {
-            mount.innerHTML = svg;
-            const svgEl = mount.querySelector('svg');
-            svgEl?.setAttribute('id', 'establishment-qr-svg');
-            svgEl?.classList.add('h-full', 'w-full');
-        })
-        .catch(() => {
-            mount.innerHTML = '<span class="text-xs text-danger">Couldn\'t generate QR code.</span>';
-        });
 }
 
 /**
@@ -90,6 +61,9 @@ function arrivalForm(actionUrl, defaultDate) {
         date: defaultDate,
         leadVisitorName: '',
         visitType: 'Daytour',
+        localOriginScope: '',
+        localOriginPlace: '',
+        foreignCountry: '',
         submitting: false,
         guests: emptyGuestMatrix(),
         ageRows: [
@@ -130,11 +104,15 @@ function arrivalForm(actionUrl, defaultDate) {
         },
 
         get totalPeople() {
-            return 1 + this.localTotal + this.foreignTotal;
+            return this.localTotal + this.foreignTotal;
         },
 
         async submit() {
             if (!this.$refs.form.reportValidity()) return;
+            if (this.totalPeople < 1) {
+                window.dispatchEvent(new CustomEvent('itour:toast', { detail: { message: 'Add at least one guest to the headcount.', tone: 'danger' } }));
+                return;
+            }
 
             this.submitting = true;
 
@@ -150,6 +128,9 @@ function arrivalForm(actionUrl, defaultDate) {
                         date: this.date,
                         visitorName: this.leadVisitorName,
                         visitType: this.visitType,
+                        localOriginScope: this.localTotal > 0 ? this.localOriginScope : null,
+                        localOriginPlace: this.localTotal > 0 && this.localOriginScope === 'outside_province' ? this.localOriginPlace : null,
+                        foreignCountry: this.foreignTotal > 0 ? this.foreignCountry : null,
                         ...this.sums(),
                     }),
                 });
@@ -162,6 +143,9 @@ function arrivalForm(actionUrl, defaultDate) {
 
                 this.leadVisitorName = '';
                 this.visitType = 'Daytour';
+                this.localOriginScope = '';
+                this.localOriginPlace = '';
+                this.foreignCountry = '';
                 this.date = defaultDate;
                 this.guests = emptyGuestMatrix();
             } catch {
@@ -182,21 +166,3 @@ function emptyGuestMatrix() {
     };
 }
 
-/**
- * Set-as-Featured, Remove, and Add Image are each a real per-photo
- * `<form>` now (resources/views/establishment/profile.blade.php) — Set-
- * as-Featured and Remove submit like any other form (Remove goes through
- * the shared confirm-dialog flow in dashboard.js first), so the only
- * gallery-specific behavior left here is auto-submitting the hidden Add
- * Image form the moment a file is chosen.
- */
-function initImageGallery() {
-    const uploadForm = document.getElementById('image-upload-form');
-    const addInput = document.getElementById('image-upload-input');
-
-    addInput?.addEventListener('change', () => {
-        if (addInput.files?.length) {
-            uploadForm.submit();
-        }
-    });
-}

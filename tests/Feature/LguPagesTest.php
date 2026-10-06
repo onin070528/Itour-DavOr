@@ -1,5 +1,13 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Tests — lgu pages.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 use App\Enums\UserRole;
 use App\Models\Municipality;
 use App\Models\User;
@@ -25,14 +33,12 @@ test('every LGU page renders for a municipality with data', function (string $ro
     test()->actingAs($user)->get(route($routeName))->assertOk();
 })->with([
     'lgu.dashboard',
-    'lgu.monitoring.arrivals',
-    'lgu.monitoring.statistics',
-    'lgu.monitoring.destinations',
     'lgu.directory.destinations',
     'lgu.directory.establishments',
+    'lgu.monthlyReports.index',
     'lgu.feedback.index',
     'lgu.feedback.analytics',
-    'lgu.reports',
+    'lgu.images.index',
     'lgu.settings',
     'lgu.users',
 ]);
@@ -43,17 +49,22 @@ test('every LGU page renders for a municipality with no mock data (empty states)
     test()->actingAs($user)->get(route($routeName))->assertOk();
 })->with([
     'lgu.dashboard',
-    'lgu.monitoring.arrivals',
-    'lgu.monitoring.statistics',
-    'lgu.monitoring.destinations',
     'lgu.directory.destinations',
     'lgu.directory.establishments',
+    'lgu.monthlyReports.index',
     'lgu.feedback.index',
     'lgu.feedback.analytics',
-    'lgu.reports',
+    'lgu.images.index',
     'lgu.settings',
     'lgu.users',
 ]);
+
+test('the old Photo Approvals URL redirects to the Photos page\'s approval tab', function () {
+    $user = actingAsLgu('City of Mati');
+
+    test()->actingAs($user)->get(route('lgu.images.queue'))
+        ->assertRedirect(route('lgu.images.index', ['tab' => 'approval']));
+});
 
 test('the dashboard only shows data scoped to the LGU\'s own municipality', function () {
     $user = actingAsLgu('Cateel');

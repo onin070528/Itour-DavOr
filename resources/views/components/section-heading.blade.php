@@ -1,3 +1,10 @@
+{{--
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: Public section heading with eyebrow text.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+--}}
 @props(['eyebrow' => null, 'description' => null, 'actionLabel' => null, 'actionHref' => null, 'actionId' => null])
 
 <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">

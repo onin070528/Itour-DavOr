@@ -1,13 +1,15 @@
+{{--
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: Listing card used by the Explore page.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+--}}
 @props(['listing'])
 
 <article class="group flex flex-col overflow-hidden rounded-md border border-sand-200 bg-sand-0 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
     <div class="relative h-44 overflow-hidden bg-sand-200">
-        <img
-            src="{{ asset('storage/itour-images/'.$listing['image']) }}"
-            alt="{{ $listing['name'] }}"
-            loading="lazy"
-            class="absolute inset-0 h-full w-full object-cover"
-        >
+        <x-listing-photo :listing="$listing" />
         <div class="pointer-events-none absolute inset-0 bg-gradient-to-t from-sand-900/55 via-transparent to-transparent"></div>
         <span class="relative m-3 inline-block rounded-sm bg-sand-900/45 px-2.5 py-1 text-xs font-semibold text-sand-0">
             {{ \App\Support\TourismCatalog::categoryLabel($listing['category']) }}

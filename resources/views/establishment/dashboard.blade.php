@@ -1,3 +1,10 @@
+{{--
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: Establishment dashboard.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+--}}
 @php
     $trendLabels = ['week' => 'This Week', 'month' => 'This Month', 'year' => 'This Year'];
     $totalClassified = $classificationBreakdown->sum();
@@ -95,7 +102,7 @@
                         <div class="flex items-center gap-3">
                             <span class="w-44 shrink-0 truncate text-sm text-sand-700">{{ $classification }}</span>
                             <div class="h-2.5 flex-1 rounded-full bg-sand-100">
-                                <div class="h-2.5 rounded-full bg-primary-700" style="width: {{ max(4, round(($count / $totalClassified) * 100)) }}%"></div>
+                                <div class="h-2.5 rounded-full bg-primary-700" @style(['width' => max(4, round(($count / $totalClassified) * 100)) . '%'])></div>
                             </div>
                             <span class="w-8 shrink-0 text-right text-sm font-semibold text-sand-800">{{ $count }}</span>
                         </div>
@@ -139,7 +146,7 @@
                 ['icon' => 'ti-list-details', 'label' => 'View Arrival Records', 'href' => route('establishment.arrivals.index')],
                 ['icon' => 'ti-building-store', 'label' => 'View My Establishment', 'href' => route('establishment.profile')],
                 ['icon' => 'ti-message-2', 'label' => 'View Feedback', 'href' => route('establishment.feedback.index')],
-                ['icon' => 'ti-file-report', 'label' => 'Generate Report', 'href' => route('establishment.reports')],
+                ['icon' => 'ti-calendar-event', 'label' => 'Monthly Reports', 'href' => route('establishment.arrivals.monthly')],
             ] as $action)
                 <a href="{{ $action['href'] }}" class="flex items-center gap-2.5 rounded-md border border-sand-200 px-3.5 py-3 text-sm font-semibold text-sand-800 transition-colors hover:border-primary-300 hover:text-primary-700">
                     <i class="ti {{ $action['icon'] }} text-primary-700" aria-hidden="true"></i>

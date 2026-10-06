@@ -23,10 +23,10 @@ class SettingsController extends EstablishmentController
     /**
      * Settings: account profile, contact information, and preferences.
      */
-    public function index(Request $request): View
+    public function index(Request $objRequest): View
     {
-        return $this->renderEstablishment($request, 'establishment.settings', 'settings', 'Settings', [
-            'preferences' => $this->notificationPreferencesFor($request->user()->usr_id),
+        return $this->renderEstablishment($objRequest, 'establishment.settings', 'settings', 'Settings', [
+            'preferences' => $this->notificationPreferencesFor($objRequest->user()->usr_id),
         ]);
     }
 

@@ -1,5 +1,13 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Seeds the municipalities of Davao Oriental.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 namespace Database\Seeders;
 
 use App\Models\Municipality;
@@ -17,7 +25,7 @@ class MunicipalitySeeder extends Seeder
      */
     public function run(): void
     {
-        $rows = [
+        $arrRows = [
             ['Boston', 'BOS'],
             ['Cateel', 'CAT'],
             ['Baganga', 'BAG'],
@@ -31,8 +39,8 @@ class MunicipalitySeeder extends Seeder
             ['Banaybanay', 'BNB'],
         ];
 
-        foreach ($rows as [$name, $code]) {
-            Municipality::query()->updateOrCreate(['mun_code' => $code], ['mun_name' => $name]);
+        foreach ($arrRows as [$strName, $code]) {
+            Municipality::query()->updateOrCreate(['mun_code' => $code], ['mun_name' => $strName]);
         }
     }
 }

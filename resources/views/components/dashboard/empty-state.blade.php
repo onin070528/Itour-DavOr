@@ -1,3 +1,10 @@
+{{--
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: Dashboard empty-state placeholder with an optional action.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+--}}
 @props(['icon' => 'ti-map-search', 'title' => 'Nothing here yet', 'description' => null])
 
 <div {{ $attributes->class(['flex flex-col items-center justify-center rounded-md border border-sand-200 bg-sand-0 px-6 py-16 text-center']) }}>

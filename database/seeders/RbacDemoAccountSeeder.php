@@ -1,5 +1,13 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Seeds the PTO, LGU and Establishment demo accounts and their demo establishments.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 namespace Database\Seeders;
 
 use App\Enums\UserRole;
@@ -24,18 +32,18 @@ class RbacDemoAccountSeeder extends Seeder
             return;
         }
 
-        $password = env('SEED_DEMO_PASSWORD');
+        $strPassword = env('SEED_DEMO_PASSWORD');
 
-        if (! $password) {
+        if (! $strPassword) {
             $this->command?->warn('RbacDemoAccountSeeder: skipped — SEED_DEMO_PASSWORD is not set in .env.');
 
             return;
         }
 
-        $mati = Municipality::query()->where('mun_code', 'MATI')->first();
-        $baganga = Municipality::query()->where('mun_code', 'BAG')->first();
+        $objMati = Municipality::query()->where('mun_code', 'MATI')->first();
+        $objBaganga = Municipality::query()->where('mun_code', 'BAG')->first();
 
-        if (! $mati || ! $baganga) {
+        if (! $objMati || ! $objBaganga) {
             $this->command?->warn('RbacDemoAccountSeeder: skipped — run MunicipalitySeeder first.');
 
             return;
@@ -48,22 +56,23 @@ class RbacDemoAccountSeeder extends Seeder
         // establishment also doubles as the cross-municipality-denial test
         // fixture used by tests/Feature/Rbac/MunicipalityScopingTest.php.
         //
-        // status stays 'Pending Review' (not 'Active') so these no-image,
+        // status stays 'DRAFT' (not 'PUBLISHED') so these no-image,
         // no-rating placeholders never surface in public-facing curation
         // (TourismCatalog::featuredEstablishments()/signatureExperiences(),
-        // the /explore hub — both filter to Active only). The linked demo
+        // the /explore hub — both filter to publicly-visible listings only,
+        // see Listing::isPubliclyVisible()). The linked demo
         // Establishment account can still manage its own listing regardless
-        // of status, same as any real not-yet-verified establishment.
-        $matiEstablishment = Listing::query()->updateOrCreate(
+        // of status, same as any real not-yet-published establishment.
+        $objMatiEstablishment = Listing::query()->updateOrCreate(
             ['lst_slug' => 'itour-demo-establishment-mati'],
             [
                 'lst_name' => 'iTOUR Demo Establishment (Mati)',
                 'lst_category' => 'accommodation',
                 'lst_municipality' => 'City of Mati',
-                'mun_id' => $mati->mun_id,
+                'mun_id' => $objMati->mun_id,
                 'lst_barangay' => 'Poblacion',
                 'lst_description' => 'RBAC demo/test fixture — not a real establishment.',
-                'lst_status' => 'Pending Review',
+                'lst_status' => 'DRAFT',
             ]
         );
 
@@ -73,10 +82,10 @@ class RbacDemoAccountSeeder extends Seeder
                 'lst_name' => 'iTOUR Demo Establishment (Baganga)',
                 'lst_category' => 'accommodation',
                 'lst_municipality' => 'Baganga',
-                'mun_id' => $baganga->mun_id,
+                'mun_id' => $objBaganga->mun_id,
                 'lst_barangay' => 'Poblacion',
                 'lst_description' => 'RBAC demo/test fixture — not a real establishment. Used to verify cross-municipality access denial.',
-                'lst_status' => 'Pending Review',
+                'lst_status' => 'DRAFT',
             ]
         );
 
@@ -84,7 +93,7 @@ class RbacDemoAccountSeeder extends Seeder
             ['usr_email' => 'tourism@itourdavor.gov.ph'],
             [
                 'usr_name' => 'iTOUR PTO Demo Account',
-                'usr_password' => $password,
+                'usr_password' => $strPassword,
                 'usr_email_verified_at' => now(),
                 'usr_role' => UserRole::PtoAdministrator,
                 'usr_organization_name' => 'Provincial Tourism Office',
@@ -99,12 +108,12 @@ class RbacDemoAccountSeeder extends Seeder
             ['usr_email' => 'tourism.mati@itourdavor.gov.ph'],
             [
                 'usr_name' => 'iTOUR LGU Demo Account (Mati)',
-                'usr_password' => $password,
+                'usr_password' => $strPassword,
                 'usr_email_verified_at' => now(),
                 'usr_role' => UserRole::Lgu,
                 'usr_organization_name' => 'Mati City Tourism Office',
                 'usr_organization_subtitle' => 'City of Mati',
-                'mun_id' => $mati->mun_id,
+                'mun_id' => $objMati->mun_id,
                 'lst_id' => null,
                 'usr_status' => 'Active',
             ]
@@ -114,13 +123,13 @@ class RbacDemoAccountSeeder extends Seeder
             ['usr_email' => 'establishments@itourdavor.gov.ph'],
             [
                 'usr_name' => 'iTOUR Establishment Demo Account',
-                'usr_password' => $password,
+                'usr_password' => $strPassword,
                 'usr_email_verified_at' => now(),
                 'usr_role' => UserRole::Establishment,
-                'usr_organization_name' => $matiEstablishment->lst_name,
-                'usr_organization_subtitle' => "{$matiEstablishment->lst_barangay}, {$matiEstablishment->lst_municipality}",
-                'mun_id' => $mati->mun_id,
-                'lst_id' => $matiEstablishment->lst_id,
+                'usr_organization_name' => $objMatiEstablishment->lst_name,
+                'usr_organization_subtitle' => "{$objMatiEstablishment->lst_barangay}, {$objMatiEstablishment->lst_municipality}",
+                'mun_id' => $objMati->mun_id,
+                'lst_id' => $objMatiEstablishment->lst_id,
                 'usr_status' => 'Active',
             ]
         );

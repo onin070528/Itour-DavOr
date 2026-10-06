@@ -24,14 +24,14 @@ class EnsureLguHasMunicipality
      * with a clear message instead of a 500 from a null municipality
      * reaching the data layer.
      */
-    public function handle(Request $request, Closure $next): Response
+    public function handle(Request $objRequest, Closure $fnNext): Response
     {
         abort_if(
-            blank($request->user()?->mun_id),
+            blank($objRequest->user()?->mun_id),
             403,
             'Your account has no assigned municipality yet. Contact your Provincial Tourism Office administrator.'
         );
 
-        return $next($request);
+        return $fnNext($objRequest);
     }
 }

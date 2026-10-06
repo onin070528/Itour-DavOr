@@ -20,31 +20,31 @@ class FeedbackController extends LguController
     /**
      * All Feedback: entries for destinations/establishments in this municipality only.
      */
-    public function index(Request $request): View
+    public function index(Request $objRequest): View
     {
-        $municipality = $request->user()->usr_organization_subtitle;
+        $objMunicipality = $objRequest->user()->usr_organization_subtitle;
 
-        return $this->renderLgu($request, 'lgu.feedback.index', 'feedback.index', 'Tourist Feedback', [
-            'municipality' => $municipality,
-            'feedback' => LguMockData::feedback($municipality),
+        return $this->renderLgu($objRequest, 'lgu.feedback.index', 'feedback.index', 'Tourist Feedback', [
+            'municipality' => $objMunicipality,
+            'feedback' => LguMockData::feedback($objMunicipality),
         ]);
     }
 
     /**
      * Experience Analytics: municipality-level sentiment breakdown and trends.
      */
-    public function analytics(Request $request): View
+    public function analytics(Request $objRequest): View
     {
-        $municipality = $request->user()->usr_organization_subtitle;
-        $feedback = collect(LguMockData::feedback($municipality));
-        $destinationNames = collect(LguMockData::destinations($municipality))->pluck('name');
+        $objMunicipality = $objRequest->user()->usr_organization_subtitle;
+        $objFeedback = collect(LguMockData::feedback($objMunicipality));
+        $objDestinationNames = collect(LguMockData::destinations($objMunicipality))->pluck('name');
 
-        return $this->renderLgu($request, 'lgu.feedback.analytics', 'feedback.analytics', 'Experience Analytics', [
-            'municipality' => $municipality,
-            'sentiment' => LguMockData::sentimentBreakdown($municipality),
-            'sentimentTrend' => LguMockData::sentimentTrend($municipality),
-            'byDestination' => $feedback->whereIn('subject', $destinationNames)->groupBy('subject')->map->count()->sortDesc()->take(5),
-            'byEstablishment' => $feedback->whereNotIn('subject', $destinationNames)->groupBy('subject')->map->count()->sortDesc()->take(5),
+        return $this->renderLgu($objRequest, 'lgu.feedback.analytics', 'feedback.analytics', 'Experience Analytics', [
+            'municipality' => $objMunicipality,
+            'sentiment' => LguMockData::sentimentBreakdown($objMunicipality),
+            'sentimentTrend' => LguMockData::sentimentTrend($objMunicipality),
+            'byDestination' => $objFeedback->whereIn('subject', $objDestinationNames)->groupBy('subject')->map->count()->sortDesc()->take(5),
+            'byEstablishment' => $objFeedback->whereNotIn('subject', $objDestinationNames)->groupBy('subject')->map->count()->sortDesc()->take(5),
         ]);
     }
 }

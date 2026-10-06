@@ -1,3 +1,10 @@
+import { registerSW } from 'virtual:pwa-register';
+
+// Registers the service worker configured in vite.config.js (VitePWA) —
+// offline caching for the public Hotlines page only (see its runtimeCaching
+// rule), not an app-wide offline mode.
+registerSW({ immediate: true });
+
 document.addEventListener('DOMContentLoaded', () => {
     initMobileMenu();
     initPasswordToggle();
@@ -8,7 +15,140 @@ document.addEventListener('DOMContentLoaded', () => {
     initExperiencesExploreAll();
     initChatbot();
     initEstablishmentQrForm();
+    initNavScrollSpy();
+    initHeroCarousel();
 });
+
+/**
+ * Highlights "Home"/"Nearby"/"Reviews" in the topbar as the corresponding
+ * same-page section scrolls into view — the landing page's only nav items
+ * without their own route ("Explore"/"Hotlines" keep their server-rendered,
+ * route-matched active state untouched; this never runs on pages that lack
+ * the #near-you/#reviews sections, i.e. everywhere but the landing page).
+ */
+function initNavScrollSpy() {
+    const spyLabels = ['Home', 'Nearby', 'Reviews'];
+    const navLinks = Array.from(document.querySelectorAll('[data-nav-link]'))
+        .filter((link) => spyLabels.includes(link.dataset.navLink));
+
+    if (!navLinks.length) return;
+
+    const sections = ['Nearby', 'Reviews']
+        .map((label) => ({ label, el: document.getElementById({ Nearby: 'near-you', Reviews: 'reviews' }[label]) }))
+        .filter((s) => s.el);
+
+    if (!sections.length) return;
+
+    function paint(activeLabel) {
+        navLinks.forEach((link) => {
+            const active = link.dataset.navLink === activeLabel;
+
+            if (link.dataset.navVariant === 'underline') {
+                link.classList.toggle('border-accent-500', active);
+                link.classList.toggle('text-primary-700', active);
+                link.classList.toggle('font-semibold', active);
+                link.classList.toggle('border-transparent', !active);
+                link.classList.toggle('text-sand-900', !active);
+            } else {
+                link.classList.toggle('bg-sand-100', active);
+                link.classList.toggle('text-primary-700', active);
+                link.classList.toggle('font-semibold', active);
+            }
+        });
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+        const visible = entries
+            .filter((entry) => entry.isIntersecting)
+            .map((entry) => sections.find((s) => s.el === entry.target)?.label)
+            .filter(Boolean);
+
+        if (visible.length) {
+            // Lowest section currently in view wins when two overlap.
+            paint(visible[visible.length - 1]);
+            return;
+        }
+
+        // Nothing observed is intersecting: above the first section means
+        // Home is still the active "section"; below it (past the last
+        // section's bottom) leaves About as the closest match, since
+        // there's nothing further down the page to hand off to.
+        const aboveEverything = sections[0].el.getBoundingClientRect().top > 0;
+        paint(aboveEverything ? 'Home' : 'About');
+    }, { rootMargin: '-100px 0px -55% 0px', threshold: 0 });
+
+    sections.forEach((s) => observer.observe(s.el));
+}
+
+/**
+ * Landing page hero background carousel: cross-fades between
+ * [data-hero-slide] images every 6s (opacity-only, no layout shift —
+ * transition-opacity/duration-1000 already set on each slide in the
+ * Blade markup), updates [data-hero-indicator] pagination to match, and
+ * pauses autoplay while the hero search input has focus so the background
+ * doesn't change mid-type. No-ops entirely on pages without a
+ * [data-hero-carousel] section.
+ */
+function initHeroCarousel() {
+    const root = document.querySelector('[data-hero-carousel]');
+    if (!root) return;
+
+    const slides = Array.from(root.querySelectorAll('[data-hero-slide]'));
+    const indicators = Array.from(root.querySelectorAll('[data-hero-indicator]'));
+    const searchInput = document.getElementById('hero-search');
+
+    if (!slides.length) return;
+
+    const AUTOPLAY_MS = 6000;
+    let current = 0;
+    let timer = null;
+
+    function goToSlide(index) {
+        current = (index + slides.length) % slides.length;
+
+        slides.forEach((slide, i) => {
+            slide.classList.toggle('opacity-100', i === current);
+            slide.classList.toggle('opacity-0', i !== current);
+        });
+
+        indicators.forEach((indicator, i) => {
+            const active = i === current;
+            indicator.setAttribute('aria-selected', String(active));
+            indicator.classList.toggle('w-6', active);
+            indicator.classList.toggle('bg-white', active);
+            indicator.classList.toggle('w-2', !active);
+            indicator.classList.toggle('bg-white/40', !active);
+        });
+
+    }
+
+    // Always clearing any existing interval before starting a new one, so a
+    // stray extra call (e.g. focus/blur firing in quick succession) can
+    // never leave two autoplay timers running at once.
+    function startAutoplay() {
+        stopAutoplay();
+        timer = setInterval(() => goToSlide(current + 1), AUTOPLAY_MS);
+    }
+
+    function stopAutoplay() {
+        if (timer) clearInterval(timer);
+        timer = null;
+    }
+
+    indicators.forEach((indicator, i) => {
+        indicator.addEventListener('click', () => {
+            goToSlide(i);
+            // Manual navigation restarts the 6s window from here, rather
+            // than changing slides again almost immediately.
+            startAutoplay();
+        });
+    });
+
+    searchInput?.addEventListener('focus', stopAutoplay);
+    searchInput?.addEventListener('blur', startAutoplay);
+
+    startAutoplay();
+}
 
 function initMobileMenu() {
     const menuButton = document.getElementById('mobile-menu-button');
@@ -156,6 +296,11 @@ function initExplorePage() {
 
     const searchInput = document.getElementById('explore-search');
     const municipalitySelect = document.getElementById('explore-municipality');
+    // Multiple "All"/category elements can exist at once now (the desktop
+    // sidebar list and the mobile horizontally-scrollable chips render the
+    // same slugs twice) — querySelectorAll + the shared syncChipStates()
+    // below keeps every copy of a given control in sync.
+    const allChips = Array.from(document.querySelectorAll('[data-category-all]'));
     const chipButtons = Array.from(document.querySelectorAll('[data-category-chip]'));
     const viewButtons = Array.from(document.querySelectorAll('[data-view-option]'));
     const countEl = document.getElementById('explore-count');
@@ -172,14 +317,31 @@ function initExplorePage() {
     // --- Sync controls to the initial state -------------------------------
     searchInput.value = state.q;
     municipalitySelect.value = state.municipality;
-    chipButtons.forEach((chip) => {
-        const active = state.categories.has(chip.dataset.categoryChip);
-        chip.setAttribute('aria-pressed', String(active));
-        chip.classList.toggle('bg-primary-100', active);
-        chip.classList.toggle('border-primary-300', active);
-        chip.classList.toggle('text-primary-700', active);
-    });
+    syncChipStates();
     setActiveView(state.view);
+
+    // "All" and the per-category chips share one active-state paint, so
+    // there's exactly one place that decides which chip looks selected —
+    // "All" reads as active whenever no category chip is (an empty Set),
+    // never as a chip of its own kind.
+    function syncChipStates() {
+        const noneActive = state.categories.size === 0;
+
+        allChips.forEach((chip) => {
+            chip.setAttribute('aria-pressed', String(noneActive));
+            chip.classList.toggle('bg-primary-100', noneActive);
+            chip.classList.toggle('border-primary-300', noneActive);
+            chip.classList.toggle('text-primary-700', noneActive);
+        });
+
+        chipButtons.forEach((chip) => {
+            const active = state.categories.has(chip.dataset.categoryChip);
+            chip.setAttribute('aria-pressed', String(active));
+            chip.classList.toggle('bg-primary-100', active);
+            chip.classList.toggle('border-primary-300', active);
+            chip.classList.toggle('text-primary-700', active);
+        });
+    }
 
     // --- Wire up controls ---------------------------------------------------
     let searchDebounce;
@@ -196,17 +358,21 @@ function initExplorePage() {
         render();
     });
 
+    allChips.forEach((chip) => {
+        chip.addEventListener('click', () => {
+            state.categories.clear();
+            syncChipStates();
+            render();
+        });
+    });
+
     chipButtons.forEach((chip) => {
         chip.addEventListener('click', () => {
             const slug = chip.dataset.categoryChip;
             const active = state.categories.has(slug);
 
             active ? state.categories.delete(slug) : state.categories.add(slug);
-            chip.setAttribute('aria-pressed', String(!active));
-            chip.classList.toggle('bg-primary-100', !active);
-            chip.classList.toggle('border-primary-300', !active);
-            chip.classList.toggle('text-primary-700', !active);
-
+            syncChipStates();
             render();
         });
     });
@@ -226,10 +392,7 @@ function initExplorePage() {
 
         searchInput.value = '';
         municipalitySelect.value = '';
-        chipButtons.forEach((chip) => {
-            chip.setAttribute('aria-pressed', 'false');
-            chip.classList.remove('bg-primary-100', 'border-primary-300', 'text-primary-700');
-        });
+        syncChipStates();
 
         render();
     });
@@ -287,7 +450,7 @@ function initExplorePage() {
         views.grid.innerHTML = items.map((item) => `
             <article class="group flex flex-col overflow-hidden rounded-md border border-sand-200 bg-sand-0 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
                 <div class="relative h-44 overflow-hidden bg-sand-200">
-                    <img src="/storage/itour-images/${item.image}" alt="${item.name}" loading="lazy" class="absolute inset-0 h-full w-full object-cover">
+                    ${listingPhotoMarkup(item, 'absolute inset-0 h-full w-full object-cover')}
                     <div class="pointer-events-none absolute inset-0 bg-gradient-to-t from-sand-900/55 via-transparent to-transparent"></div>
                     <span class="relative m-3 inline-block rounded-sm bg-sand-900/45 px-2.5 py-1 text-xs font-semibold text-sand-0">${categoryLabel(item.category)}</span>
                 </div>
@@ -308,7 +471,7 @@ function initExplorePage() {
         tableBody.innerHTML = items.map((item) => `
             <tr class="hover:bg-sand-50">
                 <td class="flex items-center gap-3 px-4 py-3">
-                    <span class="h-11 w-11 shrink-0 overflow-hidden rounded-sm bg-sand-200"><img src="/storage/itour-images/${item.image}" alt="" class="h-full w-full object-cover"></span>
+                    <span class="relative h-11 w-11 shrink-0 overflow-hidden rounded-sm bg-sand-200">${listingPhotoMarkup(item, 'h-full w-full object-cover')}</span>
                     <span class="font-semibold text-sand-900">${item.name}</span>
                 </td>
                 <td class="px-4 py-3 text-sand-700">${categoryLabel(item.category)}</td>
@@ -366,7 +529,7 @@ function initExplorePage() {
         mapboxMarkers = plotted.map((item) => new mapboxgl.Marker({ color: '#125d5a' })
             .setLngLat([item.lng, item.lat])
             .setPopup(new mapboxgl.Popup({ offset: 24, maxWidth: '260px' }).setHTML(`
-                <img src="/storage/itour-images/${escapeHtml(item.image)}" alt="" class="mb-2 h-24 w-full rounded-sm object-cover">
+                <span class="relative mb-2 block h-24 w-full overflow-hidden rounded-sm">${listingPhotoMarkup(item, 'h-24 w-full rounded-sm object-cover')}</span>
                 <p class="font-semibold text-sand-900">${escapeHtml(item.name)}</p>
                 <p class="text-xs text-sand-600">${escapeHtml(categoryLabel(item.category))} · ${escapeHtml(item.barangay)}, ${escapeHtml(item.municipality)}</p>
                 <a href="${escapeHtml(item.href)}" class="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary-700 hover:text-primary-900">View Details<i class="ti ti-arrow-right"></i></a>
@@ -619,6 +782,21 @@ function escapeHtml(value) {
 }
 
 /**
+ * Shared cover-photo markup for every JS-rendered card (explore grid/table/
+ * map popup): the cover photo when the listing has one, otherwise a
+ * neutral category icon — never a stock/DOT placeholder photo (7E). Mirrors
+ * resources/views/components/listing-photo.blade.php for server-rendered
+ * cards.
+ */
+function listingPhotoMarkup(item, imgClass) {
+    if (item.displayImageUrl) {
+        return `<img src="${escapeHtml(item.displayImageUrl)}" alt="${escapeHtml(item.name)}" loading="lazy" class="${imgClass}">`;
+    }
+
+    return `<div class="${imgClass} flex items-center justify-center bg-sand-200"><i class="ti ${escapeHtml(item.categoryIcon)} text-3xl text-sand-400" aria-hidden="true"></i></div>`;
+}
+
+/**
  * Floating AI assistant widget (bottom-right on the public site). Handles
  * opening/closing the panel and appending messages to the thread.
  *
@@ -629,7 +807,7 @@ function initChatbot() {
     const toggle = document.getElementById('chatbot-toggle');
     const panel = document.getElementById('chatbot-panel');
     const closeButton = document.getElementById('chatbot-close');
-    const iconOpen = document.getElementById('chatbot-toggle-icon-open');
+    const toggleAvatar = document.getElementById('chatbot-toggle-avatar');
     const iconClose = document.getElementById('chatbot-toggle-icon-close');
     const form = document.getElementById('chatbot-form');
     const input = document.getElementById('chatbot-input');
@@ -643,8 +821,8 @@ function initChatbot() {
         panel.classList.toggle('hidden', !open);
         panel.classList.toggle('flex', open);
         toggle.setAttribute('aria-expanded', String(open));
-        toggle.setAttribute('aria-label', open ? 'Close chat assistant' : 'Open chat assistant');
-        iconOpen?.classList.toggle('hidden', open);
+        toggle.setAttribute('aria-label', open ? 'Close chat with Ori' : 'Chat with Ori, your iTOUR tourism assistant');
+        toggleAvatar?.classList.toggle('hidden', open);
         iconClose?.classList.toggle('hidden', !open);
         if (open) input.focus();
     };
@@ -652,20 +830,30 @@ function initChatbot() {
     toggle.addEventListener('click', () => setOpen(panel.classList.contains('hidden')));
     closeButton?.addEventListener('click', () => setOpen(false));
 
+    const sendMessage = (text) => {
+        appendMessage(text, 'user');
+
+        window.setTimeout(() => {
+            appendMessage(
+                "Thanks for your message! I'm still being set up — in the meantime, try Explore to browse destinations, or check the Emergency contacts in the footer.",
+                'bot'
+            );
+        }, 500);
+    };
+
     form.addEventListener('submit', (event) => {
         event.preventDefault();
         const text = input.value.trim();
         if (!text) return;
 
-        appendMessage(text, 'user');
         input.value = '';
+        sendMessage(text);
+    });
 
-        window.setTimeout(() => {
-            appendMessage(
-                "Thanks for your message! The AI assistant is still being set up — in the meantime, try Explore to browse destinations, or check the Emergency contacts in the footer.",
-                'bot'
-            );
-        }, 500);
+    messages.querySelectorAll('[data-chatbot-suggestion]').forEach((button) => {
+        button.addEventListener('click', () => {
+            sendMessage(button.textContent.trim());
+        });
     });
 
     function appendMessage(text, from) {
@@ -679,7 +867,7 @@ function initChatbot() {
             wrapper.appendChild(bubble);
         } else {
             wrapper.className = 'flex items-start gap-2';
-            wrapper.innerHTML = '<span class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-100 text-primary-700"><i class="ti ti-message-chatbot text-sm" aria-hidden="true"></i></span>';
+            wrapper.innerHTML = '<span class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full border border-primary-100"><img src="/storage/itour-images/ori-chatbot-ai.png" alt="Ori" class="h-full w-full object-cover"></span>';
             bubble.className = 'max-w-[85%] rounded-md rounded-tl-none bg-sand-100 px-3 py-2 text-sm leading-relaxed text-sand-800';
             wrapper.appendChild(bubble);
         }
@@ -731,13 +919,28 @@ function initEstablishmentQrForm() {
         return sums;
     }
 
+    const localOriginScope = document.getElementById('qr-local-origin-scope');
+    const localOriginPlace = document.getElementById('qr-local-origin-place');
+    const localOriginPlaceWrap = document.getElementById('qr-local-origin-place-wrap');
+    const localOriginWrap = document.getElementById('qr-local-origin-wrap');
+    const foreignCountry = document.getElementById('qr-foreign-country');
+    const foreignCountryWrap = document.getElementById('qr-foreign-country-wrap');
+
     function updateTotal() {
         const sums = computeMatrixSums();
         const companions = sums.foreign + sums.local;
-        totalValue.textContent = String(1 + companions);
+        totalValue.textContent = String(companions);
         foreignValue.textContent = String(sums.foreign);
         localValue.textContent = String(sums.local);
+
+        localOriginWrap?.classList.toggle('hidden', sums.local <= 0);
+        foreignCountryWrap?.classList.toggle('hidden', sums.foreign <= 0);
+        if (localOriginPlaceWrap) {
+            localOriginPlaceWrap.classList.toggle('hidden', localOriginScope?.value !== 'outside_province');
+        }
     }
+
+    localOriginScope?.addEventListener('change', updateTotal);
 
     counters.forEach((counter) => {
         counter.querySelector('[data-counter-decrement]').addEventListener('click', () => {
@@ -754,6 +957,12 @@ function initEstablishmentQrForm() {
         event.preventDefault();
         if (!form.reportValidity()) return;
 
+        const sums = computeMatrixSums();
+        if (sums.male + sums.female < 1) {
+            alert('Add at least one guest to the headcount.');
+            return;
+        }
+
         const submitButton = form.querySelector('button[type="submit"]');
         if (submitButton) submitButton.disabled = true;
 
@@ -766,7 +975,11 @@ function initEstablishmentQrForm() {
             const payload = {
                 visitorName: form.elements.namedItem('visitorName')?.value,
                 visitorContact: form.elements.namedItem('visitorContact')?.value,
-                ...computeMatrixSums(),
+                website: form.elements.namedItem('website')?.value,
+                localOriginScope: sums.local > 0 ? (localOriginScope?.value || null) : null,
+                localOriginPlace: sums.local > 0 && localOriginScope?.value === 'outside_province' ? (localOriginPlace?.value || null) : null,
+                foreignCountry: sums.foreign > 0 ? (foreignCountry?.value || null) : null,
+                ...sums,
             };
 
             const response = await fetch(form.dataset.actionUrl, {
@@ -796,6 +1009,9 @@ function initEstablishmentQrForm() {
     resetButton?.addEventListener('click', () => {
         form.reset();
         counters.forEach((counter) => writeValue(counter, 0));
+        if (localOriginScope) localOriginScope.value = '';
+        if (localOriginPlace) localOriginPlace.value = '';
+        if (foreignCountry) foreignCountry.value = '';
         updateTotal();
         successStep?.classList.add('hidden');
         successStep?.classList.remove('flex');
@@ -822,9 +1038,23 @@ function initListingDetailsModal() {
     const listings = JSON.parse(dataEl.textContent);
     const field = (id) => document.getElementById(`listing-details-${id}`);
 
+    // Shows the <img> when the listing has a cover photo, otherwise the
+    // neutral category-icon placeholder — independent of showPhoto()/
+    // showDirections() below, which toggle the whole photo-vs-map group.
+    function applyPhotoVisibility(listing) {
+        const hasPhoto = Boolean(listing?.displayImageUrl);
+        field('image').hidden = !hasPhoto;
+        field('placeholder').hidden = hasPhoto;
+    }
+
     function open(listing) {
-        field('image').src = `/storage/itour-images/${listing.image}`;
-        field('image').alt = `${listing.name}, ${listing.municipality}`;
+        if (listing.displayImageUrl) {
+            field('image').src = listing.displayImageUrl;
+            field('image').alt = `${listing.name}, ${listing.municipality}`;
+        }
+        field('placeholder-icon').className = `ti ${listing.categoryIcon} text-6xl text-sand-400`;
+        applyPhotoVisibility(listing);
+        field('full-page').href = listing.href;
         field('category').textContent = listing.categoryLabel;
         field('name').textContent = listing.name;
         field('rating').textContent = listing.rating !== null ? listing.rating.toFixed(1) : 'No ratings yet';
@@ -897,6 +1127,9 @@ function initListingDetailsModal() {
         directionsRequestId++;
         mapWrapper.hidden = true;
         modal.querySelectorAll('[data-listing-details-photo]').forEach((el) => { el.hidden = false; });
+        // Re-applies which of image/placeholder belongs to this listing —
+        // the blanket unhide above would otherwise show both.
+        applyPhotoVisibility(currentListing);
         directionsLabel.textContent = 'Get directions';
         setDirectionsStatus('');
     }

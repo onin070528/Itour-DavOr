@@ -1,4 +1,11 @@
 {{--
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: Public QR self check-in form for visitors.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+--}}
+{{--
     Public visitor self-registration form, reached by scanning the QR code
     posted at a municipality's registered establishment (hence living next
     to the rest of the LGU views, but served without auth — the visitor
@@ -8,9 +15,10 @@
     scannable link/code per establishment.
 
     Counters are wired up client-side in resources/js/app.js (initEstablishmentQrForm).
-    There is no backend/database yet — submitting shows a local success
-    step, matching the front-end-only arrival wizard under
-    resources/views/establishment/arrivals/record.blade.php.
+    Submitting posts to CheckinController::store, which saves one arrival
+    row for this establishment (same table/fields as the staff-entered
+    arrival wizard under resources/views/establishment/arrivals/record.blade.php),
+    then shows a local success step rather than reloading the page.
 --}}
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
@@ -37,7 +45,22 @@
                 <p class="mt-1 text-sm text-sand-600">You're checking in at this establishment.</p>
             </div>
 
+            @if ($refusalMessage)
+                <div class="flex flex-col items-center rounded-md border border-sand-200 bg-sand-0 p-8 text-center shadow-sm">
+                    <span class="flex h-14 w-14 items-center justify-center rounded-full bg-danger-bg text-danger">
+                        <i class="ti ti-ban text-3xl" aria-hidden="true"></i>
+                    </span>
+                    <p class="mt-4 font-display text-base font-bold text-sand-900">{{ $refusalMessage }}</p>
+                    <p class="mt-1 text-sm text-sand-600">Please check with staff at {{ $establishmentName }} for assistance.</p>
+                </div>
+            @else
             <form id="establishment-qr-form" data-action-url="{{ $checkinAction }}" novalidate>
+                {{-- Honeypot: left empty by real visitors, hidden from
+                     screen readers and sighted users, but visible to naive
+                     bots that fill in every field. CheckinController::store
+                     rejects the submission if this is non-empty. --}}
+                <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" class="absolute left-[-9999px] h-0 w-0 opacity-0">
+
                 {{-- Form step --}}
                 <div id="qr-form-step" class="flex flex-col gap-4">
                     {{-- Your Details --}}
@@ -77,8 +100,8 @@
                                 <i class="ti ti-users text-lg" aria-hidden="true"></i>
                             </span>
                             <div>
-                                <h2 class="font-display text-sm font-bold text-sand-900">Your Travel Companions</h2>
-                                <p class="text-xs text-sand-500">Tap (+) to add people traveling with you (do not count yourself).</p>
+                                <h2 class="font-display text-sm font-bold text-sand-900">Your Group</h2>
+                                <p class="text-xs text-sand-500">Tap (+) to add everyone in your group, including yourself.</p>
                             </div>
                         </div>
 
@@ -125,8 +148,40 @@
                                         </div>
                                     @endforeach
                                 </div>
+
+                                @if ($group['key'] === 'local')
+                                    <div id="qr-local-origin-wrap" class="mt-4 border-t border-dashed border-sand-200 pt-4 hidden">
+                                        <label for="qr-local-origin-scope" class="mb-1 block text-xs font-semibold text-sand-700">Where are you from? <span class="font-normal text-sand-500">(optional)</span></label>
+                                        <select id="qr-local-origin-scope" name="localOriginScope" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none">
+                                            <option value="">Prefer not to say</option>
+                                            <option value="within_province">Within Davao Oriental</option>
+                                            <option value="outside_province">Outside Davao Oriental</option>
+                                        </select>
+
+                                        <div id="qr-local-origin-place-wrap" class="mt-3 hidden">
+                                            <label for="qr-local-origin-place" class="mb-1 block text-xs font-semibold text-sand-700">Home Province</label>
+                                            <input id="qr-local-origin-place" name="localOriginPlace" type="text" list="province-options" placeholder="e.g. Davao del Sur" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none">
+                                        </div>
+                                    </div>
+                                @else
+                                    <div id="qr-foreign-country-wrap" class="mt-4 border-t border-dashed border-sand-200 pt-4 hidden">
+                                        <label for="qr-foreign-country" class="mb-1 block text-xs font-semibold text-sand-700">Home Country <span class="font-normal text-sand-500">(optional)</span></label>
+                                        <input id="qr-foreign-country" name="foreignCountry" type="text" list="country-options" placeholder="e.g. Japan" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none">
+                                    </div>
+                                @endif
                             </div>
                         @endforeach
+
+                        <datalist id="province-options">
+                            @foreach ($provinces as $province)
+                                <option value="{{ $province }}"></option>
+                            @endforeach
+                        </datalist>
+                        <datalist id="country-options">
+                            @foreach ($countries as $country)
+                                <option value="{{ $country }}"></option>
+                            @endforeach
+                        </datalist>
                     </div>
 
                     {{-- Total Group Size --}}
@@ -134,13 +189,18 @@
                         <p class="text-xs font-semibold tracking-wide text-primary-700 uppercase">Total Group Size</p>
                         <div class="mt-1.5 flex items-center justify-between gap-3">
                             <p id="qr-total-caption" class="text-sm text-sand-700">
-                                You (<b>1</b>) + Local (<b id="qr-local-value">0</b>) + International (<b id="qr-foreign-value">0</b>)
+                                Local (<b id="qr-local-value">0</b>) + International (<b id="qr-foreign-value">0</b>)
                             </p>
                             <p class="shrink-0 font-display text-3xl font-extrabold text-primary-900">
-                                <span id="qr-total-value">1</span> <span class="text-sm font-semibold text-sand-500">People</span>
+                                <span id="qr-total-value">0</span> <span class="text-sm font-semibold text-sand-500">People</span>
                             </p>
                         </div>
                     </div>
+
+                    <p class="text-xs text-sand-500">
+                        Your information is used for tourism statistics of the Provincial Tourism Office of Davao Oriental.
+                        See our <a href="{{ route('privacy') }}" target="_blank" rel="noopener" class="font-semibold text-primary-700 hover:text-primary-900">Privacy Notice</a>.
+                    </p>
 
                     <button type="submit" class="flex items-center justify-center gap-2 rounded-md bg-primary-700 px-5 py-3.5 text-sm font-semibold text-sand-0 shadow-md transition-colors hover:bg-primary-900">
                         <i class="ti ti-clipboard-check text-lg" aria-hidden="true"></i>
@@ -161,6 +221,7 @@
                     </button>
                 </div>
             </form>
+            @endif
         </div>
     </body>
 </html>

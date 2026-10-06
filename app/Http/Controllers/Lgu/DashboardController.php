@@ -21,18 +21,18 @@ class DashboardController extends LguController
      * The LGU landing page: a snapshot of tourism activity in the user's
      * assigned municipality.
      */
-    public function index(Request $request): View
+    public function index(Request $objRequest): View
     {
-        $municipality = $request->user()->usr_organization_subtitle;
+        $objMunicipality = $objRequest->user()->usr_organization_subtitle;
 
-        return $this->renderLgu($request, 'lgu.dashboard', 'dashboard', 'Dashboard', [
-            'summary' => LguMockData::dashboardSummary($municipality),
-            'arrivalTrend' => LguMockData::arrivalTrend($municipality),
-            'topDestinations' => array_slice(LguMockData::destinationPerformance($municipality), 0, 5),
-            'establishmentCategories' => LguMockData::establishmentCategories($municipality),
-            'establishmentCount' => count(LguMockData::establishments($municipality)),
-            'sentiment' => LguMockData::sentimentBreakdown($municipality),
-            'recentActivity' => array_slice(LguMockData::recentActivity($municipality), 0, 6),
+        return $this->renderLgu($objRequest, 'lgu.dashboard', 'dashboard', 'Dashboard', [
+            'summary' => LguMockData::dashboardSummary($objMunicipality),
+            'arrivalTrend' => LguMockData::arrivalTrend($objMunicipality),
+            'topDestinations' => array_slice(LguMockData::destinationPerformance($objMunicipality), 0, 5),
+            'establishmentCategories' => LguMockData::establishmentCategories($objMunicipality),
+            'establishmentCount' => count(LguMockData::establishments($objMunicipality)),
+            'sentiment' => LguMockData::sentimentBreakdown($objMunicipality),
+            'recentActivity' => array_slice(LguMockData::recentActivity($objMunicipality), 0, 6),
         ]);
     }
 }

@@ -10,11 +10,15 @@
 
 namespace App\Providers;
 
+use App\Models\EstablishmentImage;
+use App\Policies\ImagePolicy;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rules\Password;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -35,10 +39,45 @@ class AppServiceProvider extends ServiceProvider
         // attempts against one account from many IPs is still limited, and
         // one IP can't hammer many accounts unbounded either. Applied to
         // POST /login via the 'throttle:login' middleware.
-        RateLimiter::for('login', function (Request $request) {
-            $key = Str::lower((string) $request->input('email')).'|'.$request->ip();
+        RateLimiter::for('login', function (Request $objRequest) {
+            $strKey = Str::lower((string) $objRequest->input('email')).'|'.$objRequest->ip();
 
-            return Limit::perMinute(5)->by($key);
+            return Limit::perMinute(5)->by($strKey);
         });
+
+        // Report generation/export (PDF preview, PDF download, Excel) is
+        // cheap to spam and expensive to render (DomPDF/PhpSpreadsheet) —
+        // keyed by user, since every caller here is authenticated.
+        RateLimiter::for('report-export', function (Request $objRequest) {
+            return Limit::perMinute(20)->by($objRequest->user()?->usr_id ?: $objRequest->ip());
+        });
+
+        // Public QR self check-in — no account behind it, so keyed by IP +
+        // the scanned establishment to stop one flood from blocking
+        // legitimate tourists at other establishments.
+        RateLimiter::for('qr-checkin', function (Request $objRequest) {
+            $strKey = $objRequest->ip().'|'.(string) $objRequest->route('establishment');
+
+            return Limit::perMinute(10)->by($strKey);
+        });
+
+        // Establishment photo uploads — per-user, not per-establishment, so
+        // one account can't bypass the limit by spreading uploads across
+        // establishments it manages.
+        RateLimiter::for('establishment-image-upload', function (Request $objRequest) {
+            return Limit::perMinute((int) config('establishment_images.uploads_per_minute'))->by($objRequest->user()?->usr_id ?: $objRequest->ip());
+        });
+
+        // Single source of truth for password strength — every path that
+        // sets a password (change, reset) validates with Password::default()
+        // instead of redeclaring the rule. Deliberately no uncompromised():
+        // that check calls an external API (Have I Been Pwned) on every
+        // password submission.
+        Password::defaults(fn () => Password::min(12)->letters()->numbers());
+
+        // ImagePolicy doesn't follow Laravel's {Model}Policy auto-discovery
+        // naming convention (named ImagePolicy, not EstablishmentImagePolicy)
+        // — registered explicitly instead.
+        Gate::policy(EstablishmentImage::class, ImagePolicy::class);
     }
 }

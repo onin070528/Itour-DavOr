@@ -1,3 +1,10 @@
+{{--
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: Listing details modal shared by the Explore and landing pages.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+--}}
 @props(['listings' => []])
 
 {{-- Shared "View Details" modal for the landing page. Any element with
@@ -12,6 +19,12 @@
 >
     <div class="relative h-64 bg-sand-200 sm:h-80">
         <img id="listing-details-image" data-listing-details-photo src="" alt="" class="absolute inset-0 h-full w-full object-cover">
+        {{-- Shown instead of the <img> above when the listing has no cover
+             photo at all — a neutral category icon, never a stock/DOT
+             placeholder photo (7E). --}}
+        <div id="listing-details-placeholder" data-listing-details-photo class="absolute inset-0 flex items-center justify-center bg-sand-200">
+            <i id="listing-details-placeholder-icon" class="ti text-6xl text-sand-400" aria-hidden="true"></i>
+        </div>
         <div data-listing-details-photo class="pointer-events-none absolute inset-0 bg-gradient-to-t from-sand-900/60 via-transparent to-transparent"></div>
 
         {{-- "Get directions" swaps the photo for this Mapbox route map. The
@@ -75,6 +88,14 @@
         </dl>
 
         <div class="mt-6 flex flex-wrap gap-3">
+            <a
+                id="listing-details-full-page"
+                href=""
+                class="inline-flex items-center gap-2 rounded-sm border border-sand-300 px-5 py-2.5 text-sm font-semibold text-sand-800 transition-colors hover:border-primary-300 hover:text-primary-700"
+            >
+                <i class="ti ti-photo" aria-hidden="true"></i>
+                View Full Details &amp; Photos
+            </a>
             <button
                 type="button"
                 id="listing-details-directions"

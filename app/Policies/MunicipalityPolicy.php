@@ -16,32 +16,32 @@ use App\Models\User;
 
 class MunicipalityPolicy
 {
-    public function viewAny(User $user): bool
+    public function viewAny(User $objUser): bool
     {
         return true;
     }
 
-    public function view(User $user, Municipality $municipality): bool
+    public function view(User $objUser, Municipality $objMunicipality): bool
     {
-        return match ($user->usr_role) {
+        return match ($objUser->usr_role) {
             UserRole::PtoAdministrator => true,
-            UserRole::Lgu, UserRole::Establishment => $municipality->mun_id === $user->mun_id,
+            UserRole::Lgu, UserRole::Establishment => $objMunicipality->mun_id === $objUser->mun_id,
             default => false,
         };
     }
 
-    public function create(User $user): bool
+    public function create(User $objUser): bool
     {
-        return $user->usr_role === UserRole::PtoAdministrator;
+        return $objUser->usr_role === UserRole::PtoAdministrator;
     }
 
-    public function update(User $user, Municipality $municipality): bool
+    public function update(User $objUser, Municipality $objMunicipality): bool
     {
-        return $user->usr_role === UserRole::PtoAdministrator;
+        return $objUser->usr_role === UserRole::PtoAdministrator;
     }
 
-    public function delete(User $user, Municipality $municipality): bool
+    public function delete(User $objUser, Municipality $objMunicipality): bool
     {
-        return $user->usr_role === UserRole::PtoAdministrator;
+        return $objUser->usr_role === UserRole::PtoAdministrator;
     }
 }

@@ -28,9 +28,9 @@ trait ManagesDestinationListings
     /**
      * @return array{lst_name: string, lst_barangay: string, lst_description: ?string, lst_contact_office: ?string, lst_contact_phone: ?string}
      */
-    protected function validatedDestinationFields(Request $request): array
+    protected function validatedDestinationFields(Request $objRequest): array
     {
-        $data = $request->validate([
+        $arrData = $objRequest->validate([
             'name' => ['required', 'string', 'max:255'],
             'barangay' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
@@ -39,46 +39,56 @@ trait ManagesDestinationListings
         ]);
 
         return [
-            'lst_name' => $data['name'],
-            'lst_barangay' => $data['barangay'],
-            'lst_description' => $data['description'] ?? null,
-            'lst_contact_office' => $data['contactOffice'] ?? null,
-            'lst_contact_phone' => $data['contactPhone'] ?? null,
+            'lst_name' => $arrData['name'],
+            'lst_barangay' => $arrData['barangay'],
+            'lst_description' => $arrData['description'] ?? null,
+            'lst_contact_office' => $arrData['contactOffice'] ?? null,
+            'lst_contact_phone' => $arrData['contactPhone'] ?? null,
         ];
     }
 
-    protected function createDestination(array $fields, string $municipality): Listing
+    /**
+     * $intMunicipalityId is the real FK (App\Models\Municipality) — the caller
+     * resolves it (LGU: its own account's mun_id, already a
+     * reliable FK; PTO: looked up from the submitted municipality name)
+     * since only the caller knows which is trustworthy for its form.
+     * Left null here, it's null on the row too, which then fails the
+     * municipality-scoped access checks (Lgu\DirectoryController::
+     * authorizeOwnMunicipality) — always pass it.
+     */
+    protected function createDestination(array $arrFields, string $strMunicipality, ?int $intMunicipalityId): Listing
     {
         return Listing::query()->create([
-            ...$fields,
-            'lst_slug' => $this->uniqueDestinationSlug($fields['lst_name']),
+            ...$arrFields,
+            'lst_slug' => $this->uniqueDestinationSlug($arrFields['lst_name']),
             'lst_category' => 'destinations',
-            'lst_municipality' => $municipality,
+            'lst_municipality' => $strMunicipality,
+            'mun_id' => $intMunicipalityId,
             'lst_status' => 'Active',
         ]);
     }
 
-    protected function uniqueDestinationSlug(string $name): string
+    protected function uniqueDestinationSlug(string $strName): string
     {
-        $base = Str::slug($name) ?: 'destination';
-        $slug = $base;
-        $suffix = 2;
+        $strBase = Str::slug($strName) ?: 'destination';
+        $strSlug = $strBase;
+        $intSuffix = 2;
 
-        while (Listing::query()->where('lst_slug', $slug)->exists()) {
-            $slug = "{$base}-{$suffix}";
-            $suffix++;
+        while (Listing::query()->where('lst_slug', $strSlug)->exists()) {
+            $strSlug = "{$strBase}-{$intSuffix}";
+            $intSuffix++;
         }
 
-        return $slug;
+        return $strSlug;
     }
 
     /**
      * The municipality select for the PTO "Add/Edit Destination" modal,
      * validated against the real municipality list.
      */
-    protected function validatedMunicipality(Request $request): string
+    protected function validatedMunicipality(Request $objRequest): string
     {
-        return $request->validate([
+        return $objRequest->validate([
             'municipality' => ['required', 'string', Rule::in(collect(TourismCatalog::municipalities())->pluck('name'))],
         ])['municipality'];
     }

@@ -3,8 +3,9 @@
 /**
  * iTOUR — Davao Oriental Tourism Information System
  *
- * Purpose: Handles the Establishment role's public tourism profile — editing
- * profile details and managing the photo gallery (upload, feature, remove).
+ * Purpose: Handles the Establishment role's merged Profile & Photos page —
+ * editing profile details, managing the reviewed photo gallery, and the
+ * self-review submission to the LGU (DRAFT/UNPUBLISHED → FOR_LGU_REVIEW).
  * Programmer/s: iTOUR Development Team
  * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
  */
@@ -12,142 +13,203 @@
 namespace App\Http\Controllers\Establishment;
 
 use App\Models\Listing;
-use App\Models\ListingImage;
-use App\Support\EstablishmentMockData;
+use App\Models\OperationLog;
+use App\Services\ListingPublishWorkflow;
+use App\Support\ListingReadinessChecklist;
+use App\Support\OperationLogger;
 use App\Support\TourismCatalog;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class ProfileController extends EstablishmentController
 {
     /**
-     * Establishment Profile: view/edit the account's own public tourism
-     * profile. The municipality is fixed to the account's assignment.
+     * Establishment Profile: the merged page — status banner, details
+     * form, and the reviewed photo manager, in that order. Read-only
+     * (both fields and photo management) once the package has been
+     * submitted, until it's returned.
      */
-    public function edit(Request $request): View
+    public function edit(Request $objRequest): View
     {
-        $name = $request->user()->usr_organization_name;
+        $objListing = $this->ownListing($objRequest);
 
-        return $this->renderEstablishment($request, 'establishment.profile', 'establishment.profile', 'Establishment Profile', [
-            'profile' => EstablishmentMockData::profile($name),
-            'gallery' => EstablishmentMockData::galleryImages($name),
+        return $this->renderEstablishment($objRequest, 'establishment.profile', 'establishment.profile', 'Establishment Profile', [
+            'listing' => $objListing,
+            'images' => $objListing->establishmentImages,
             'categories' => TourismCatalog::categories(),
+            'blnIsReadOnly' => $this->isReadOnly($objListing),
+            'strStatusLabel' => $this->statusLabel($objListing),
+            'strStatusTone' => $this->statusTone($objListing),
+            'strReturnReason' => $this->returnReason($objListing),
         ]);
     }
 
-    public function update(Request $request): RedirectResponse
+    /**
+     * "Save draft" — saves the details form without validating required
+     * fields and never changes status. Always available in DRAFT/UNPUBLISHED.
+     */
+    public function update(Request $objRequest): RedirectResponse
     {
-        $listing = $this->ownListing($request);
+        $objListing = $this->ownListing($objRequest);
+        abort_unless($objRequest->user()->can('update', $objListing), 403);
 
-        $data = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'category' => ['required', 'string', Rule::in(collect(TourismCatalog::categories())->pluck('slug')->reject(fn ($slug) => $slug === 'destinations'))],
-            'address' => ['required', 'string', 'max:255'],
+        $arrData = $this->validateDetails($objRequest);
+
+        if (! $this->saveDetails($objRequest, $objListing, $arrData)) {
+            return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
+        }
+
+        return back()->with('toast', 'Draft saved.');
+    }
+
+    /**
+     * "Save and submit to LGU" — saves the details form, runs the Ready-
+     * to-publish checklist, and only submits (DRAFT/UNPUBLISHED →
+     * FOR_LGU_REVIEW) when everything required is present.
+     */
+    public function submit(Request $objRequest, ListingPublishWorkflow $objWorkflow): RedirectResponse
+    {
+        $objListing = $this->ownListing($objRequest);
+        abort_unless($objRequest->user()->can('update', $objListing), 403);
+        abort_unless($objRequest->user()->can('submitToLgu', $objListing), 403);
+
+        $arrData = $this->validateDetails($objRequest);
+
+        if (! $this->saveDetails($objRequest, $objListing, $arrData)) {
+            return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
+        }
+
+        $arrMissingFields = ListingReadinessChecklist::missingFields($objListing->fresh());
+
+        if ($arrMissingFields !== []) {
+            return back()->with('arrMissingFields', $arrMissingFields)->with('toast', 'A few things are missing before this can be submitted.')->with('toast_tone', 'danger');
+        }
+
+        try {
+            $objWorkflow->submitToLgu($objRequest->user(), $objListing);
+        } catch (\Throwable $objException) {
+            Log::error('Failed to submit establishment profile to LGU.', ['exception' => $objException, 'listing_id' => $objListing->lst_id]);
+
+            return back()->with('toast', 'Something went wrong while submitting. Please try again.')->with('toast_tone', 'danger');
+        }
+
+        return back()->with('toast', 'Submitted to your LGU tourism office for review.');
+    }
+
+    /**
+     * @return array{name: string, category: string, address: string, description: ?string, phone: ?string, hours: ?string, email: ?string, website: ?string}
+     */
+    private function validateDetails(Request $objRequest): array
+    {
+        return $objRequest->validate([
+            'name' => ['nullable', 'string', 'max:255'],
+            'category' => ['nullable', 'string', Rule::in(collect(TourismCatalog::categories())->pluck('slug')->reject(fn ($strSlug) => $strSlug === 'destinations'))],
+            'address' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
-            'phone' => ['required', 'string', 'max:255'],
-            'hours' => ['required', 'string', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:255'],
+            'hours' => ['nullable', 'string', 'max:255'],
             'email' => ['nullable', 'email', 'max:255'],
             'website' => ['nullable', 'string', 'max:255'],
         ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $arrData
+     */
+    private function saveDetails(Request $objRequest, Listing $objListing, array $arrData): bool
+    {
+        $arrBefore = $objListing->getOriginal();
 
         try {
-            $listing->update([
-                'lst_name' => $data['name'],
-                'lst_category' => $data['category'],
-                'lst_barangay' => $data['address'],
-                'lst_description' => $data['description'] ?? null,
-                'lst_contact_phone' => $data['phone'],
-                'lst_hours' => $data['hours'],
-                'lst_email' => $data['email'] ?? null,
-                'lst_website' => $data['website'] ?? null,
+            $objListing->update([
+                'lst_name' => $arrData['name'] ?? $objListing->lst_name,
+                'lst_category' => $arrData['category'] ?? $objListing->lst_category,
+                'lst_barangay' => $arrData['address'] ?? $objListing->lst_barangay,
+                'lst_description' => $arrData['description'] ?? null,
+                'lst_contact_phone' => $arrData['phone'] ?? null,
+                'lst_hours' => $arrData['hours'] ?? null,
+                'lst_email' => $arrData['email'] ?? null,
+                'lst_website' => $arrData['website'] ?? null,
             ]);
 
             // The account's usr_organization_name is a display label only (the
-            // join to $listing is via lst_id, not this string) —
+            // join to $objListing is via lst_id, not this string) —
             // still kept in sync so EstablishmentMockData's name-keyed
-            // lookups (profile/gallery/arrivals reads) don't go stale.
-            if ($data['name'] !== $request->user()->usr_organization_name) {
-                $request->user()->update(['usr_organization_name' => $data['name']]);
+            // lookups (arrivals/feedback reads) don't go stale.
+            if ($objListing->lst_name !== $objRequest->user()->usr_organization_name) {
+                $objRequest->user()->update(['usr_organization_name' => $objListing->lst_name]);
             }
-        } catch (\Throwable $e) {
-            Log::error('Failed to update establishment profile.', ['exception' => $e, 'lst_id' => $listing->lst_id]);
+        } catch (\Throwable $objException) {
+            Log::error('Failed to save establishment profile.', ['exception' => $objException, 'listing_id' => $objListing->lst_id]);
 
-            return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
+            return false;
         }
 
-        return back()->with('toast', 'Establishment profile updated.');
+        OperationLogger::updated($objRequest->user(), 'establishment', $objListing->lst_id, $objListing->mun_id, $objListing->lst_id, OperationLogger::diff($arrBefore, $objListing));
+
+        return true;
     }
 
-    public function storeImage(Request $request): RedirectResponse
+    /**
+     * Read-only once the package leaves the establishment's hands — only
+     * DRAFT/UNPUBLISHED are editable (matches ListingPolicy::update()).
+     */
+    private function isReadOnly(Listing $objListing): bool
     {
-        $listing = $this->ownListing($request);
-
-        $data = $request->validate([
-            'image' => ['required', 'image', 'max:5120'],
-        ]);
-
-        try {
-            $path = $request->file('image')->store('itour-images', 'public');
-
-            $listing->images()->create([
-                'lsi_path' => basename($path),
-                'lsi_caption' => null,
-                'lsi_is_primary' => ! $listing->images()->exists(),
-                'lsi_sort_order' => $listing->images()->count(),
-            ]);
-        } catch (\Throwable $e) {
-            Log::error('Failed to store establishment photo.', ['exception' => $e, 'lst_id' => $listing->lst_id]);
-
-            return back()->with('toast', 'Something went wrong while uploading the photo. Please try again.')->with('toast_tone', 'danger');
-        }
-
-        return back()->with('toast', 'Photo added.');
+        return ! in_array($objListing->lst_status, ['DRAFT', 'UNPUBLISHED'], true);
     }
 
-    public function setPrimaryImage(Request $request, ListingImage $image): RedirectResponse
+    private function statusLabel(Listing $objListing): string
     {
-        $listing = $this->ownListing($request);
-        abort_unless($image->lst_id === $listing->lst_id, 403);
-
-        try {
-            $listing->images()->update(['lsi_is_primary' => false]);
-            $image->update(['lsi_is_primary' => true]);
-        } catch (\Throwable $e) {
-            Log::error('Failed to set primary establishment photo.', ['exception' => $e, 'lst_id' => $listing->lst_id, 'image_id' => $image->lsi_id]);
-
-            return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
+        if ($this->returnReason($objListing) !== null) {
+            return 'Returned';
         }
 
-        return back()->with('toast', 'Featured photo updated.');
+        return match ($objListing->lst_status) {
+            'DRAFT', 'UNPUBLISHED' => 'Draft',
+            'FOR_LGU_REVIEW' => 'Waiting for LGU Review',
+            'FOR_PTO_REVIEW' => 'Waiting for PTO',
+            'PUBLISHED' => 'Live',
+            default => $objListing->lst_status,
+        };
     }
 
-    public function destroyImage(Request $request, ListingImage $image): RedirectResponse
+    private function statusTone(Listing $objListing): string
     {
-        $listing = $this->ownListing($request);
-        abort_unless($image->lst_id === $listing->lst_id, 403);
-
-        $wasPrimary = $image->lsi_is_primary;
-
-        try {
-            Storage::disk('public')->delete('itour-images/'.$image->lsi_path);
-            $image->delete();
-
-            // Removing the featured photo shouldn't leave the gallery with none
-            // — promote whatever's left, if anything.
-            if ($wasPrimary) {
-                $listing->images()->orderBy('lsi_sort_order')->first()?->update(['lsi_is_primary' => true]);
-            }
-        } catch (\Throwable $e) {
-            Log::error('Failed to remove establishment photo.', ['exception' => $e, 'lst_id' => $listing->lst_id, 'image_id' => $image->lsi_id]);
-
-            return back()->with('toast', 'Something went wrong while removing the photo. Please try again.')->with('toast_tone', 'danger');
+        if ($this->returnReason($objListing) !== null) {
+            return 'warning';
         }
 
-        return back()->with('toast', 'Photo removed.');
+        return match ($objListing->lst_status) {
+            'FOR_LGU_REVIEW', 'FOR_PTO_REVIEW' => 'info',
+            'PUBLISHED' => 'success',
+            default => 'neutral',
+        };
+    }
+
+    /**
+     * Derives "was this DRAFT/UNPUBLISHED status caused by a return, and
+     * why" from the audit trail — no extra database column. Only the most
+     * recent relevant transition matters: a later submit/publish means the
+     * listing has moved on since the return and the reason is stale.
+     */
+    private function returnReason(Listing $objListing): ?string
+    {
+        if (! in_array($objListing->lst_status, ['DRAFT', 'UNPUBLISHED'], true)) {
+            return null;
+        }
+
+        $objLastTransition = OperationLog::query()
+            ->where('opl_entity_type', 'establishment')
+            ->where('opl_entity_id', $objListing->lst_id)
+            ->whereIn('opl_action', ['submit', 'return', 'publish', 'unpublish'])
+            ->latest('opl_id')
+            ->first();
+
+        return $objLastTransition?->opl_action === 'return' ? $objLastTransition->opl_reason : null;
     }
 
     /**
@@ -157,14 +219,14 @@ class ProfileController extends EstablishmentController
      * gets its own distinct, scannable code (rendered client-side — see
      * resources/js/establishment.js).
      */
-    public function qr(Request $request): View
+    public function qr(Request $objRequest): View
     {
-        $name = $request->user()->usr_organization_name;
-        $profile = EstablishmentMockData::profile($name);
+        abort_if($objRequest->user()->lst_id === null, 403, 'Your account is not linked to an establishment yet.');
+        $objListing = $objRequest->user()->establishment()->firstOrFail();
 
-        return $this->renderEstablishment($request, 'establishment.qr', 'establishment.qr', 'QR Code', [
-            'profile' => $profile,
-            'checkinUrl' => $profile ? route('lgu.establishmentQr', ['establishment' => $profile['id']]) : null,
+        return $this->renderEstablishment($objRequest, 'establishment.qr', 'establishment.qr', 'QR Code', [
+            'establishmentName' => $objListing->lst_name,
+            'checkinUrl' => route('lgu.establishmentQr', ['establishment' => $objListing->lst_uuid]),
         ]);
     }
 
@@ -174,10 +236,10 @@ class ProfileController extends EstablishmentController
      * string an account could otherwise rename to collide with a different
      * establishment's listing.
      */
-    private function ownListing(Request $request): Listing
+    private function ownListing(Request $objRequest): Listing
     {
-        abort_if($request->user()->lst_id === null, 403, 'Your account is not linked to an establishment yet.');
+        abort_if($objRequest->user()->lst_id === null, 403, 'Your account is not linked to an establishment yet.');
 
-        return $request->user()->establishment()->firstOrFail();
+        return $objRequest->user()->establishment()->firstOrFail();
     }
 }

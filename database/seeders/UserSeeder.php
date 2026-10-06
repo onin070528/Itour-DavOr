@@ -1,5 +1,13 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Seeds the demo account list used by the PTO User Management page.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 namespace Database\Seeders;
 
 use App\Enums\UserRole;
@@ -66,11 +74,11 @@ class UserSeeder extends Seeder
         // The rest of PtoMockData::seedUsers() — the 3 above already have their
         // proper long-form usr_organization_name authored by hand, so they're
         // skipped here rather than flattened to the generic mapping below.
-        $seededEmails = ['ebautista@davaooriental.gov.ph', 'adizon@mati.gov.ph', 'frontdesk@botanikaresort.ph'];
-        $roleByTitle = collect(UserRole::cases())->keyBy(fn (UserRole $role) => $role->title());
+        $arrSeededEmails = ['ebautista@davaooriental.gov.ph', 'adizon@mati.gov.ph', 'frontdesk@botanikaresort.ph'];
+        $objRoleByTitle = collect(UserRole::cases())->keyBy(fn (UserRole $objRole) => $objRole->title());
 
-        foreach (PtoMockData::seedUsers() as $row) {
-            if (in_array($row['email'], $seededEmails, true)) {
+        foreach (PtoMockData::seedUsers() as $arrRow) {
+            if (in_array($arrRow['email'], $arrSeededEmails, true)) {
                 continue;
             }
 
@@ -81,16 +89,16 @@ class UserSeeder extends Seeder
             // Pto\UsersController as the same mapping real account creation
             // uses, not a one-off guess for seed data.
             User::query()->updateOrCreate(
-                ['usr_email' => $row['email']],
+                ['usr_email' => $arrRow['email']],
                 [
-                    'usr_name' => $row['name'],
+                    'usr_name' => $arrRow['name'],
                     'usr_password' => 'password',
                     'usr_email_verified_at' => now(),
-                    'usr_role' => $roleByTitle[$row['role']] ?? UserRole::Lgu,
-                    'usr_organization_name' => $row['assignment'],
-                    'usr_organization_subtitle' => $row['assignment'],
-                    'usr_status' => $row['status'],
-                    'usr_last_login_at' => Carbon::parse($row['lastActive']),
+                    'usr_role' => $objRoleByTitle[$arrRow['role']] ?? UserRole::Lgu,
+                    'usr_organization_name' => $arrRow['assignment'],
+                    'usr_organization_subtitle' => $arrRow['assignment'],
+                    'usr_status' => $arrRow['status'],
+                    'usr_last_login_at' => Carbon::parse($arrRow['lastActive']),
                 ]
             );
         }

@@ -1,5 +1,13 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Seeds the demo front-desk arrivals for Botanika Nature Resort.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 namespace Database\Seeders;
 
 use App\Models\Listing;
@@ -11,27 +19,33 @@ class ArrivalSeeder extends Seeder
     /**
      * Moves Botanika Nature Resort's demo front-desk arrivals — the only
      * establishment App\Support\EstablishmentMockData::seedArrivals() has
-     * rows for — into the real `arrivals` table (source: staff), verbatim.
+     * rows for — into the real `tbl_arrivals` table (source: staff), verbatim.
      */
     public function run(): void
     {
-        $listing = Listing::query()->where('lst_name', 'Botanika Nature Resort')->first();
+        if (app()->environment('production')) {
+            $this->command?->warn('ArrivalSeeder: skipped — refusing to seed demo arrivals in production.');
 
-        if (! $listing) {
             return;
         }
 
-        $listing->arrivals()->where('arr_source', 'staff')->delete();
+        $objListing = Listing::query()->where('lst_name', 'Botanika Nature Resort')->first();
 
-        $listing->arrivals()->createMany(
-            collect(EstablishmentMockData::seedArrivals($listing->lst_name))->map(fn (array $row) => [
+        if (! $objListing) {
+            return;
+        }
+
+        $objListing->arrivals()->where('arr_source', 'staff')->delete();
+
+        $objListing->arrivals()->createMany(
+            collect(EstablishmentMockData::seedArrivals($objListing->lst_name))->map(fn (array $arrRow) => [
                 'arr_source' => 'staff',
-                'arr_date' => $row['date'],
-                'arr_visitor_name' => $row['visitorName'],
-                'arr_gender' => $row['gender'],
-                'arr_classification' => $row['classification'],
-                'arr_remarks' => $row['remarks'],
-                'arr_status' => $row['status'],
+                'arr_date' => $arrRow['date'],
+                'arr_visitor_name' => $arrRow['visitorName'],
+                'arr_gender' => $arrRow['gender'],
+                'arr_classification' => $arrRow['classification'],
+                'arr_remarks' => $arrRow['remarks'],
+                'arr_status' => $arrRow['status'],
                 'arr_party_size' => 1,
             ])->all()
         );

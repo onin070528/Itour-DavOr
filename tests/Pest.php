@@ -1,6 +1,19 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Pest bootstrap — binds the test case and defines shared test helpers.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
+use App\Enums\UserRole;
+use App\Models\Category;
+use App\Models\Listing;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /*
@@ -47,4 +60,41 @@ expect()->extend('toBeOne', function () {
 function something()
 {
     // ..
+}
+
+/**
+ * Create an establishment user linked to an existing seeded listing
+ * (or create a new one if no seeded listing matches the name).
+ *
+ * Reuses pre-seeded listings (e.g., "Botanika Nature Resort") so that
+ * ArrivalSeeder data is available for tests that need it.
+ */
+function actingAsEstablishment(string $name, string $subtitle = 'Somewhere, Davao Oriental'): User
+{
+    // Try to find the pre-seeded listing first (so ArrivalSeeder data works)
+    $listing = Listing::query()->where('lst_name', $name)->first();
+
+    if (! $listing) {
+        $category = Category::query()->firstOrCreate(
+            ['cat_name' => 'Accommodation'],
+            ['cat_sort_order' => 1, 'cat_is_active' => true, 'cat_is_qr_enabled' => true]
+        );
+
+        $listing = Listing::query()->create([
+            'lst_slug' => Str::slug($name.'-'.Str::random(6)),
+            'lst_name' => $name,
+            'lst_category' => 'accommodation',
+            'cat_id' => $category->cat_id,
+            'lst_municipality' => 'City of Mati',
+            'lst_barangay' => 'Dahican',
+            'lst_status' => 'DRAFT',
+        ]);
+    }
+
+    return User::factory()->create([
+        'usr_role' => UserRole::Establishment,
+        'usr_organization_name' => $name,
+        'usr_organization_subtitle' => $subtitle,
+        'lst_id' => $listing->lst_id,
+    ]);
 }

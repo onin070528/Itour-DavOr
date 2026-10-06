@@ -1,3 +1,10 @@
+{{--
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: Public site footer.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+--}}
 @php
     $footerColumns = [
         'Discover' => [
@@ -55,7 +62,10 @@
 
         <div class="mt-12 flex flex-col gap-3 border-t border-sand-200 pt-6 text-xs text-sand-500 sm:flex-row sm:items-center sm:justify-between">
             <p>&copy; {{ now()->year }} Provincial Tourism Office of Davao Oriental. All rights reserved.</p>
-            <p>An official platform of the Provincial Government of Davao Oriental, Republic of the Philippines.</p>
+            <p>
+                An official platform of the Provincial Government of Davao Oriental, Republic of the Philippines.
+                &middot; <a href="{{ route('privacy') }}" class="font-semibold text-sand-600 hover:text-primary-700">Privacy Notice</a>
+            </p>
         </div>
     </div>
 </footer>
