@@ -71,6 +71,19 @@ class SecurityLogger
         self::write($newStatus === 'Inactive' ? 'account_suspended' : 'account_reactivated', user: $actor, targetUser: $account);
     }
 
+    /**
+     * Records a denied authorization attempt without recording request
+     * payloads or other sensitive data.
+     */
+    public static function accessDenied(User $user, string $ability, ?string $resource = null, ?int $targetMunicipalityId = null): void
+    {
+        self::write('access_denied', user: $user, details: array_filter([
+            'ability' => $ability,
+            'resource' => $resource,
+            'target_municipality_id' => $targetMunicipalityId,
+        ], static fn (mixed $value): bool => $value !== null));
+    }
+
     public static function roleChanged(User $actor, User $account, UserRole $fromRole, UserRole $toRole): void
     {
         self::write('role_changed', user: $actor, targetUser: $account, details: [

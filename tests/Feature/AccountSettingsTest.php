@@ -42,12 +42,12 @@ test('a 12-character password with letters and numbers is accepted when changing
 
     $response = test()->actingAs($user)->post(route('pto.settings.password'), [
         'current_password' => 'password',
-        'password' => 'validpass123',
-        'password_confirmation' => 'validpass123',
+        'password' => 'valid-pass123',
+        'password_confirmation' => 'valid-pass123',
     ]);
 
     $response->assertSessionHasNoErrors();
-    expect(Hash::check('validpass123', $user->fresh()->password))->toBeTrue();
+    expect(Hash::check('valid-pass123', $user->fresh()->password))->toBeTrue();
 });
 
 test('changing password never stores it in plain text', function () {
@@ -55,11 +55,11 @@ test('changing password never stores it in plain text', function () {
 
     test()->actingAs($user)->post(route('pto.settings.password'), [
         'current_password' => 'password',
-        'password' => 'validpass123',
-        'password_confirmation' => 'validpass123',
+        'password' => 'valid-pass123',
+        'password_confirmation' => 'valid-pass123',
     ]);
 
-    expect($user->fresh()->password)->not->toBe('validpass123');
+    expect($user->fresh()->password)->not->toBe('valid-pass123');
     expect($user->fresh()->password)->toStartWith('$2y$');
 });
 
@@ -105,8 +105,8 @@ test('changing password records a security log entry', function () {
 
     test()->actingAs($user)->post(route('pto.settings.password'), [
         'current_password' => 'password',
-        'password' => 'validpass123',
-        'password_confirmation' => 'validpass123',
+        'password' => 'valid-pass123',
+        'password_confirmation' => 'valid-pass123',
     ]);
 
     expect(SecurityLog::where('user_id', $user->id)->where('event_type', 'password_changed')->exists())->toBeTrue();

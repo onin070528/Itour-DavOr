@@ -88,7 +88,11 @@ trait UpdatesAccountSettings
         $user = $request->user();
 
         try {
-            $user->update(['password' => $data['password']]);
+            $user->forceFill([
+                'password' => $data['password'],
+                'usr_must_change_password' => false,
+                'usr_password_changed_at' => now(),
+            ])->save();
         } catch (\Throwable $e) {
             Log::error('Failed to update account password.', ['exception' => $e, 'user_id' => $user->id]);
 

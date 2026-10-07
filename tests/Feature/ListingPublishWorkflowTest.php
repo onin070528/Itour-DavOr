@@ -43,19 +43,25 @@ function publishWorkflowLguFixture(Municipality $objMunicipality): User
 test('LGU registering an establishment creates it as DRAFT, not publicly visible', function () {
     $mati = Municipality::query()->firstOrCreate(['code' => 'MATI'], ['name' => 'City of Mati']);
     $lgu = publishWorkflowLguFixture($mati);
+    $category = Category::query()->firstOrCreate(
+        ['cat_name' => 'Accommodation'],
+        ['cat_sort_order' => 1, 'cat_is_active' => true, 'cat_is_qr_enabled' => true]
+    );
 
-    test()->actingAs($lgu)->post(route('lgu.users.store'), [
+    test()->actingAs($lgu)->post(route('lgu.directory.establishments.store'), [
         'name' => 'New Resort',
-        'email' => 'new-resort@example.test',
-        'category' => 'accommodation',
+        'cat_id' => $category->cat_id,
+        'type' => 'Resort',
         'barangay' => 'Dahican',
-        'ownerName' => 'Juan Dela Cruz',
-        'contactPhone' => '09171234567',
+        'owner_name' => 'Juan Dela Cruz',
+        'contact_phone' => '09171234567',
     ])->assertSessionHasNoErrors();
 
     $listing = Listing::query()->where('name', 'New Resort')->sole();
     expect($listing->status)->toBe('DRAFT');
     expect($listing->isPubliclyVisible())->toBeFalse();
+    // Registering the establishment never creates its account.
+    expect($listing->establishmentUser)->toBeNull();
 
     test()->get(route('explore'))->assertDontSee('New Resort');
 });
@@ -133,7 +139,9 @@ test('PTO Return to LGU sends it back with one note and notifies the LGU', funct
         'reason' => 'Missing barangay clearance.',
     ])->assertRedirect();
 
-    expect($listing->fresh()->status)->toBe('DRAFT');
+    // Returned for Correction, with the remarks kept for the LGU.
+    expect($listing->fresh()->status)->toBe('FOR_CORRECTION');
+    expect($listing->fresh()->lst_review_remarks)->toBe('Missing barangay clearance.');
     Notification::assertSentTo($lgu, EstablishmentListingReturnedToLgu::class);
 });
 

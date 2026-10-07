@@ -65,15 +65,16 @@ test('created_by records which account created a new LGU account', function () {
     expect($created->created_by)->toBe($pto->id);
 });
 
-test('created_by records which account registered a new establishment', function () {
+test('created_by records which account activated a new establishment account', function () {
     $mati = makeMunicipalityFixture('City of Mati', 'MATI');
     $lgu = User::factory()->create([
         'role' => UserRole::Lgu,
         'organization_subtitle' => 'City of Mati',
         'municipality_id' => $mati->id,
     ]);
+    $listing = makeEstablishmentListingFixture($mati, 'Mati Fixture Inn');
 
-    test()->actingAs($lgu)->post(route('lgu.users.store'), establishmentFormPayload());
+    test()->actingAs($lgu)->post(route('lgu.directory.establishments.switchToOnline', $listing), establishmentAccountPayload());
 
     $created = User::query()->where('email', 'frontdesk@matifixtureinn.test')->first();
     expect($created->created_by)->toBe($lgu->id);
@@ -215,54 +216,43 @@ test('PTO cannot promote an existing LGU account to PTO Administrator', function
 });
 
 /**
+ * The "Activate Online iTOUR account" form: the account holder and sign-in
+ * email only. Everything else comes from the establishment record.
+ *
  * @return array<string, string>
  */
-function establishmentFormPayload(array $overrides = []): array
+function establishmentAccountPayload(array $overrides = []): array
 {
     return [
-        'name' => 'Mati Fixture Inn',
-        'category' => 'accommodation',
-        'barangay' => 'Dahican',
-        'ownerName' => 'Juan Dela Cruz',
-        'contactPhone' => '09171234567',
-        'email' => 'frontdesk@matifixtureinn.test',
-        'hoursDays' => 'mon-sun',
-        'hoursOpen' => '08:00',
-        'hoursClose' => '17:00',
-        'website' => 'https://matifixtureinn.test',
-        'description' => 'Beachfront inn.',
+        'account_name' => 'Juan Dela Cruz',
+        'account_email' => 'frontdesk@matifixtureinn.test',
         ...$overrides,
     ];
 }
 
-test('LGU can register an establishment and its account in its own municipality', function () {
+test('LGU can activate an account for an establishment in its own municipality', function () {
     $mati = makeMunicipalityFixture('City of Mati', 'MATI');
     $lgu = User::factory()->create([
         'role' => UserRole::Lgu,
         'organization_subtitle' => 'City of Mati',
         'municipality_id' => $mati->id,
     ]);
+    $listing = makeEstablishmentListingFixture($mati, 'Mati Fixture Inn');
 
-    $response = test()->actingAs($lgu)->post(route('lgu.users.store'), establishmentFormPayload());
+    $response = test()->actingAs($lgu)->post(route('lgu.directory.establishments.switchToOnline', $listing), establishmentAccountPayload());
 
-    $response->assertRedirect()->assertSessionHasNoErrors();
+    $response->assertRedirect(route('lgu.directory.establishments.show', $listing))->assertSessionHasNoErrors();
     $created = User::query()->where('email', 'frontdesk@matifixtureinn.test')->first();
     expect($created)->not->toBeNull();
     expect($created->role)->toBe(UserRole::Establishment);
     expect($created->name)->toBe('Juan Dela Cruz');
+    expect($created->organization_name)->toBe('Mati Fixture Inn');
     expect($created->municipality_id)->toBe($mati->id);
-
-    $listing = $created->establishment;
-    expect($listing)->not->toBeNull();
-    expect($listing->name)->toBe('Mati Fixture Inn');
-    expect($listing->category)->toBe('accommodation');
-    expect($listing->barangay)->toBe('Dahican');
-    expect($listing->owner_name)->toBe('Juan Dela Cruz');
-    expect($listing->contact_phone)->toBe('09171234567');
-    expect($listing->municipality_id)->toBe($mati->id);
+    expect($created->establishment_id)->toBe($listing->id);
+    expect($listing->fresh()->reportingMethod()->isOnline())->toBeTrue();
 });
 
-test('LGU-registered establishments are always placed in the LGU\'s own municipality', function () {
+test('LGU cannot activate an account for an establishment in another municipality', function () {
     $mati = makeMunicipalityFixture('City of Mati', 'MATI');
     $baganga = makeMunicipalityFixture('Baganga', 'BAG');
     $matiLgu = User::factory()->create([
@@ -270,36 +260,45 @@ test('LGU-registered establishments are always placed in the LGU\'s own municipa
         'organization_subtitle' => 'City of Mati',
         'municipality_id' => $mati->id,
     ]);
+    $bagangaListing = makeEstablishmentListingFixture($baganga, 'Baganga Fixture Inn');
 
-    test()->actingAs($matiLgu)->post(route('lgu.users.store'), establishmentFormPayload([
-        'email' => 'frontdesk@baganganfixtureinn.test',
-        'municipality_id' => (string) $baganga->id,
-        'municipality' => 'Baganga',
-    ]))->assertRedirect();
+    test()->actingAs($matiLgu)
+        ->post(route('lgu.directory.establishments.switchToOnline', $bagangaListing), establishmentAccountPayload())
+        ->assertForbidden();
 
-    $created = User::query()->where('email', 'frontdesk@baganganfixtureinn.test')->first();
-    expect($created->municipality_id)->toBe($mati->id);
-    expect($created->establishment->municipality_id)->toBe($mati->id);
+    expect(User::query()->where('email', 'frontdesk@matifixtureinn.test')->exists())->toBeFalse();
+    expect($bagangaListing->fresh()->reportingMethod()->isOnline())->toBeFalse();
+    expect(SecurityLog::query()->where('user_id', $matiLgu->id)->where('event_type', 'access_denied')->exists())->toBeTrue();
 });
 
-test('LGU cannot register an establishment under the destinations category', function () {
+test('LGU cannot activate an establishment account for a destination', function () {
     $mati = makeMunicipalityFixture('City of Mati', 'MATI');
     $lgu = User::factory()->create([
         'role' => UserRole::Lgu,
         'organization_subtitle' => 'City of Mati',
         'municipality_id' => $mati->id,
     ]);
+    $destination = Listing::query()->create([
+        'slug' => 'mati-fixture-falls',
+        'name' => 'Mati Fixture Falls',
+        'category' => 'destinations',
+        'municipality' => $mati->name,
+        'municipality_id' => $mati->id,
+        'barangay' => 'Poblacion',
+        'status' => 'Active',
+    ]);
 
     test()->actingAs($lgu)
-        ->post(route('lgu.users.store'), establishmentFormPayload(['category' => 'destinations']))
-        ->assertSessionHasErrors('category');
+        ->post(route('lgu.directory.establishments.switchToOnline', $destination), establishmentAccountPayload())
+        ->assertNotFound();
 
     expect(User::query()->where('email', 'frontdesk@matifixtureinn.test')->exists())->toBeFalse();
 });
 
-test('LGU can edit an establishment\'s information and account', function () {
+test('LGU can edit an establishment account, but never its establishment or municipality', function () {
     $mati = makeMunicipalityFixture('City of Mati', 'MATI');
     $listing = makeEstablishmentListingFixture($mati, 'Old Inn Name');
+    $otherListing = makeEstablishmentListingFixture($mati, 'Other Inn');
     $establishmentUser = User::factory()->create([
         'role' => UserRole::Establishment,
         'municipality_id' => $mati->id,
@@ -311,17 +310,22 @@ test('LGU can edit an establishment\'s information and account', function () {
         'municipality_id' => $mati->id,
     ]);
 
-    test()->actingAs($lgu)->put(route('lgu.users.update', $establishmentUser), establishmentFormPayload([
-        'name' => 'New Inn Name',
+    test()->actingAs($lgu)->put(route('lgu.users.update', $establishmentUser), [
+        'name' => 'Maria Santos',
         'email' => 'renamed@matifixtureinn.test',
-    ]))->assertRedirect()->assertSessionHasNoErrors();
+        // Not accepted by the account form — forged anyway.
+        'establishment_id' => $otherListing->id,
+        'municipality_id' => 999,
+        'role' => UserRole::PtoAdministrator->value,
+    ])->assertRedirect()->assertSessionHasNoErrors();
 
     $fresh = $establishmentUser->fresh();
+    expect($fresh->name)->toBe('Maria Santos');
     expect($fresh->email)->toBe('renamed@matifixtureinn.test');
-    expect($fresh->organization_name)->toBe('New Inn Name');
+    expect($fresh->role)->toBe(UserRole::Establishment);
     expect($fresh->establishment_id)->toBe($listing->id);
-    expect($listing->fresh()->name)->toBe('New Inn Name');
-    expect($listing->fresh()->hours)->toBe('Mon–Sun, 8:00 AM – 5:00 PM');
+    expect($fresh->municipality_id)->toBe($mati->id);
+    expect($listing->fresh()->name)->toBe('Old Inn Name');
 });
 
 test('LGU cannot reach the PTO-only account-creation route at all', function () {
@@ -406,58 +410,31 @@ test('self-service settings cannot change role, status, municipality_id, or esta
     expect($fresh->establishment_id)->toBe($listing->id);
 });
 
-test('the LGU Users table lists each establishment\'s saved information', function () {
+test('the LGU Establishment Accounts table lists each account with its establishment', function () {
     $mati = makeMunicipalityFixture('City of Mati', 'MATI');
     $lgu = User::factory()->create([
         'role' => UserRole::Lgu,
         'organization_subtitle' => 'City of Mati',
         'municipality_id' => $mati->id,
     ]);
+    $listing = makeEstablishmentListingFixture($mati, 'Mati Fixture Inn');
+    $listing->update(['barangay' => 'Dahican', 'contact_phone' => '09171234567']);
 
-    test()->actingAs($lgu)->post(route('lgu.users.store'), establishmentFormPayload())->assertRedirect();
+    test()->actingAs($lgu)->post(route('lgu.directory.establishments.switchToOnline', $listing), establishmentAccountPayload())->assertRedirect();
 
     test()->actingAs($lgu)->get(route('lgu.users'))
         ->assertOk()
         ->assertSee('Mati Fixture Inn')
         ->assertSee('Accommodation')
+        ->assertSee('Online iTOUR')
         ->assertSee('Dahican')
         ->assertSee('Juan Dela Cruz')
-        ->assertSee('09171234567');
+        ->assertSee('09171234567')
+        ->assertSee(route('lgu.directory.establishments.show', $listing), false);
 });
 
-test('business hours dropdowns save as a single hours string, including open 24 hours', function () {
-    $mati = makeMunicipalityFixture('City of Mati', 'MATI');
-    $lgu = User::factory()->create([
-        'role' => UserRole::Lgu,
-        'organization_subtitle' => 'City of Mati',
-        'municipality_id' => $mati->id,
-    ]);
-
-    test()->actingAs($lgu)->post(route('lgu.users.store'), establishmentFormPayload([
-        'hoursDays' => 'mon-fri',
-        'hoursOpen' => '24h',
-        'hoursClose' => '',
-    ]))->assertSessionHasNoErrors();
-
-    $listing = User::query()->where('email', 'frontdesk@matifixtureinn.test')->first()->establishment;
-    expect($listing->hours)->toBe('Mon–Fri, Open 24 hours');
-    expect(BusinessHours::parse($listing->hours))->toBe(['days' => 'mon-fri', 'opens' => '24h', 'closes' => null]);
+test('business hours format and parse as a single hours string, including open 24 hours', function () {
+    expect(BusinessHours::format('mon-fri', '24h', null))->toBe('Mon–Fri, Open 24 hours');
+    expect(BusinessHours::parse('Mon–Fri, Open 24 hours'))->toBe(['days' => 'mon-fri', 'opens' => '24h', 'closes' => null]);
     expect(BusinessHours::parse('Mon–Sun, 8:00 AM – 5:00 PM'))->toBe(['days' => 'mon-sun', 'opens' => '08:00', 'closes' => '17:00']);
-});
-
-test('business hours require a closing time unless open 24 hours', function () {
-    $mati = makeMunicipalityFixture('City of Mati', 'MATI');
-    $lgu = User::factory()->create([
-        'role' => UserRole::Lgu,
-        'organization_subtitle' => 'City of Mati',
-        'municipality_id' => $mati->id,
-    ]);
-
-    test()->actingAs($lgu)
-        ->post(route('lgu.users.store'), establishmentFormPayload(['hoursClose' => '']))
-        ->assertSessionHasErrors('hoursClose');
-
-    test()->actingAs($lgu)
-        ->post(route('lgu.users.store'), establishmentFormPayload(['hoursDays' => '']))
-        ->assertSessionHasErrors('hoursDays');
 });

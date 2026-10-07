@@ -166,7 +166,7 @@ test('PTO publishing an establishment records a publish operation log', function
     expect($listing->fresh()->status)->toBe('PUBLISHED');
 });
 
-test('editing an establishment\'s info records an update operation log with masked email', function () {
+test('editing an establishment account records an update operation log with masked email', function () {
     $mati = makeMunicipalityFixture('City of Mati', 'MATI');
     $listing = Listing::query()->create([
         'slug' => 'mati-fixture-inn-op-log',
@@ -192,16 +192,14 @@ test('editing an establishment\'s info records an update operation log with mask
     ]);
 
     test()->actingAs($lgu)->put(route('lgu.users.update', $establishmentUser), [
-        'name' => $listing->name,
-        'category' => $listing->category,
-        'barangay' => $listing->barangay,
-        'ownerName' => $listing->owner_name,
-        'contactPhone' => $listing->contact_phone,
+        'name' => $listing->owner_name,
         'email' => 'new@matifixtureinn.test',
     ])->assertSessionHasNoErrors();
 
-    $log = OperationLog::where('entity_type', 'establishment')->where('entity_id', $listing->id)->where('action', 'update')->first();
+    $log = OperationLog::where('entity_type', 'user')->where('entity_id', $establishmentUser->id)->where('action', 'update')->first();
     expect($log)->not->toBeNull();
+    expect($log->municipality_id)->toBe($mati->id);
+    expect($log->establishment_id)->toBe($listing->id);
     expect($log->new_values['email'])->not->toBe('new@matifixtureinn.test');
     expect($log->new_values['email'])->toContain('***@');
     expect(json_encode($log->toArray()))->not->toContain('new@matifixtureinn.test');

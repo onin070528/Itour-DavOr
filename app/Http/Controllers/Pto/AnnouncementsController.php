@@ -36,6 +36,8 @@ class AnnouncementsController extends PtoController
 
     public function store(Request $request): RedirectResponse
     {
+        abort_unless($request->user()->can('create', Announcement::class), 403);
+
         $data = $this->validatedFields($request);
 
         try {
@@ -57,6 +59,8 @@ class AnnouncementsController extends PtoController
 
     public function update(Request $request, Announcement $announcement): RedirectResponse
     {
+        abort_unless($request->user()->can('update', $announcement), 403);
+
         $data = $this->validatedFields($request);
         $before = $announcement->getOriginal();
 
@@ -75,6 +79,8 @@ class AnnouncementsController extends PtoController
 
     public function togglePublish(Request $request, Announcement $announcement): RedirectResponse
     {
+        abort_unless($request->user()->can('togglePublish', $announcement), 403);
+
         $before = $announcement->getOriginal();
 
         $announcement->update(['ann_is_published' => ! $announcement->ann_is_published, 'ann_updated_by' => $request->user()->id]);

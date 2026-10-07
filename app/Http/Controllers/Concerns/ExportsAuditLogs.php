@@ -16,6 +16,8 @@
 
 namespace App\Http\Controllers\Concerns;
 
+use App\Models\OperationLog;
+use App\Models\SecurityLog;
 use App\Support\AuditLogQuery;
 use App\Support\OperationLogger;
 use Illuminate\Http\Request;
@@ -31,6 +33,8 @@ trait ExportsAuditLogs
         $tab = $request->query('tab');
         $filters = AuditLogQuery::validatedFilters($request);
         $user = Auth::user();
+
+        abort_unless($user->can('export', $tab === 'security' ? SecurityLog::class : OperationLog::class), 403);
 
         $rows = $tab === 'security'
             ? AuditLogQuery::securityLogsForExport($user, $filters)

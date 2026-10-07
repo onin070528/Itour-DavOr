@@ -4,7 +4,8 @@
  * iTOUR — Davao Oriental Tourism Information System
  *
  * Purpose: Shared Add/Edit/Archive Destination logic used by the LGU and PTO
- * directory controllers (validation, creation, and unique slug generation).
+ * directory controllers (validation and unique slug generation). Creating an
+ * LGU destination goes through App\Services\AttractionRecordService.
  * Programmer/s: iTOUR Development Team
  * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
  */
@@ -14,7 +15,6 @@ namespace App\Http\Controllers\Concerns;
 use App\Models\Listing;
 use App\Support\TourismCatalog;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 /**
@@ -47,39 +47,9 @@ trait ManagesDestinationListings
         ];
     }
 
-    /**
-     * $municipalityId is the real FK (App\Models\Municipality) — the caller
-     * resolves it (LGU: its own account's municipality_id, already a
-     * reliable FK; PTO: looked up from the submitted municipality name)
-     * since only the caller knows which is trustworthy for its form.
-     * Left null here, it's null on the row too, which then fails the
-     * municipality-scoped access checks (Lgu\DirectoryController::
-     * authorizeOwnMunicipality) — always pass it.
-     */
-    protected function createDestination(array $fields, string $municipality, ?int $municipalityId): Listing
-    {
-        return Listing::query()->create([
-            ...$fields,
-            'slug' => $this->uniqueDestinationSlug($fields['name']),
-            'category' => 'destinations',
-            'municipality' => $municipality,
-            'municipality_id' => $municipalityId,
-            'status' => 'Active',
-        ]);
-    }
-
     protected function uniqueDestinationSlug(string $name): string
     {
-        $base = Str::slug($name) ?: 'destination';
-        $slug = $base;
-        $suffix = 2;
-
-        while (Listing::query()->where('slug', $slug)->exists()) {
-            $slug = "{$base}-{$suffix}";
-            $suffix++;
-        }
-
-        return $slug;
+        return Listing::uniqueSlug($name);
     }
 
     /**

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Auth\FirstLoginPasswordController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\SessionController;
@@ -15,19 +16,24 @@ use App\Http\Controllers\EstablishmentImageFileController;
 use App\Http\Controllers\ExploreController;
 use App\Http\Controllers\HotlinesController;
 use App\Http\Controllers\LandingController;
+use App\Http\Controllers\Lgu\AttractionsController as LguAttractionsController;
 use App\Http\Controllers\Lgu\AuditLogsController as LguAuditLogsController;
 use App\Http\Controllers\Lgu\DashboardController as LguDashboardController;
 use App\Http\Controllers\Lgu\DirectoryController as LguDirectoryController;
+use App\Http\Controllers\Lgu\EstablishmentAdoptionController as LguEstablishmentAdoptionController;
+use App\Http\Controllers\Lgu\EstablishmentsController as LguEstablishmentsController;
 use App\Http\Controllers\Lgu\FeedbackController as LguFeedbackController;
 use App\Http\Controllers\Lgu\ImagesController as LguImagesController;
 use App\Http\Controllers\Lgu\MonthlyReportsController as LguMonthlyReportsController;
 use App\Http\Controllers\Lgu\SettingsController as LguSettingsController;
 use App\Http\Controllers\Lgu\UsersController as LguUsersController;
 use App\Http\Controllers\ListingDetailController;
+use App\Http\Controllers\NotificationsController;
 use App\Http\Controllers\PrivacyController;
 use App\Http\Controllers\Pto\AnnouncementsController as PtoAnnouncementsController;
 use App\Http\Controllers\Pto\AuditLogsController as PtoAuditLogsController;
 use App\Http\Controllers\Pto\DashboardController as PtoDashboardController;
+use App\Http\Controllers\Pto\DestinationReviewsController as PtoDestinationReviewsController;
 use App\Http\Controllers\Pto\DirectoryController as PtoDirectoryController;
 use App\Http\Controllers\Pto\FeedbackController as PtoFeedbackController;
 use App\Http\Controllers\Pto\HotlinesController as PtoHotlinesController;
@@ -36,6 +42,7 @@ use App\Http\Controllers\Pto\MonthlyReportsController as PtoMonthlyReportsContro
 use App\Http\Controllers\Pto\MunicipalReportsController as PtoMunicipalReportsController;
 use App\Http\Controllers\Pto\SettingsController as PtoSettingsController;
 use App\Http\Controllers\Pto\UsersController as PtoUsersController;
+use App\Http\Controllers\QrCodeController;
 use App\Http\Controllers\ReportVerificationController;
 use Illuminate\Support\Facades\Route;
 
@@ -58,6 +65,23 @@ Route::get('/establishment-images/{image}/{variant}', [EstablishmentImageFileCon
 Route::get('/checkin/{establishment}', [CheckinController::class, 'show'])->name('lgu.establishmentQr');
 Route::post('/checkin/{establishment}', [CheckinController::class, 'store'])->middleware('throttle:qr-checkin')->name('checkin.store');
 
+// An establishment's check-in QR code, for the signed-in roles allowed to
+// see it — shared by PTO, LGU, and Establishment screens; who may see which
+// QR is ListingPolicy::viewQr(), not a per-role route prefix.
+Route::middleware(['auth', 'role:pto_administrator,lgu,establishment'])->prefix('qr-codes')->name('qrCodes.')->group(function () {
+    Route::get('/{listing}', [QrCodeController::class, 'show'])->name('show');
+    Route::get('/{listing}/download', [QrCodeController::class, 'download'])->name('download');
+    Route::get('/{listing}/poster', [QrCodeController::class, 'poster'])->name('poster');
+    Route::patch('/{listing}/status', [QrCodeController::class, 'updateStatus'])->name('updateStatus');
+});
+
+// The dashboard notification bell (Laravel database notifications), shared by
+// every signed-in role — a user only ever reads or opens their own notifications.
+Route::middleware(['auth', 'role:pto_administrator,lgu,establishment'])->prefix('notifications')->name('notifications.')->group(function () {
+    Route::post('/read-all', [NotificationsController::class, 'markAllRead'])->name('readAll');
+    Route::post('/{notification}/open', [NotificationsController::class, 'open'])->name('open');
+});
+
 Route::middleware('guest')->group(function () {
     Route::get('/login', [SessionController::class, 'create'])->name('login');
     Route::post('/login', [SessionController::class, 'store'])->middleware('throttle:login')->name('login.store');
@@ -71,6 +95,13 @@ Route::middleware('guest')->group(function () {
 Route::post('/logout', [SessionController::class, 'destroy'])
     ->middleware('auth')
     ->name('logout');
+
+// First-login password change — the only page (besides sign-out) an account
+// with a temporary password can reach; see App\Http\Middleware\ForcePasswordChange.
+Route::middleware('auth')->group(function () {
+    Route::get('/change-password', [FirstLoginPasswordController::class, 'create'])->name('password.change');
+    Route::put('/change-password', [FirstLoginPasswordController::class, 'store'])->middleware('throttle:6,1')->name('password.change.store');
+});
 
 Route::middleware(['auth', 'role:pto_administrator'])->prefix('pto')->name('pto.')->group(function () {
     Route::get('/', [PtoDashboardController::class, 'index'])->name('dashboard');
@@ -101,6 +132,11 @@ Route::middleware(['auth', 'role:pto_administrator'])->prefix('pto')->name('pto.
         Route::patch('/{listing}/publish', [PtoDirectoryController::class, 'publish'])->name('publish');
         Route::patch('/{listing}/return', [PtoDirectoryController::class, 'returnToLgu'])->name('returnToLgu');
         Route::patch('/{listing}/unpublish', [PtoDirectoryController::class, 'unpublish'])->name('unpublish');
+    });
+
+    Route::prefix('destination-reviews')->name('destinationReviews.')->group(function () {
+        Route::get('/', [PtoDestinationReviewsController::class, 'index'])->name('index');
+        Route::get('/{listing}', [PtoDestinationReviewsController::class, 'show'])->name('show');
     });
 
     Route::prefix('feedback')->name('feedback.')->group(function () {
@@ -160,22 +196,49 @@ Route::middleware(['auth', 'role:lgu', 'lgu.municipality'])->prefix('lgu')->name
     Route::get('/', [LguDashboardController::class, 'index'])->name('dashboard');
 
     Route::prefix('directory')->name('directory.')->group(function () {
-        Route::get('/destinations', [LguDirectoryController::class, 'destinations'])->name('destinations');
+        // Legacy LGU destination page: keep the named route and write actions
+        // below for compatibility, but send the old GET entry point to the
+        // unified Establishments -> Attractions view.
+        Route::get('/destinations', fn () => redirect()->route('lgu.directory.establishments', ['view' => 'attractions']))->name('destinations');
         Route::post('/destinations', [LguDirectoryController::class, 'storeDestination'])->name('destinations.store');
         Route::put('/destinations/{listing}', [LguDirectoryController::class, 'updateDestination'])->name('destinations.update');
         Route::patch('/destinations/{listing}/archive', [LguDirectoryController::class, 'archiveDestination'])->name('destinations.archive');
-        Route::get('/establishments', [LguDirectoryController::class, 'establishments'])->name('establishments');
+        Route::get('/establishments', [LguEstablishmentsController::class, 'index'])->name('establishments');
+        Route::get('/establishments/create', [LguEstablishmentsController::class, 'create'])->name('establishments.create');
+        Route::post('/establishments', [LguEstablishmentsController::class, 'store'])->middleware('throttle:establishment-image-upload')->name('establishments.store');
+        Route::get('/establishments/{listing}', [LguEstablishmentsController::class, 'show'])->name('establishments.show');
+        Route::get('/establishments/{listing}/edit', [LguEstablishmentsController::class, 'edit'])->name('establishments.edit');
+        Route::put('/establishments/{listing}', [LguEstablishmentsController::class, 'update'])->name('establishments.update');
+        Route::post('/establishments/{listing}/online-reporting', [LguEstablishmentAdoptionController::class, 'switchToOnline'])->name('establishments.switchToOnline');
+        Route::patch('/establishments/{listing}/manual-reporting', [LguEstablishmentAdoptionController::class, 'switchToManual'])->name('establishments.switchToManual');
         Route::patch('/establishments/{listing}/submit', [LguDirectoryController::class, 'submitToPto'])->name('establishments.submit');
         Route::patch('/establishments/{listing}/return', [LguDirectoryController::class, 'returnToEstablishment'])->name('establishments.return');
+        // Tourist attractions (destination-only records): listed on the Establishments page (Attractions view).
+        Route::get('/attractions/create', [LguAttractionsController::class, 'create'])->name('attractions.create');
+        Route::post('/attractions', [LguAttractionsController::class, 'store'])->middleware('throttle:establishment-image-upload')->name('attractions.store');
+        Route::get('/attractions/{listing}', [LguAttractionsController::class, 'show'])->name('attractions.show');
+        Route::get('/attractions/{listing}/edit', [LguAttractionsController::class, 'edit'])->name('attractions.edit');
+        Route::put('/attractions/{listing}', [LguAttractionsController::class, 'update'])->name('attractions.update');
+        Route::patch('/attractions/{listing}/submit', [LguDirectoryController::class, 'submitToPto'])->name('attractions.submit');
     });
 
     Route::prefix('monthly-reports')->name('monthlyReports.')->group(function () {
         Route::get('/', [LguMonthlyReportsController::class, 'index'])->name('index');
+        Route::get('/manual-entry', [LguMonthlyReportsController::class, 'manualEntryIndex'])->name('manualEntry.index');
         Route::get('/{listing}/manual-entry', [LguMonthlyReportsController::class, 'showManualEntry'])->name('manualEntry');
         Route::post('/{listing}/manual-entry', [LguMonthlyReportsController::class, 'storeManualEntry'])->name('manualEntry.store');
         Route::post('/consolidate', [LguMonthlyReportsController::class, 'consolidate'])->name('consolidate');
+        Route::get('/municipal', [LguMonthlyReportsController::class, 'municipalIndex'])->name('municipal');
+        Route::get('/municipal/{period}', [LguMonthlyReportsController::class, 'municipalShow'])->where('period', '[0-9]{4}-(0[1-9]|1[0-2])')->name('municipal.show');
+        Route::get('/municipal/{period}/preview', [LguMonthlyReportsController::class, 'municipalPreview'])->where('period', '[0-9]{4}-(0[1-9]|1[0-2])')->name('municipal.preview');
+        Route::get('/municipal/{period}/report.pdf', [LguMonthlyReportsController::class, 'municipalPdf'])->where('period', '[0-9]{4}-(0[1-9]|1[0-2])')->middleware('throttle:report-export')->name('municipal.pdf');
         Route::get('/{monthlyArrivalReport}', [LguMonthlyReportsController::class, 'show'])->name('show');
         Route::patch('/{monthlyArrivalReport}/verify', [LguMonthlyReportsController::class, 'verify'])->name('verify');
+        Route::patch('/{monthlyArrivalReport}/submit', [LguMonthlyReportsController::class, 'submit'])->name('submit');
+        Route::patch('/{monthlyArrivalReport}/review', [LguMonthlyReportsController::class, 'startReview'])->name('review');
+        Route::get('/{monthlyArrivalReport}/preview', [LguMonthlyReportsController::class, 'preview'])->name('preview');
+        Route::get('/{monthlyArrivalReport}/report.pdf', [LguMonthlyReportsController::class, 'pdf'])->middleware('throttle:report-export')->name('pdf');
+        Route::patch('/{monthlyArrivalReport}/return', [LguMonthlyReportsController::class, 'returnForCorrection'])->name('return');
         Route::get('/{monthlyArrivalReport}/edit', [LguMonthlyReportsController::class, 'edit'])->name('edit');
         Route::put('/{monthlyArrivalReport}', [LguMonthlyReportsController::class, 'update'])->name('update');
     });
@@ -229,7 +292,11 @@ Route::middleware(['auth', 'role:establishment'])->prefix('establishment')->name
         Route::post('/', [EstablishmentArrivalsController::class, 'store'])->name('store');
         Route::get('/', [EstablishmentArrivalsController::class, 'index'])->name('index');
         Route::get('/monthly', [EstablishmentArrivalsController::class, 'monthlyReports'])->name('monthly');
+        Route::post('/monthly/draft', [EstablishmentArrivalsController::class, 'saveMonthlyDraft'])->name('monthly.draft');
         Route::post('/monthly/submit', [EstablishmentArrivalsController::class, 'submitMonthlyReport'])->name('monthly.submit');
+        Route::get('/monthly/{monthlyArrivalReport}', [EstablishmentArrivalsController::class, 'showMonthlyReport'])->whereNumber('monthlyArrivalReport')->name('monthly.show');
+        Route::get('/monthly/{monthlyArrivalReport}/preview', [EstablishmentArrivalsController::class, 'previewMonthlyReport'])->whereNumber('monthlyArrivalReport')->name('monthly.preview');
+        Route::get('/monthly/{monthlyArrivalReport}/report.pdf', [EstablishmentArrivalsController::class, 'downloadMonthlyReportPdf'])->whereNumber('monthlyArrivalReport')->middleware('throttle:report-export')->name('monthly.pdf');
     });
 
     Route::prefix('feedback')->name('feedback.')->group(function () {

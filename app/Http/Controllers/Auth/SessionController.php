@@ -96,6 +96,12 @@ class SessionController extends Controller
         $request->session()->regenerate();
         $user->forceFill(['last_login_at' => now()])->save();
 
+        // Temporary password: straight to the change-password page. The
+        // intended URL stays in the session for after the change.
+        if ($user->mustChangePassword()) {
+            return redirect()->route('password.change');
+        }
+
         return redirect()->intended(
             $user->role ? route($user->role->dashboardRouteName()) : route('home')
         );

@@ -1,6 +1,6 @@
 <x-layouts.auth title="Set New Password">
     <h1 class="mt-6 text-xl sm:text-2xl">Set a new password</h1>
-    <p class="mt-1.5 text-sm text-sand-600">Choose a password with at least 8 characters.</p>
+    <p class="mt-1.5 text-sm text-sand-600">Choose a new password for your account.</p>
 
     @if ($errors->any())
         <div class="mt-6 rounded-sm bg-danger-bg px-3.5 py-2.5 text-sm text-danger" role="alert">
@@ -37,9 +37,9 @@
                         type="password"
                         name="{{ $field }}"
                         required
-                        minlength="8"
+                        minlength="12"
                         autocomplete="new-password"
-                        @if ($loop->first) autofocus @endif
+                        @if ($loop->first) autofocus aria-describedby="password-requirements" @endif
                         aria-invalid="{{ $errors->has($field) ? 'true' : 'false' }}"
                         class="min-h-[44px] w-full rounded-sm border border-sand-500 px-3.5 py-2.5 pr-12 text-base text-sand-900 transition-colors placeholder:text-sand-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 focus-visible:ring-2"
                     >
@@ -54,6 +54,10 @@
                         <i class="ti ti-eye-off hidden" data-icon-hide aria-hidden="true"></i>
                     </button>
                 </div>
+
+                @if ($loop->first)
+                    <x-auth.password-requirements for="password" />
+                @endif
             </div>
         @endforeach
 

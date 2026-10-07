@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ReportingMethod;
 use App\Enums\UserRole;
 use App\Models\Category;
 use App\Models\Listing;
@@ -166,6 +167,8 @@ test('two establishments with the same display name do not see each other\'s arr
         'barangay' => 'Poblacion',
         'status' => 'PUBLISHED',
     ]);
+
+    $listingA->forceFill(['reporting_mode' => ReportingMethod::OnlineItour])->save();
 
     $listingA->arrivals()->create([
         'source' => 'staff', 'date' => '2026-08-22', 'visitor_name' => 'Guest At A',

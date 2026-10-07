@@ -6,6 +6,10 @@
  * renderer. Everything here is generic and driven by data-* markers so
  * individual pages only need to add markup, not JS.
  */
+import { initEstablishmentPhotoPreviews } from './establishment_form';
+import { initEstablishmentTypeSelects, isTourGuideTypeSelected, syncEstablishmentTypeOptions } from './establishment_type_select';
+import { initAutoSubmitSelects } from './report_filters';
+
 document.addEventListener('DOMContentLoaded', () => {
     initSidebarSubmenus();
     initSidebarDrawer();
@@ -22,9 +26,11 @@ document.addEventListener('DOMContentLoaded', () => {
     initFlashToast();
     initTourismMap();
     initCategoryPanels();
+    initEstablishmentTypeSelects();
     initDirectoryFormToggles();
-    initQrActions();
+    initEstablishmentPhotoPreviews();
     initPhotoReorder();
+    initAutoSubmitSelects();
 });
 
 /**
@@ -349,6 +355,19 @@ function initTabs() {
             panelHost.querySelectorAll('[data-tab-panel]').forEach((panel) => {
                 panel.classList.toggle('hidden', panel.dataset.tabPanel !== target);
             });
+
+            // Opt-in (data-tab-sync="<query param>"): remember the open tab in
+            // the URL so a refresh or the year filter keeps the user on the
+            // same tab — without reloading the page when switching tabs.
+            const syncParam = group.dataset.tabSync;
+            if (syncParam) {
+                const url = new URL(window.location.href);
+                url.searchParams.set(syncParam, target);
+                window.history.replaceState(null, '', url);
+                document.querySelectorAll(`[data-active-tab-input="${syncParam}"]`).forEach((input) => {
+                    input.value = target;
+                });
+            }
         }
 
         buttons.forEach((btn) => btn.addEventListener('click', () => activate(btn.dataset.tabTarget)));
@@ -998,28 +1017,36 @@ function initCategoryPanels() {
 
 /**
  * Tourism Directory Add/Edit form: shows only the fields that apply to the
- * selected category/type. `[data-show-when="travel"]` fields only show for
- * the Travel & Tours category, `[data-show-when="guide"]` only for
- * type=Tour Guide within it, `[[data-hide-when="guide"]]` (coordinates, QR)
- * hide for a guide, and `[data-show-when="others"]` (the category note)
- * only shows for the Others category. Re-run after an edit trigger
- * populates the form (see initEditTriggers) since setting .value directly
- * doesn't fire `change`.
+ * selected category/type. `[data-show-when="establishment"]` (the
+ * dependent Type select) shows for every category except Tourist
+ * Destinations, `[data-show-when="guide"]` only for the tour guide type,
+ * `[[data-hide-when="guide"]]` (coordinates, QR) hide for a guide, and
+ * `[data-show-when="others"]` (the category note) only shows for the
+ * Others category. Re-run after an edit trigger populates the form (see
+ * initEditTriggers) since setting .value directly doesn't fire `change`.
  */
 function initDirectoryFormToggles() {
-    const form = document.getElementById('listing-form');
-    if (!form) return;
+    // The PTO directory modal form, plus any page form marked
+    // `data-listing-form` (LGU Add/Edit Establishment).
+    document.querySelectorAll('#listing-form, [data-listing-form]').forEach((form) => initListingFormToggles(form));
+}
 
+function initListingFormToggles(form) {
     const categorySelect = form.elements.namedItem('cat_id');
     const typeSelect = form.elements.namedItem('type');
 
     function apply() {
         const categoryName = categorySelect?.selectedOptions?.[0]?.dataset.categoryName;
-        const isTravel = categoryName === 'Travel & Tours';
+        const isEstablishment = categoryName !== undefined && categoryName !== 'Tourist Destinations';
         const isOthers = categoryName === 'Others';
-        const isGuide = isTravel && typeSelect?.value === 'Tour Guide';
 
-        form.querySelectorAll('[data-show-when="travel"]').forEach((el) => el.classList.toggle('hidden', !isTravel));
+        if (typeSelect && categorySelect) {
+            syncEstablishmentTypeOptions(typeSelect, categorySelect.value);
+        }
+
+        const isGuide = isEstablishment && isTourGuideTypeSelected(typeSelect);
+
+        form.querySelectorAll('[data-show-when="establishment"]').forEach((el) => el.classList.toggle('hidden', !isEstablishment));
         form.querySelectorAll('[data-show-when="others"]').forEach((el) => el.classList.toggle('hidden', !isOthers));
         form.querySelectorAll('[data-show-when="guide"]').forEach((el) => el.classList.toggle('hidden', !isGuide));
         form.querySelectorAll('[data-hide-when="guide"]').forEach((el) => el.classList.toggle('hidden', isGuide));
@@ -1032,41 +1059,6 @@ function initDirectoryFormToggles() {
     });
 
     apply();
-}
-
-/**
- * Print/download actions for every `[data-qr-mount]` on the page (one per
- * QR-enabled listing's "View QR" modal). The QR code itself is rendered
- * server-side as SVG directly into the mount (simplesoftwareio/simple-qrcode,
- * see resources/views/pto/directory/index.blade.php) — this only wires up
- * the buttons, mirroring resources/js/establishment.js.
- */
-function initQrActions() {
-    document.addEventListener('click', (e) => {
-        const printTrigger = e.target.closest('[data-qr-print]');
-        if (printTrigger) {
-            window.print();
-
-            return;
-        }
-
-        const downloadTrigger = e.target.closest('[data-qr-download]');
-        if (!downloadTrigger) return;
-
-        const svg = downloadTrigger.closest('[data-modal]')?.querySelector('[data-qr-mount] svg');
-        if (!svg) return;
-
-        const source = new XMLSerializer().serializeToString(svg);
-        const blob = new Blob([source], { type: 'image/svg+xml' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = downloadTrigger.dataset.qrFilename || 'qr-code.svg';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(url);
-    });
 }
 
 /**

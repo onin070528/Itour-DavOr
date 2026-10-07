@@ -30,6 +30,9 @@ class Category extends Model
 
     protected $primaryKey = 'cat_id';
 
+    /** cat_name of the category used by destination-only records. */
+    public const DESTINATION_CATEGORY_NAME = 'Tourist Destinations';
+
     protected function casts(): array
     {
         return [
@@ -47,6 +50,70 @@ class Category extends Model
         return $this->cat_name === 'Others';
     }
 
+    /**
+     * Describes whether this is the "Tourist Destinations" category — the
+     * one row used by destination-only records, never offered as an
+     * establishment category and never given establishment types.
+     */
+    public function isDestinationCategory(): bool
+    {
+        return $this->cat_name === self::DESTINATION_CATEGORY_NAME;
+    }
+
+    /**
+     * The legacy free-text `listings.category` slug for this category —
+     * kept in sync with cat_id on every write because TourismCatalog, the
+     * public Explore page, and ListingPolicy still read the slug. Moved
+     * here from Pto\DirectoryController so the PTO and LGU directory forms
+     * share one mapping.
+     */
+    public function legacySlug(): string
+    {
+        return match ($this->cat_name) {
+            self::DESTINATION_CATEGORY_NAME => 'destinations',
+            'Accommodation' => 'accommodation',
+            'Food & Dining' => 'restaurants',
+            'Tourist Transport' => 'transportation',
+            'Travel & Tours' => 'tour-guides',
+            'Farm & Agri-Tourism' => 'farm-agri-tourism',
+            'Wellness & Spa' => 'wellness-spa',
+            'Recreation & Activities' => 'recreation-activities',
+            'MICE & Events' => 'mice-events',
+            default => 'others',
+        };
+    }
+
+    /**
+     * The establishment types allowed under this category, in display
+     * order, from the single source config/establishment_categories.php.
+     * Empty for Tourist Destinations (and for any category the config
+     * does not list).
+     *
+     * @return array<int, string>
+     */
+    public function establishmentTypes(): array
+    {
+        return config('establishment_categories.types.'.$this->cat_name, []);
+    }
+
+    /**
+     * Every category's types keyed by cat_id — what the dependent
+     * Category -> Type dropdown needs on the client side.
+     *
+     * @param  iterable<int, Category>  $arrCategories
+     * @return array<int, array<int, string>>
+     */
+    public static function establishmentTypesById(iterable $arrCategories): array
+    {
+        $arrTypesById = [];
+
+        foreach ($arrCategories as $objCategory) {
+            $arrTypesById[$objCategory->cat_id] = $objCategory->establishmentTypes();
+        } // end foreach category
+
+        return $arrTypesById;
+    }
+
     public function establishments(): HasMany
     {
         return $this->hasMany(Listing::class, 'cat_id', 'cat_id');
@@ -59,5 +126,14 @@ class Category extends Model
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('cat_is_active', true)->orderBy('cat_sort_order');
+    }
+
+    /**
+     * Establishment categories only — every category except Tourist
+     * Destinations (R13: it is never an establishment category).
+     */
+    public function scopeForEstablishments(Builder $query): Builder
+    {
+        return $query->where('cat_name', '!=', self::DESTINATION_CATEGORY_NAME);
     }
 }

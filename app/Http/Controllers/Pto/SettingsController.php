@@ -44,6 +44,8 @@ class SettingsController extends PtoController
      */
     public function toggleCategoryQr(Request $request, Category $category): RedirectResponse
     {
+        abort_unless($request->user()->can('update', $category), 403);
+
         $before = $category->getOriginal();
 
         $category->update(['cat_is_qr_enabled' => ! $category->cat_is_qr_enabled]);

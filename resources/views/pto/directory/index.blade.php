@@ -2,7 +2,7 @@
     $statusTone = fn ($status) => match ($status) {
         'Active', 'PUBLISHED' => 'success',
         'FOR_LGU_REVIEW' => 'info',
-        'Pending Review', 'DRAFT', 'FOR_PTO_REVIEW', 'UNPUBLISHED' => 'warning',
+        'Pending Review', 'DRAFT', 'FOR_PTO_REVIEW', 'FOR_CORRECTION', 'UNPUBLISHED' => 'warning',
         'Suspended', 'Inactive' => 'danger',
         default => 'neutral',
     };
@@ -10,6 +10,7 @@
         'DRAFT' => 'Draft',
         'FOR_LGU_REVIEW' => 'Waiting for LGU Review',
         'FOR_PTO_REVIEW' => 'For PTO Review',
+        'FOR_CORRECTION' => 'Returned to LGU',
         'PUBLISHED' => 'Published',
         'UNPUBLISHED' => 'Unpublished',
         default => $status,
@@ -29,6 +30,7 @@
         ])
         ->values();
     $unplottedCount = $listings->count() - $plottedListings->count();
+    $intReviewCount = $listings->filter(fn ($listing) => $listing->category !== 'destinations' && $listing->isAwaitingPtoDecision())->count();
 @endphp
 
 @push('head')
@@ -48,6 +50,13 @@
             </button>
         </x-slot:actions>
     </x-dashboard.page-header>
+
+    @if ($intReviewCount > 0)
+        <div class="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-md border border-warning/30 bg-warning-bg px-4 py-3 text-sm text-warning">
+            <p class="flex items-center gap-2 font-semibold"><i class="ti ti-clipboard-list" aria-hidden="true"></i> {{ $intReviewCount }} destination {{ \Illuminate\Support\Str::plural('listing', $intReviewCount) }} waiting for your review.</p>
+            <a href="{{ route('pto.destinationReviews.index') }}" class="rounded-sm bg-primary-700 px-3 py-1.5 text-xs font-semibold text-sand-0 hover:bg-primary-900">Review listings</a>
+        </div>
+    @endif
 
     <div class="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-[240px_1fr]">
         {{-- Categories panel: data-driven from tblcategories — adding/renaming a
@@ -94,6 +103,7 @@
                         <option value="DRAFT">Draft</option>
                         <option value="FOR_LGU_REVIEW">Waiting for LGU Review</option>
                         <option value="FOR_PTO_REVIEW">For PTO Review</option>
+                        <option value="FOR_CORRECTION">Returned to LGU</option>
                         <option value="PUBLISHED">Published</option>
                         <option value="UNPUBLISHED">Unpublished</option>
                         <option value="Suspended">Suspended</option>
@@ -131,7 +141,6 @@
                             @foreach ($listings as $listing)
                                 @php
                                     $isGuide = $listing->isTourGuide();
-                                    $isQrEnabled = $listing->isQrEnabled();
                                     $editValues = [
                                         'name' => $listing->name,
                                         'cat_id' => $listing->cat_id,
@@ -172,13 +181,7 @@
                                     <td class="px-4 py-3 text-sand-700">{{ $listing->contact_phone }}</td>
                                     <td class="px-4 py-3"><x-dashboard.status-badge :tone="$statusTone($listing->status)">{{ $listing->status }}</x-dashboard.status-badge></td>
                                     <td class="px-4 py-3">
-                                        @if ($isQrEnabled)
-                                            <button type="button" data-modal-open="qr-view-{{ $listing->id }}" class="rounded-sm border border-sand-300 px-2.5 py-1 text-xs font-semibold text-sand-800 hover:border-primary-300">
-                                                <i class="ti ti-qrcode" aria-hidden="true"></i> View
-                                            </button>
-                                        @else
-                                            <span class="text-xs text-sand-400">No QR</span>
-                                        @endif
+                                        <x-dashboard.qr-cell :listing="$listing" />
                                     </td>
                                     <td class="px-4 py-3 text-sand-700">{{ $listing->publishedPhotoLastUpdatedAt()?->format('M j, Y') ?? '—' }}</td>
                                     <td class="px-4 py-3 text-right">
@@ -197,6 +200,11 @@
                                                     <a href="{{ route('listings.show', $listing) }}" target="_blank" rel="noopener" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-sand-700 hover:bg-sand-50">
                                                         <i class="ti ti-external-link" aria-hidden="true"></i> Preview as Public
                                                     </a>
+                                                    @if ($listing->isAwaitingPtoDecision())
+                                                        <a href="{{ route('pto.destinationReviews.show', $listing) }}" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-primary-700 hover:bg-sand-50">
+                                                            <i class="ti ti-clipboard-check" aria-hidden="true"></i> Review Listing
+                                                        </a>
+                                                    @endif
                                                     @if ($listing->status === 'FOR_PTO_REVIEW')
                                                         <form method="POST" action="{{ route('pto.directory.publish', $listing) }}">
                                                             @csrf
@@ -303,23 +311,8 @@
                         </x-dashboard.modal>
                     @endif
 
-                    @if ($listing->isQrEnabled())
-                        <x-dashboard.modal id="qr-view-{{ $listing->id }}" title="{{ $listing->name }} QR Code">
-                            <div data-qr-mount class="mx-auto flex h-56 w-56 items-center justify-center rounded-md border border-sand-200 bg-sand-0 p-3 [&>svg]:h-full [&>svg]:w-full">
-                                {!! \SimpleSoftwareIO\QrCode\Facades\QrCode::format('svg')->size(220)->margin(1)->generate(route('lgu.establishmentQr', ['establishment' => $listing->uuid])) !!}
-                            </div>
-                            <p class="mt-3 text-center text-xs text-sand-500">Tourists scan this to register their arrival at {{ $listing->name }}.</p>
-
-                            <x-slot:footer>
-                                <button type="button" data-qr-print class="rounded-sm border border-sand-300 bg-sand-0 px-4 py-2.5 text-sm font-semibold text-sand-800 hover:border-primary-300">
-                                    <i class="ti ti-printer" aria-hidden="true"></i> Print
-                                </button>
-                                <button type="button" data-qr-download data-qr-filename="{{ $listing->slug }}-qr.svg" class="rounded-sm bg-primary-700 px-4 py-2.5 text-sm font-semibold text-sand-0 hover:bg-primary-900">
-                                    <i class="ti ti-download" aria-hidden="true"></i> Download
-                                </button>
-                            </x-slot:footer>
-                        </x-dashboard.modal>
-                    @endif
+                    {{-- PTO is read-only for QR codes: view, print, download — no on/off switch. --}}
+                    <x-dashboard.qr-modal :listing="$listing" />
                 @endforeach
 
                 <x-dashboard.empty-state
@@ -397,13 +390,9 @@
                         @endforeach
                     </select>
                 </div>
-                <div data-show-when="travel" class="hidden">
-                    <label class="mb-1 block text-xs font-semibold text-sand-700">Type</label>
-                    <select name="type" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
-                        <option value="">—</option>
-                        <option value="Tour Operator">Tour Operator</option>
-                        <option value="Tour Guide">Tour Guide</option>
-                    </select>
+                <div data-show-when="establishment" class="hidden">
+                    <label class="mb-1 block text-xs font-semibold text-sand-700">Type <span class="text-danger" aria-hidden="true">*</span></label>
+                    <x-dashboard.establishment-type-select :categories="$categories" />
                 </div>
             </div>
 

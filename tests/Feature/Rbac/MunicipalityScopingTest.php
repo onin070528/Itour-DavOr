@@ -3,6 +3,7 @@
 use App\Enums\UserRole;
 use App\Models\Listing;
 use App\Models\Municipality;
+use App\Models\SecurityLog;
 use App\Models\User;
 use Illuminate\Support\Str;
 
@@ -102,6 +103,30 @@ test('direct listing id manipulation across municipalities never returns 200', f
         ->patch(route('lgu.directory.destinations.archive', $baganganDestination));
 
     expect($response->status())->toBe(403);
+});
+
+test('a denied cross-municipality action is security-logged without request details', function () {
+    $mati = makeMunicipality('City of Mati', 'MATI');
+    $baganga = makeMunicipality('Baganga', 'BAG');
+    $baganganDestination = makeListing($baganga, 'destinations');
+    $matiLgu = makeLguUser($mati);
+
+    test()->actingAs($matiLgu)
+        ->patch(route('lgu.directory.destinations.archive', $baganganDestination))
+        ->assertForbidden();
+
+    $log = SecurityLog::query()
+        ->where('user_id', $matiLgu->id)
+        ->where('event_type', 'access_denied')
+        ->latest('id')
+        ->first();
+
+    expect($log)->not->toBeNull()
+        ->and($log->municipality_id)->toBe($mati->id)
+        ->and($log->details)->toMatchArray([
+            'ability' => 'municipality_scope',
+            'target_municipality_id' => $baganga->id,
+        ]);
 });
 
 test('an LGU with no assigned municipality cannot reach LGU-scoped pages', function () {

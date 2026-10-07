@@ -35,6 +35,8 @@ class HotlinesController extends PtoController
 
     public function store(Request $request): RedirectResponse
     {
+        abort_unless($request->user()->can('create', Hotline::class), 403);
+
         $data = $this->validatedFields($request);
 
         try {
@@ -56,6 +58,8 @@ class HotlinesController extends PtoController
 
     public function update(Request $request, Hotline $hotline): RedirectResponse
     {
+        abort_unless($request->user()->can('update', $hotline), 403);
+
         $data = $this->validatedFields($request);
         $before = $hotline->getOriginal();
 
@@ -78,6 +82,8 @@ class HotlinesController extends PtoController
      */
     public function deactivate(Request $request, Hotline $hotline): RedirectResponse
     {
+        abort_unless($request->user()->can('deactivate', $hotline), 403);
+
         $before = $hotline->getOriginal();
 
         $hotline->update(['hot_is_active' => ! $hotline->hot_is_active, 'hot_updated_by' => $request->user()->id]);
@@ -93,6 +99,8 @@ class HotlinesController extends PtoController
      */
     public function reorder(Request $request, Hotline $hotline): RedirectResponse
     {
+        abort_unless($request->user()->can('reorder', $hotline), 403);
+
         $data = $request->validate([
             'direction' => ['required', Rule::in(['up', 'down'])],
         ]);

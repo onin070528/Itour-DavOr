@@ -10,6 +10,7 @@
 namespace App\Policies;
 
 use App\Enums\ImageSourceRole;
+use App\Enums\ReportingMethod;
 use App\Enums\UserRole;
 use App\Models\EstablishmentImage;
 use App\Models\Listing;
@@ -26,7 +27,7 @@ class ImagePolicy
      * I1: who may upload a photo for $objListing. Establishment users may
      * only upload for their own linked listing. LGU may upload on behalf
      * only within their own municipality, and only for a listing with no
-     * linked account or with reporting_mode PAPER_LGU. PTO may upload for
+     * linked account or whose reporting method is Manual/Paper. PTO may upload for
      * any listing.
      */
     public function uploadFor(User $objUser, Listing $objListing): bool
@@ -39,7 +40,7 @@ class ImagePolicy
                 && in_array($objListing->status, ['DRAFT', 'UNPUBLISHED'], true),
             UserRole::Lgu => $objUser->municipality_id !== null
                 && $objUser->municipality_id === $objListing->municipality_id
-                && ($objListing->establishmentUser === null || $objListing->reporting_mode === 'PAPER_LGU'),
+                && ($objListing->establishmentUser === null || $objListing->reportingMethod() === ReportingMethod::ManualPaper),
             UserRole::PtoAdministrator => true,
             default => false,
         };

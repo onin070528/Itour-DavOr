@@ -199,7 +199,7 @@ test('LGU cannot reach the PTO-only account-creation route to create a PTO or LG
     expect(User::query()->where('email', 'sneaky-lgu-attempt@example.test')->exists())->toBeFalse();
 });
 
-test('LGU cannot assign an establishment to another municipality — municipality always comes from the LGU account itself', function () {
+test('LGU cannot assign an establishment account to another municipality — municipality always comes from the establishment itself', function () {
     $mati = accountCreationMunicipalityFixture('City of Mati', 'MATI');
     $baganga = accountCreationMunicipalityFixture('Baganga', 'BAG');
     $lgu = User::factory()->create([
@@ -207,29 +207,26 @@ test('LGU cannot assign an establishment to another municipality — municipalit
         'organization_subtitle' => 'City of Mati',
         'municipality_id' => $mati->id,
     ]);
+    $listing = accountCreationUnassignedEstablishmentFixture($mati, 'Cross-Municipality Inn');
+    $otherListing = accountCreationUnassignedEstablishmentFixture($baganga, 'Baganga Inn');
 
-    test()->actingAs($lgu)->post(route('lgu.users.store'), [
-        'name' => 'Cross-Municipality Inn',
-        'category' => 'accommodation',
-        'barangay' => 'Dahican',
-        'ownerName' => 'Juan Dela Cruz',
-        'contactPhone' => '09171234567',
-        'email' => 'cross-municipality@example.test',
-        'hoursDays' => 'mon-sun',
-        'hoursOpen' => '08:00',
-        'hoursClose' => '17:00',
-        // An LGU has no municipality field to submit at all — this
-        // attempts the closest forgeable equivalent and confirms it's
-        // ignored, not merely absent from the form.
+    test()->actingAs($lgu)->post(route('lgu.directory.establishments.switchToOnline', $listing), [
+        'account_name' => 'Juan Dela Cruz',
+        'account_email' => 'cross-municipality@example.test',
+        // The account form has no municipality or establishment field at
+        // all — this attempts the closest forgeable equivalent and confirms
+        // it's ignored, not merely absent from the form.
         'municipality_id' => $baganga->id,
+        'establishment_id' => $otherListing->id,
     ])->assertRedirect()->assertSessionHasNoErrors();
 
     $created = User::query()->where('email', 'cross-municipality@example.test')->first();
     expect($created->municipality_id)->toBe($mati->id);
-    expect($created->establishment->municipality_id)->toBe($mati->id);
+    expect($created->establishment_id)->toBe($listing->id);
+    expect($otherListing->fresh()->establishmentUser)->toBeNull();
 });
 
-test('LGU registering an establishment also gets a passphrase and must_change_password', function () {
+test('LGU activating an establishment account also gets a passphrase and must_change_password', function () {
     Mail::fake();
     $mati = accountCreationMunicipalityFixture('City of Mati', 'MATI');
     $lgu = User::factory()->create([
@@ -237,18 +234,12 @@ test('LGU registering an establishment also gets a passphrase and must_change_pa
         'organization_subtitle' => 'City of Mati',
         'municipality_id' => $mati->id,
     ]);
+    $listing = accountCreationUnassignedEstablishmentFixture($mati, 'LGU-Registered Inn');
 
-    test()->actingAs($lgu)->post(route('lgu.users.store'), [
-        'name' => 'LGU-Registered Inn',
-        'category' => 'accommodation',
-        'barangay' => 'Dahican',
-        'ownerName' => 'Juan Dela Cruz',
-        'contactPhone' => '09171234567',
-        'email' => 'lgu-registered@example.test',
-        'hoursDays' => 'mon-sun',
-        'hoursOpen' => '08:00',
-        'hoursClose' => '17:00',
-    ])->assertRedirect()->assertSessionHasNoErrors();
+    test()->actingAs($lgu)->post(route('lgu.directory.establishments.switchToOnline', $listing), [
+        'account_name' => 'Juan Dela Cruz',
+        'account_email' => 'lgu-registered@example.test',
+    ])->assertRedirect()->assertSessionHasNoErrors()->assertSessionHas('accountCreated.passphrase');
 
     $created = User::query()->where('email', 'lgu-registered@example.test')->first();
     expect($created->usr_must_change_password)->toBeTrue();

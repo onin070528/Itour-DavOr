@@ -8,6 +8,7 @@ registerSW({ immediate: true });
 document.addEventListener('DOMContentLoaded', () => {
     initMobileMenu();
     initPasswordToggle();
+    initPasswordChecklist();
     initLoginForm();
     initExplorePage();
     initNearbyMap();
@@ -189,6 +190,44 @@ function initPasswordToggle() {
             showIcon?.classList.toggle('hidden', isPassword);
             hideIcon?.classList.toggle('hidden', !isPassword);
         });
+    });
+}
+
+/**
+ * Live password checklist (<x-auth.password-requirements>): ticks each rule
+ * as the user types in the input it describes. Mirrors Password::defaults()
+ * in AppServiceProvider — min 12 characters plus a letter, a number and a
+ * symbol, using the same Unicode classes as Laravel's Password rule. A
+ * visual guide only; the server validation stays the final authority.
+ */
+const PASSWORD_RULES = {
+    length: (value) => [...value].length >= 12,
+    letter: (value) => /\p{L}/u.test(value),
+    number: (value) => /\p{N}/u.test(value),
+    symbol: (value) => /[\p{Z}\p{S}\p{P}]/u.test(value),
+};
+
+function initPasswordChecklist() {
+    document.querySelectorAll('[data-password-checklist]').forEach((checklist) => {
+        const input = document.getElementById(checklist.dataset.passwordChecklist);
+        if (!input) return;
+
+        const items = checklist.querySelectorAll('[data-rule]');
+
+        const update = () => {
+            items.forEach((item) => {
+                const isMet = PASSWORD_RULES[item.dataset.rule]?.(input.value) ?? false;
+                item.dataset.met = String(isMet);
+                item.querySelector('[data-icon-met]')?.classList.toggle('hidden', !isMet);
+                item.querySelector('[data-icon-unmet]')?.classList.toggle('hidden', isMet);
+
+                const state = item.querySelector('[data-rule-state]');
+                if (state) state.textContent = isMet ? '(met)' : '(not met yet)';
+            });
+        };
+
+        input.addEventListener('input', update);
+        update();
     });
 }
 
@@ -879,33 +918,55 @@ function initChatbot() {
 
 /**
  * Establishment QR self-registration form (resources/views/lgu/establishmentQR.blade.php).
- * Wires up every +/- counter, keeps the "Total Registration Headcount" readout
- * in sync, and swaps in a success step on submit.
+ * Wires up every +/- counter, keeps the live totals (header, per-group, and
+ * the sticky submit bar) in sync, shows the "where is your group from"
+ * fields only for the parts of the group that exist, and swaps in a
+ * success step on submit.
  *
- * Companion Headcount is a Foreign/Local x Male/Female x Adults/Children/Seniors
+ * The headcount is a Foreign/Local x Male/Female x Adults/Children/Seniors
  * matrix — each cell's data-counter is "<group>-<gender>-<age>" (e.g.
  * "foreign-male-adults"). computeMatrixSums() parses that key on every cell to
  * roll the 12 granular counters back up into the 7 flat totals
  * (male/female/adults/children/seniors/local/foreign) CheckinController
- * already validates and stores — every companion is counted exactly once per
+ * validates and stores — every guest is counted exactly once per
  * dimension, so foreign+local always equals male+female.
+ *
+ * Double submit is blocked by an in-flight flag plus a disabled button;
+ * server validation messages are shown inline above the submit button.
  */
 function initEstablishmentQrForm() {
     const form = document.getElementById('establishment-qr-form');
     if (!form) return;
 
     const counters = Array.from(form.querySelectorAll('[data-counter]'));
-    const totalValue = document.getElementById('qr-total-value');
-    const foreignValue = document.getElementById('qr-foreign-value');
-    const localValue = document.getElementById('qr-local-value');
-    const formStep = document.getElementById('qr-form-step');
-    const successStep = document.getElementById('qr-success-step');
-    const resetButton = document.getElementById('qr-form-reset');
+    const byId = (id) => document.getElementById(id);
+    const totalValue = byId('qr-total-value');
+    const submitTotal = byId('qr-submit-total');
+    const foreignValue = byId('qr-foreign-value');
+    const localValue = byId('qr-local-value');
+    const formStep = byId('qr-form-step');
+    const successStep = byId('qr-success-step');
+    const successSummary = byId('qr-success-summary');
+    const resetButton = byId('qr-form-reset');
+    const submitButton = byId('qr-submit');
+    const errorBox = byId('qr-form-error');
+
+    const originCard = byId('qr-origin-card');
+    const localOriginWrap = byId('qr-local-origin-wrap');
+    const municipalityWrap = byId('qr-local-origin-municipality-wrap');
+    const municipalitySelect = byId('qr-local-origin-municipality');
+    const provinceWrap = byId('qr-local-origin-place-wrap');
+    const provinceInput = byId('qr-local-origin-place');
+    const foreignCountryWrap = byId('qr-foreign-country-wrap');
+    const foreignCountry = byId('qr-foreign-country');
+
+    let isSubmitting = false;
 
     const readValue = (counter) => Number(counter.querySelector('[data-counter-value]').textContent) || 0;
     const writeValue = (counter, value) => {
         counter.querySelector('[data-counter-value]').textContent = String(Math.max(0, value));
     };
+    const checkedValue = (name) => form.querySelector(`input[name="${name}"]:checked`)?.value ?? '';
 
     function computeMatrixSums() {
         const sums = { male: 0, female: 0, adults: 0, children: 0, seniors: 0, local: 0, foreign: 0 };
@@ -919,28 +980,54 @@ function initEstablishmentQrForm() {
         return sums;
     }
 
-    const localOriginScope = document.getElementById('qr-local-origin-scope');
-    const localOriginPlace = document.getElementById('qr-local-origin-place');
-    const localOriginPlaceWrap = document.getElementById('qr-local-origin-place-wrap');
-    const localOriginWrap = document.getElementById('qr-local-origin-wrap');
-    const foreignCountry = document.getElementById('qr-foreign-country');
-    const foreignCountryWrap = document.getElementById('qr-foreign-country-wrap');
+    function showError(message) {
+        if (!errorBox) {
+            return;
+        }
+        errorBox.textContent = message;
+        errorBox.classList.toggle('hidden', !message);
+    }
+
+    function setSubmitting(submitting) {
+        isSubmitting = submitting;
+        if (!submitButton) {
+            return;
+        }
+        submitButton.disabled = submitting;
+        submitButton.querySelector('[data-submit-label]').textContent = submitting ? 'Submitting…' : 'Submit Registration';
+        submitButton.querySelector('[data-submit-icon]').className = submitting
+            ? 'ti ti-loader-2 animate-spin text-lg'
+            : 'ti ti-clipboard-check text-lg';
+    }
 
     function updateTotal() {
         const sums = computeMatrixSums();
-        const companions = sums.foreign + sums.local;
-        totalValue.textContent = String(companions);
+        const total = sums.foreign + sums.local;
+        const originScope = checkedValue('localOriginScope');
+
+        totalValue.textContent = String(total);
+        if (submitTotal) submitTotal.textContent = String(total);
         foreignValue.textContent = String(sums.foreign);
         localValue.textContent = String(sums.local);
 
+        originCard?.classList.toggle('hidden', total <= 0);
         localOriginWrap?.classList.toggle('hidden', sums.local <= 0);
         foreignCountryWrap?.classList.toggle('hidden', sums.foreign <= 0);
-        if (localOriginPlaceWrap) {
-            localOriginPlaceWrap.classList.toggle('hidden', localOriginScope?.value !== 'outside_province');
-        }
+        municipalityWrap?.classList.toggle('hidden', originScope !== 'within_province');
+        provinceWrap?.classList.toggle('hidden', originScope !== 'outside_province');
     }
 
-    localOriginScope?.addEventListener('change', updateTotal);
+    // The place sent depends on the chosen scope: a Davao Oriental
+    // municipality for "within", a province for "outside", nothing otherwise.
+    function localOriginPlace(sums) {
+        if (sums.local <= 0) return null;
+        const originScope = checkedValue('localOriginScope');
+        if (originScope === 'within_province') return municipalitySelect?.value || null;
+        if (originScope === 'outside_province') return provinceInput?.value.trim() || null;
+        return null;
+    }
+
+    form.querySelectorAll('input[name="localOriginScope"]').forEach((radio) => radio.addEventListener('change', updateTotal));
 
     counters.forEach((counter) => {
         counter.querySelector('[data-counter-decrement]').addEventListener('click', () => {
@@ -950,35 +1037,40 @@ function initEstablishmentQrForm() {
         counter.querySelector('[data-counter-increment]').addEventListener('click', () => {
             writeValue(counter, readValue(counter) + 1);
             updateTotal();
+            showError('');
         });
     });
 
     form.addEventListener('submit', async (event) => {
         event.preventDefault();
-        if (!form.reportValidity()) return;
+        if (isSubmitting) return;
+        showError('');
 
         const sums = computeMatrixSums();
         if (sums.male + sums.female < 1) {
-            alert('Add at least one guest to the headcount.');
+            showError('Add at least one guest to the headcount — tap (+) for yourself and everyone with you.');
             return;
         }
+        if (!form.reportValidity()) return;
 
-        const submitButton = form.querySelector('button[type="submit"]');
-        if (submitButton) submitButton.disabled = true;
+        setSubmitting(true);
+        let succeeded = false;
 
         try {
-            // Companion counts live in [data-counter-value] spans, not real
-            // form fields (see resources/views/components/lgu/qr-counter.blade.php),
+            // Counts live in [data-counter-value] spans, not real form
+            // fields (see resources/views/components/lgu/qr-counter.blade.php),
             // so they're read directly rather than via FormData, then rolled
             // up from the 12-cell matrix into the 7 flat fields the backend
             // validates (see computeMatrixSums() above).
+            const originScope = checkedValue('localOriginScope');
             const payload = {
-                visitorName: form.elements.namedItem('visitorName')?.value,
-                visitorContact: form.elements.namedItem('visitorContact')?.value,
+                visitorName: form.elements.namedItem('visitorName')?.value.trim(),
+                visitorContact: form.elements.namedItem('visitorContact')?.value.trim(),
+                visitType: checkedValue('visitType'),
                 website: form.elements.namedItem('website')?.value,
-                localOriginScope: sums.local > 0 ? (localOriginScope?.value || null) : null,
-                localOriginPlace: sums.local > 0 && localOriginScope?.value === 'outside_province' ? (localOriginPlace?.value || null) : null,
-                foreignCountry: sums.foreign > 0 ? (foreignCountry?.value || null) : null,
+                localOriginScope: sums.local > 0 ? (originScope || null) : null,
+                localOriginPlace: localOriginPlace(sums),
+                foreignCountry: sums.foreign > 0 ? (foreignCountry?.value.trim() || null) : null,
                 ...sums,
             };
 
@@ -993,29 +1085,42 @@ function initEstablishmentQrForm() {
             });
 
             if (!response.ok) {
-                throw new Error('Request failed');
+                const body = await response.json().catch(() => ({}));
+                const firstError = body.errors ? Object.values(body.errors)[0]?.[0] : null;
+                const message = response.status === 429
+                    ? 'Too many submissions in a short time. Please wait a minute and try again.'
+                    : (firstError || body.message || "Couldn't submit your registration. Please try again.");
+                showError(message);
+                return;
             }
 
+            succeeded = true;
+            const visitLabel = payload.visitType === 'Overnight' ? 'Overnight' : 'Day Tour';
+            const total = sums.local + sums.foreign;
+            if (successSummary) successSummary.textContent = `${total} ${total === 1 ? 'person' : 'people'} · ${visitLabel}`;
             formStep?.classList.add('hidden');
             successStep?.classList.remove('hidden');
             successStep?.classList.add('flex');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         } catch {
-            alert("Couldn't submit your registration — please check your connection and try again.");
+            showError("Couldn't submit your registration — please check your connection and try again.");
         } finally {
-            if (submitButton) submitButton.disabled = false;
+            // After a success the button stays disabled until "Register
+            // Another Group", so a second tap can't save the group twice.
+            if (!succeeded) setSubmitting(false);
         }
     });
 
     resetButton?.addEventListener('click', () => {
         form.reset();
         counters.forEach((counter) => writeValue(counter, 0));
-        if (localOriginScope) localOriginScope.value = '';
-        if (localOriginPlace) localOriginPlace.value = '';
-        if (foreignCountry) foreignCountry.value = '';
+        showError('');
+        setSubmitting(false);
         updateTotal();
         successStep?.classList.add('hidden');
         successStep?.classList.remove('flex');
         formStep?.classList.remove('hidden');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     });
 
     updateTotal();

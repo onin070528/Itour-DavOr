@@ -1,10 +1,13 @@
 <?php
 
 use App\Enums\ArrivalOriginScope;
+use App\Enums\ReportingMethod;
 use App\Enums\UserRole;
 use App\Models\Arrival;
 use App\Models\Category;
 use App\Models\Listing;
+use App\Models\MonthlyArrivalReport;
+use App\Models\Municipality;
 use App\Models\User;
 use Illuminate\Support\Str;
 
@@ -26,8 +29,14 @@ function arrivalRecordingListingFixture(array $overrides = []): Listing
     ], $overrides));
 }
 
+/**
+ * The establishment's account. An establishment with an active account
+ * reports through Online iTOUR (Lgu\EstablishmentAdoptionController).
+ */
 function arrivalRecordingStaffUser(Listing $listing): User
 {
+    $listing->forceFill(['reporting_mode' => ReportingMethod::OnlineItour])->save();
+
     return User::factory()->create([
         'role' => UserRole::Establishment,
         'organization_name' => $listing->name,
@@ -36,14 +45,27 @@ function arrivalRecordingStaffUser(Listing $listing): User
     ]);
 }
 
+/**
+ * A listing the public QR form accepts — Listing::isAcceptingRegistrations()
+ * requires Online iTOUR reporting and a linked, active establishment account.
+ */
+function arrivalRecordingCheckinListingFixture(): Listing
+{
+    $listing = arrivalRecordingListingFixture();
+    arrivalRecordingStaffUser($listing);
+
+    return $listing;
+}
+
 // --- Counting rule: the companion grid includes the lead visitor, so total must be >= 1 ---
 
 test('the public self-checkin form rejects a submission with an all-zero headcount', function () {
-    $listing = arrivalRecordingListingFixture();
+    $listing = arrivalRecordingCheckinListingFixture();
 
     $response = test()->postJson(route('checkin.store', $listing->uuid), [
         'visitorName' => 'Jane Doe',
         'visitorContact' => '0912',
+        'visitType' => 'Daytour',
         'male' => 0, 'female' => 0,
     ]);
 
@@ -72,15 +94,15 @@ test('party_size equals the grid sum with no lead-visitor offset, on both record
     test()->actingAs($user)->post(route('establishment.arrivals.store'), [
         'date' => now()->toDateString(),
         'visitType' => 'Daytour',
-        'male' => 2, 'female' => 1, 'local' => 3,
+        'male' => 2, 'female' => 1, 'adults' => 3, 'local' => 3,
     ])->assertOk();
 
     $staffArrival = Arrival::query()->where('listing_id', $listing->id)->first();
     expect($staffArrival->party_size)->toBe(3);
 
     test()->post(route('checkin.store', $listing->uuid), [
-        'visitorName' => 'Jane Doe', 'visitorContact' => '0912',
-        'male' => 1, 'female' => 1, 'foreign' => 2,
+        'visitorName' => 'Jane Doe', 'visitorContact' => '0912', 'visitType' => 'Daytour',
+        'male' => 1, 'female' => 1, 'adults' => 2, 'foreign' => 2,
     ])->assertOk();
 
     $selfCheckinArrival = Arrival::query()->where('listing_id', $listing->id)->where('source', 'self_checkin')->first();
@@ -89,12 +111,12 @@ test('party_size equals the grid sum with no lead-visitor offset, on both record
 
 // --- Origin field validation ---
 
-test('local_origin_place is rejected unless local_origin_scope is outside_province', function () {
-    $listing = arrivalRecordingListingFixture();
+test('a within-province origin place must be a Davao Oriental municipality, not a province', function () {
+    $listing = arrivalRecordingCheckinListingFixture();
 
     $response = test()->postJson(route('checkin.store', $listing->uuid), [
-        'visitorName' => 'Jane Doe', 'visitorContact' => '0912',
-        'male' => 1, 'local' => 1,
+        'visitorName' => 'Jane Doe', 'visitorContact' => '0912', 'visitType' => 'Daytour',
+        'male' => 1, 'adults' => 1, 'local' => 1,
         'localOriginScope' => 'within_province',
         'localOriginPlace' => 'Davao del Sur',
     ]);
@@ -104,11 +126,11 @@ test('local_origin_place is rejected unless local_origin_scope is outside_provin
 });
 
 test('localOriginScope is rejected when there are no local guests in the party', function () {
-    $listing = arrivalRecordingListingFixture();
+    $listing = arrivalRecordingCheckinListingFixture();
 
     $response = test()->postJson(route('checkin.store', $listing->uuid), [
-        'visitorName' => 'Jane Doe', 'visitorContact' => '0912',
-        'male' => 1, 'foreign' => 1, 'local' => 0,
+        'visitorName' => 'Jane Doe', 'visitorContact' => '0912', 'visitType' => 'Daytour',
+        'male' => 1, 'adults' => 1, 'foreign' => 1, 'local' => 0,
         'localOriginScope' => 'within_province',
     ]);
 
@@ -117,11 +139,11 @@ test('localOriginScope is rejected when there are no local guests in the party',
 });
 
 test('foreignCountry is rejected when there are no foreign guests in the party', function () {
-    $listing = arrivalRecordingListingFixture();
+    $listing = arrivalRecordingCheckinListingFixture();
 
     $response = test()->postJson(route('checkin.store', $listing->uuid), [
-        'visitorName' => 'Jane Doe', 'visitorContact' => '0912',
-        'male' => 1, 'local' => 1, 'foreign' => 0,
+        'visitorName' => 'Jane Doe', 'visitorContact' => '0912', 'visitType' => 'Daytour',
+        'male' => 1, 'adults' => 1, 'local' => 1, 'foreign' => 0,
         'foreignCountry' => 'Japan',
     ]);
 
@@ -132,11 +154,11 @@ test('foreignCountry is rejected when there are no foreign guests in the party',
 // --- Origin fields are saved on both recording paths ---
 
 test('origin fields are saved on the self-checkin path', function () {
-    $listing = arrivalRecordingListingFixture();
+    $listing = arrivalRecordingCheckinListingFixture();
 
     test()->post(route('checkin.store', $listing->uuid), [
-        'visitorName' => 'Jane Doe', 'visitorContact' => '0912',
-        'male' => 1, 'local' => 1, 'foreign' => 1,
+        'visitorName' => 'Jane Doe', 'visitorContact' => '0912', 'visitType' => 'Daytour',
+        'male' => 1, 'female' => 1, 'adults' => 2, 'local' => 1, 'foreign' => 1,
         'localOriginScope' => 'outside_province',
         'localOriginPlace' => 'Davao del Sur',
         'foreignCountry' => 'Japan',
@@ -155,7 +177,7 @@ test('origin fields are saved on the staff recording path', function () {
     test()->actingAs($user)->post(route('establishment.arrivals.store'), [
         'date' => now()->toDateString(),
         'visitType' => 'Daytour',
-        'male' => 1, 'local' => 1, 'foreign' => 1,
+        'male' => 1, 'female' => 1, 'adults' => 2, 'local' => 1, 'foreign' => 1,
         'localOriginScope' => 'within_province',
         'foreignCountry' => 'South Korea',
     ])->assertOk();
@@ -164,4 +186,111 @@ test('origin fields are saved on the staff recording path', function () {
     expect($arrival->local_origin_scope)->toBe(ArrivalOriginScope::WithinProvince);
     expect($arrival->local_origin_place)->toBeNull();
     expect($arrival->foreign_country)->toBe('South Korea');
+});
+
+// --- Encoder: every arrival keeps who encoded it (CLAUDE.md 2.4.4) ---
+
+test('the staff recording path stores the encoding user, while self-checkin leaves it null', function () {
+    $listing = arrivalRecordingListingFixture();
+    $user = arrivalRecordingStaffUser($listing);
+
+    test()->actingAs($user)->post(route('establishment.arrivals.store'), [
+        'date' => now()->toDateString(), 'visitType' => 'Daytour', 'male' => 1, 'adults' => 1, 'local' => 1,
+    ])->assertOk();
+
+    test()->post(route('checkin.store', $listing->uuid), [
+        'visitorName' => 'Jane Doe', 'visitorContact' => '0912', 'visitType' => 'Daytour', 'male' => 1, 'adults' => 1, 'local' => 1,
+    ])->assertOk();
+
+    $staffArrival = Arrival::query()->where('listing_id', $listing->id)->where('source', 'staff')->sole();
+    $selfCheckinArrival = Arrival::query()->where('listing_id', $listing->id)->where('source', 'self_checkin')->sole();
+
+    expect($staffArrival->recorded_by)->toBe($user->id);
+    expect($staffArrival->recorder->is($user))->toBeTrue();
+    expect($selfCheckinArrival->recorded_by)->toBeNull();
+});
+
+test('an establishment staff user cannot record an arrival for another establishment through forged ids', function () {
+    $ownListing = arrivalRecordingListingFixture(['name' => 'Own Resort']);
+    $otherListing = arrivalRecordingListingFixture(['name' => 'Other Resort']);
+    $owner = arrivalRecordingStaffUser($ownListing);
+
+    test()->actingAs($owner)->postJson(route('establishment.arrivals.store'), [
+        'date' => now()->toDateString(),
+        'visitType' => 'Daytour',
+        'male' => 1,
+        'adults' => 1,
+        'local' => 1,
+        'listing_id' => $otherListing->id,
+        'municipality_id' => $otherListing->municipality_id,
+        'establishment_id' => $otherListing->id,
+    ])->assertOk();
+
+    $arrival = Arrival::query()->sole();
+
+    expect($arrival->listing_id)->toBe($ownListing->id)
+        ->and($arrival->listing_id)->not->toBe($otherListing->id)
+        ->and($arrival->recorded_by)->toBe($owner->id);
+});
+
+// --- Within Davao Oriental: municipality / city (Phase 3) ---
+
+test('a within-province municipality is saved on both recording paths', function () {
+    Municipality::query()->firstOrCreate(['code' => 'MATI'], ['name' => 'City of Mati']);
+    $listing = arrivalRecordingListingFixture();
+    $user = arrivalRecordingStaffUser($listing);
+
+    test()->actingAs($user)->post(route('establishment.arrivals.store'), [
+        'date' => now()->toDateString(), 'visitType' => 'Daytour', 'male' => 1, 'adults' => 1, 'local' => 1,
+        'localOriginScope' => 'within_province', 'localOriginPlace' => 'City of Mati',
+    ])->assertOk();
+
+    test()->post(route('checkin.store', $listing->uuid), [
+        'visitorName' => 'Jane Doe', 'visitorContact' => '0912', 'visitType' => 'Overnight',
+        'female' => 1, 'adults' => 1, 'local' => 1,
+        'localOriginScope' => 'within_province', 'localOriginPlace' => 'City of Mati',
+    ])->assertOk();
+
+    expect(Arrival::query()->where('listing_id', $listing->id)->pluck('local_origin_place')->all())
+        ->toBe(['City of Mati', 'City of Mati']);
+});
+
+test('a within-province scope with no municipality is still accepted', function () {
+    $listing = arrivalRecordingCheckinListingFixture();
+
+    test()->postJson(route('checkin.store', $listing->uuid), [
+        'visitorName' => 'Jane Doe', 'visitorContact' => '0912', 'visitType' => 'Daytour',
+        'male' => 1, 'adults' => 1, 'local' => 1, 'localOriginScope' => 'within_province',
+    ])->assertOk();
+
+    expect(Arrival::query()->where('listing_id', $listing->id)->sole()->local_origin_place)->toBeNull();
+});
+
+test('the Top Origin Provinces breakdown never lists a within-province municipality', function () {
+    $report = new MonthlyArrivalReport;
+    $report->setRelation('arrivals', collect([
+        new Arrival(['party_local' => 3, 'local_origin_scope' => 'outside_province', 'local_origin_place' => 'Davao del Sur']),
+        new Arrival(['party_local' => 5, 'local_origin_scope' => 'within_province', 'local_origin_place' => 'City of Mati']),
+    ]));
+
+    $arrBreakdown = $report->originBreakdown();
+
+    expect($arrBreakdown['topOriginPlaces']->all())->toBe(['Davao del Sur' => 3]);
+    expect($arrBreakdown['withinProvince'])->toBe(5);
+    expect($arrBreakdown['outsideProvince'])->toBe(3);
+});
+
+test('a headcount above the per-field maximum is rejected on both paths', function () {
+    $listing = arrivalRecordingListingFixture();
+    $user = arrivalRecordingStaffUser($listing);
+
+    test()->actingAs($user)->postJson(route('establishment.arrivals.store'), [
+        'date' => now()->toDateString(), 'visitType' => 'Daytour', 'male' => 1000,
+    ])->assertJsonValidationErrors('male');
+
+    test()->postJson(route('checkin.store', $listing->uuid), [
+        'visitorName' => 'Jane Doe', 'visitorContact' => '0912', 'visitType' => 'Daytour', 'male' => 1000,
+    ])->assertJsonValidationErrors('male');
+
+    expect(Arrival::query()->where('listing_id', $listing->id)->count())->toBe(0);
 });

@@ -82,14 +82,16 @@ class OperationLogger
     /**
      * An LGU submitting a listing to PTO for review (DRAFT/UNPUBLISHED →
      * FOR_PTO_REVIEW) — App\Services\ListingPublishWorkflow::submitToPto().
-     * $entityId IS the establishment's own id (entity_type is always
-     * 'establishment' here), same convention as validated()/created().
+     * For entity_type 'establishment', $entityId IS the establishment's own
+     * id, same convention as validated()/created(). Any other entity (e.g. a
+     * 'monthly_arrival_report' submitted to the LGU) passes the owning
+     * establishment's id as $establishmentId instead.
      *
      * @param  ?array{old: array<string, mixed>, new: array<string, mixed>}  $diff
      */
-    public static function submitted(User $user, string $entityType, int $entityId, ?int $municipalityId, ?array $diff = null): void
+    public static function submitted(User $user, string $entityType, int $entityId, ?int $municipalityId, ?array $diff = null, ?int $establishmentId = null): void
     {
-        self::write('submit', $user, $entityType, $entityId, $municipalityId, $entityId, $diff['old'] ?? null, $diff['new'] ?? null, null);
+        self::write('submit', $user, $entityType, $entityId, $municipalityId, $establishmentId ?? $entityId, $diff['old'] ?? null, $diff['new'] ?? null, null);
     }
 
     /**

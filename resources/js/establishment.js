@@ -3,10 +3,9 @@ import Alpine from 'alpinejs';
 /**
  * Establishment-specific frontend interactions that don't belong in the
  * shared dashboard.js engine: the Record Arrival page's reactive
- * Alpine.js form (see arrivalForm() below), and the download/print actions
- * on the establishment's QR code page (resources/views/establishment/qr.blade.php).
- * The QR code itself is rendered server-side as SVG (simplesoftwareio/simple-qrcode)
- * directly in the Blade view — this file only wires up its buttons.
+ * Alpine.js form (see arrivalForm() below). The QR code page
+ * (resources/views/establishment/qr.blade.php) needs no JS — its Download
+ * and Print Poster buttons are plain links to the QrCodeController endpoints.
  *
  * Alpine is scoped to this bundle only (not app.js/dashboard.js, which stay
  * on the rest of the app's plain data-attribute JS convention) since Record
@@ -15,30 +14,6 @@ import Alpine from 'alpinejs';
 window.Alpine = Alpine;
 Alpine.data('arrivalForm', arrivalForm);
 Alpine.start();
-
-document.addEventListener('DOMContentLoaded', () => {
-    initQrActions();
-});
-
-function initQrActions() {
-    document.getElementById('qr-print')?.addEventListener('click', () => window.print());
-
-    document.getElementById('qr-download')?.addEventListener('click', (e) => {
-        const svg = document.getElementById('establishment-qr-svg')?.querySelector('svg');
-        if (!svg) return;
-
-        const source = new XMLSerializer().serializeToString(svg);
-        const blob = new Blob([source], { type: 'image/svg+xml' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = e.currentTarget.dataset.qrFilename || 'qr-code.svg';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(url);
-    });
-}
 
 /**
  * Alpine component backing the Record Arrival page
@@ -62,6 +37,7 @@ function arrivalForm(actionUrl, defaultDate) {
         leadVisitorName: '',
         visitType: 'Daytour',
         localOriginScope: '',
+        localOriginMunicipality: '',
         localOriginPlace: '',
         foreignCountry: '',
         submitting: false,
@@ -107,6 +83,15 @@ function arrivalForm(actionUrl, defaultDate) {
             return this.localTotal + this.foreignTotal;
         },
 
+        // The place sent depends on the chosen scope: a Davao Oriental
+        // municipality for "within", a province for "outside", else nothing.
+        originPlace() {
+            if (this.localTotal <= 0) return null;
+            if (this.localOriginScope === 'within_province') return this.localOriginMunicipality || null;
+            if (this.localOriginScope === 'outside_province') return this.localOriginPlace.trim() || null;
+            return null;
+        },
+
         async submit() {
             if (!this.$refs.form.reportValidity()) return;
             if (this.totalPeople < 1) {
@@ -128,15 +113,18 @@ function arrivalForm(actionUrl, defaultDate) {
                         date: this.date,
                         visitorName: this.leadVisitorName,
                         visitType: this.visitType,
-                        localOriginScope: this.localTotal > 0 ? this.localOriginScope : null,
-                        localOriginPlace: this.localTotal > 0 && this.localOriginScope === 'outside_province' ? this.localOriginPlace : null,
+                        localOriginScope: this.localTotal > 0 ? (this.localOriginScope || null) : null,
+                        localOriginPlace: this.originPlace(),
                         foreignCountry: this.foreignTotal > 0 ? this.foreignCountry : null,
                         ...this.sums(),
                     }),
                 });
 
                 if (!response.ok) {
-                    throw new Error('Request failed');
+                    const body = await response.json().catch(() => ({}));
+                    const firstError = body.errors ? Object.values(body.errors)[0]?.[0] : null;
+                    window.dispatchEvent(new CustomEvent('itour:toast', { detail: { message: firstError || "Couldn't save this arrival — please try again.", tone: 'danger' } }));
+                    return;
                 }
 
                 window.dispatchEvent(new CustomEvent('itour:toast', { detail: { message: 'Arrival recorded.', tone: 'success' } }));
@@ -144,6 +132,7 @@ function arrivalForm(actionUrl, defaultDate) {
                 this.leadVisitorName = '';
                 this.visitType = 'Daytour';
                 this.localOriginScope = '';
+                this.localOriginMunicipality = '';
                 this.localOriginPlace = '';
                 this.foreignCountry = '';
                 this.date = defaultDate;

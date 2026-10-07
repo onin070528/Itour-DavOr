@@ -2,13 +2,26 @@
 
 **NOT FOR PRODUCTION.** These accounts exist only in local/staging environments — the seeder that creates them (`Database\Seeders\RbacDemoAccountSeeder`) refuses to run when `APP_ENV=production`.
 
-| Role | Email | Scope |
-|---|---|---|
-| PTO | `tourism@itourdavor.gov.ph` | Province-wide |
-| LGU | `tourism.mati@itourdavor.gov.ph` | Municipality: Mati |
-| ESTABLISHMENT | `establishments@itourdavor.gov.ph` | Municipality: Mati |
+| Role | Email | Scope | Must change password on first login |
+|---|---|---|---|
+| PTO (primary) | `tourism@itourdavor.gov.ph` | Province-wide | No |
+| PTO (secondary) | `tourism.admin2@itourdavor.gov.ph` | Province-wide | Yes |
+| LGU | `tourism.mati@itourdavor.gov.ph` | City of Mati | Yes |
+| LGU | `tourism.baganga@itourdavor.gov.ph` | Baganga | Yes |
+| LGU | `tourism.banaybanay@itourdavor.gov.ph` | Banaybanay | Yes |
+| LGU | `tourism.boston@itourdavor.gov.ph` | Boston | Yes |
+| LGU | `tourism.caraga@itourdavor.gov.ph` | Caraga | Yes |
+| LGU | `tourism.cateel@itourdavor.gov.ph` | Cateel | Yes |
+| LGU | `tourism.govgen@itourdavor.gov.ph` | Governor Generoso | Yes |
+| LGU | `tourism.lupon@itourdavor.gov.ph` | Lupon | Yes |
+| LGU | `tourism.manay@itourdavor.gov.ph` | Manay | Yes |
+| LGU | `tourism.sanisidro@itourdavor.gov.ph` | San Isidro | Yes |
+| LGU | `tourism.tarragona@itourdavor.gov.ph` | Tarragona | Yes |
+| ESTABLISHMENT | `establishments@itourdavor.gov.ph` | Municipality: Mati | No |
 
-**Password (all three):** `itour-davor@2026`
+**Temporary password (all of the above):** the `SEED_DEMO_PASSWORD` value in your `.env`. Only one active LGU account is allowed per municipality; the older demo LGU accounts (and `ebautista@davaooriental.gov.ph`) from `UserSeeder` are seeded **Inactive**.
+
+Re-seeding is safe: accounts are matched by email, municipalities are only looked up (never created), and the temporary password and must-change flag are only re-applied to an account that has never set its own password.
 
 ## Where these come from
 
@@ -31,7 +44,7 @@ php artisan db:seed --class=Database\\Seeders\\RbacDemoAccountSeeder
 
 ## Other seeded accounts
 
-These 3 are additive — they exist alongside the broader illustrative demo dataset `database/seeders/UserSeeder.php` already seeds (province-wide PTO/LGU/Establishment sample accounts used by the User Management pages), which all use the password `password`. Do not remove either dataset without checking what currently depends on it (`MunicipalReportSeeder`, various feature tests).
+These accounts are additive — they exist alongside the broader illustrative demo dataset `database/seeders/UserSeeder.php` already seeds (province-wide PTO/LGU/Establishment sample accounts used by the User Management pages), which all use the password `password`. Do not remove either dataset without checking what currently depends on it (`MunicipalReportSeeder`, various feature tests).
 
 ## RBAC foundation
 

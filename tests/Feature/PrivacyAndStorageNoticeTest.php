@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ReportingMethod;
 use App\Enums\UserRole;
 use App\Models\Category;
 use App\Models\Listing;
@@ -67,6 +68,13 @@ test('the QR arrival form links to the privacy notice above its submit button', 
         'municipality' => 'City of Mati',
         'barangay' => 'Dahican',
         'status' => 'PUBLISHED',
+    ]);
+    $listing->forceFill(['reporting_mode' => ReportingMethod::OnlineItour])->save();
+    User::factory()->create([
+        'role' => UserRole::Establishment,
+        'organization_name' => $listing->name,
+        'organization_subtitle' => 'Brgy. Dahican, City of Mati',
+        'establishment_id' => $listing->id,
     ]);
 
     test()->get(route('lgu.establishmentQr', $listing->uuid))

@@ -226,10 +226,7 @@
                 </div>
 
                 <div class="flex shrink-0 items-center gap-4">
-                    <button type="button" class="relative text-sand-600" aria-label="Notifications">
-                        <i class="ti ti-bell text-lg" aria-hidden="true"></i>
-                        <span class="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-accent-500"></span>
-                    </button>
+                    <x-dashboard.notification-bell :user="$user" />
 
                     <div class="relative">
                         <button type="button" data-dropdown-toggle class="flex cursor-pointer items-center gap-2.5 rounded-sm">

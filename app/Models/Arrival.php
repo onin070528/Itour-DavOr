@@ -24,7 +24,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * still on this table but no longer written by either form.
  */
 #[Fillable([
-    'listing_id', 'monthly_arrival_report_id', 'source', 'date', 'visitor_name', 'visitor_contact',
+    'listing_id', 'monthly_arrival_report_id', 'source', 'recorded_by', 'date', 'visitor_name', 'visitor_contact',
     'gender', 'classification', 'visit_type', 'remarks', 'party_male',
     'party_female', 'party_adults', 'party_children', 'party_seniors',
     'party_local', 'party_foreign', 'party_size', 'status',
@@ -45,6 +45,15 @@ class Arrival extends Model
     {
         return $this->belongsTo(Listing::class);
     }
+
+    /**
+     * The establishment user who encoded this arrival at the front desk —
+     * null for QR self-check-in rows (the tourist has no account).
+     */
+    public function recorder(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'recorded_by');
+    } // end recorder
 
     /**
      * The digitally-submitted monthly report this row was aggregated into,

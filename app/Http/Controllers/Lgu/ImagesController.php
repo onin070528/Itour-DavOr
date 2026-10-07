@@ -11,6 +11,7 @@ namespace App\Http\Controllers\Lgu;
 
 use App\Enums\ImageSourceRole;
 use App\Enums\ImageStatus;
+use App\Enums\ReportingMethod;
 use App\Http\Controllers\Concerns\ManagesEstablishmentImages;
 use App\Http\Controllers\Concerns\ReviewsEstablishmentImageQueue;
 use App\Http\Requests\UploadEstablishmentImageRequest;
@@ -166,7 +167,7 @@ class ImagesController extends LguController
         return Listing::query()
             ->where('municipality_id', $objUser->municipality_id)
             ->where(function ($query) {
-                $query->whereDoesntHave('establishmentUser')->orWhere('reporting_mode', 'PAPER_LGU');
+                $query->whereDoesntHave('establishmentUser')->orWhere('reporting_mode', ReportingMethod::ManualPaper->value);
             })
             ->orderBy('name')
             ->get();

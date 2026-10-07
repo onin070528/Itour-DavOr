@@ -12,6 +12,7 @@
 
 namespace App\Http\Controllers\Establishment;
 
+use App\Models\SecurityLog;
 use App\Support\AuditLogQuery;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -21,6 +22,7 @@ class ActivityLogController extends EstablishmentController
 {
     public function index(Request $request): View
     {
+        abort_unless($request->user()->can('viewAny', SecurityLog::class), 403);
         $request->validate(['tab' => ['nullable', Rule::in(['security', 'operation'])]]);
         $tab = $request->query('tab', 'security');
         $filters = AuditLogQuery::validatedFilters($request);

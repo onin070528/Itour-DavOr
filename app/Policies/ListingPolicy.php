@@ -39,10 +39,51 @@ class ListingPolicy
     }
 
     /**
+     * Who may view/download/print an establishment's check-in QR code:
+     * the establishment its own listing only, the LGU its own
+     * municipality's establishments, the PTO every establishment
+     * (read-only). Destinations never have a QR. Whether the listing
+     * actually has a usable QR right now is Listing::isAcceptingRegistrations()
+     * (checked separately, so out-of-scope users get 403, not 404).
+     */
+    public function viewQr(User $user, Listing $listing): bool
+    {
+        if ($listing->category === 'destinations') {
+            return false;
+        }
+
+        return match ($user->role) {
+            UserRole::PtoAdministrator => true,
+            UserRole::Lgu => $listing->municipality_id === $user->municipality_id,
+            UserRole::Establishment => $listing->id === $user->establishment_id,
+            default => false,
+        };
+    }
+
+    /**
+     * Who may switch an establishment's QR check-in on or off
+     * (lst_is_qr_enabled): the establishment its own listing (e.g. while
+     * temporarily closed), the LGU its own municipality's establishments.
+     * The PTO stays read-only for QR codes; destinations never have one.
+     */
+    public function manageQr(User $user, Listing $listing): bool
+    {
+        if ($listing->category === 'destinations') {
+            return false;
+        }
+
+        return match ($user->role) {
+            UserRole::Lgu => $listing->municipality_id === $user->municipality_id,
+            UserRole::Establishment => $listing->id === $user->establishment_id,
+            default => false,
+        };
+    }
+
+    /**
      * Applies to both establishments and destinations — LGU may create
      * either, within its own municipality (the municipality itself is
      * assigned server-side from the account, not client input — see
-     * ManagesDestinationListings::createDestination()).
+     * App\Services\AttractionRecordService::create()).
      */
     public function create(User $user): bool
     {
@@ -80,16 +121,17 @@ class ListingPolicy
     }
 
     /**
-     * LGU only, own municipality, establishments only — submitting to PTO
-     * or returning to the establishment are both gated the same way (the
-     * LGU "owns" the listing while it's DRAFT/FOR_PTO_REVIEW/UNPUBLISHED).
-     * Controllers additionally check the current status before allowing a
-     * specific transition; this is the jurisdiction check alone.
+     * LGU only, own municipality — requesting a destination listing (or
+     * resubmitting it) and returning it to the establishment are gated the
+     * same way. Covers establishments and destination-only records alike:
+     * both go through the same PTO review (Phase 6). Controllers
+     * additionally check the current status before allowing a specific
+     * transition; this is the jurisdiction check alone.
      */
     public function submit(User $user, Listing $listing): bool
     {
         return $user->role === UserRole::Lgu
-            && $listing->category !== 'destinations'
+            && $listing->municipality_id !== null
             && $listing->municipality_id === $user->municipality_id;
     }
 
@@ -100,7 +142,8 @@ class ListingPolicy
      */
     public function publish(User $user, Listing $listing): bool
     {
-        return $user->role === UserRole::PtoAdministrator && $listing->category !== 'destinations';
+        // Establishments and destination-only records alike (Phase 6).
+        return $user->role === UserRole::PtoAdministrator;
     }
 
     /**

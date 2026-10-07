@@ -97,7 +97,7 @@ class TourismAnalytics
         $notSubmittedMunicipalities = max(0, $totalMunicipalities - $reportingMunicipalities - $forClarificationMunicipalities);
 
         $forReviewCount = (int) MonthlyArrivalReport::query()
-            ->where('status', MonthlyReportStatus::ForReview)
+            ->whereIn('status', MonthlyReportStatus::awaitingReview())
             ->whereYear('period_month', $filters['year'])
             ->when($filters['month'] ?? null, fn (Builder $q, int $m) => $q->whereMonth('period_month', $m))
             ->when($filters['municipalityId'] ?? null, fn (Builder $q, int $id) => $q->where('municipality_id', $id))
@@ -356,6 +356,367 @@ class TourismAnalytics
             'time' => $log->created_at,
         ];
     }
+
+    /**
+     * One entry per calendar month of $filters['year'] for the given scope
+     * (municipalityId and/or listingId), from Verified reports only. A month
+     * with no Verified report has hasData = false and is shown as "No
+     * report" — never as a zero-arrival month. Each month also carries its
+     * change vs the previous calendar month (December of the previous year
+     * for January) when both months have verified data.
+     *
+     * @param  array<string, mixed>  $filters
+     * @return Collection<int, array{month: int, label: string, shortLabel: string, hasData: bool, total: int, reportCount: int, change: string, changePercent: ?float}>
+     */
+    public static function monthlyRecords(array $filters): Collection
+    {
+        $intYear = (int) $filters['year'];
+        $dtStart = CarbonImmutable::create($intYear - 1, 12, 1);
+        $dtEnd = CarbonImmutable::create($intYear, 12, 31);
+
+        $objRows = self::_verifiedScopeQuery($filters)
+            ->whereDate('period_month', '>=', $dtStart->toDateString())
+            ->whereDate('period_month', '<=', $dtEnd->toDateString())
+            ->get(['period_month', 'total_visitors']);
+
+        $arrTotals = $objRows
+            ->groupBy(fn (MonthlyArrivalReport $objRow) => $objRow->period_month->format('Y-m'))
+            ->map(fn (Collection $objMonthRows) => ['total' => (int) $objMonthRows->sum('total_visitors'), 'count' => $objMonthRows->count()])
+            ->all();
+
+        return self::_buildMonthlyRecords($intYear, $arrTotals);
+    } // end monthlyRecords
+
+    /**
+     * Province-wide equivalent of monthlyRecords() for PTO Provincial
+     * Reports: one entry per month of $intYear from municipal reports the
+     * PTO has verified (APPROVED, latest revision) only — the official
+     * provincial figures. A month with no PTO-verified municipal report has
+     * hasData = false. reportCount = number of verified LGU reports.
+     *
+     * @return Collection<int, array{month: int, label: string, shortLabel: string, hasData: bool, total: int, reportCount: int, change: string, changePercent: ?float}>
+     */
+    public static function provincialMonthlyRecords(int $intYear): Collection
+    {
+        $arrTotals = self::_approvedMunicipalReportsQuery()
+            ->whereDate('period_start', '>=', CarbonImmutable::create($intYear - 1, 12, 1)->toDateString())
+            ->whereDate('period_start', '<=', CarbonImmutable::create($intYear, 12, 31)->toDateString())
+            ->get(['id', 'period_start', 'total_arrivals'])
+            ->toBase()
+            ->groupBy(fn (MunicipalReport $objReport) => $objReport->period_start->format('Y-m'))
+            ->map(fn (Collection $objMonthReports) => ['total' => (int) $objMonthReports->sum('total_arrivals'), 'count' => $objMonthReports->count()])
+            ->all();
+
+        return self::_buildMonthlyRecords($intYear, $arrTotals);
+    } // end provincialMonthlyRecords
+
+    /**
+     * Visitor classifications behind the PTO-verified municipal reports of
+     * a year (or one month of it): the establishment reports each verified
+     * municipal report was consolidated from.
+     *
+     * @return array<string, int>
+     */
+    public static function provincialVisitorBreakdown(int $intYear, ?int $intMonth = null): array
+    {
+        $objApprovedIds = self::_approvedMunicipalReportsQuery()
+            ->whereYear('period_start', $intYear)
+            ->when($intMonth, fn (Builder $q, int $m) => $q->whereMonth('period_start', $m))
+            ->pluck('id');
+
+        $objRow = MonthlyArrivalReport::query()
+            ->whereIn('municipal_report_id', $objApprovedIds)
+            ->selectRaw('
+                COALESCE(SUM(party_male), 0) as male_total, COALESCE(SUM(party_female), 0) as female_total,
+                COALESCE(SUM(party_adults), 0) as adults_total, COALESCE(SUM(party_children), 0) as children_total,
+                COALESCE(SUM(party_seniors), 0) as seniors_total, COALESCE(SUM(party_local), 0) as local_total,
+                COALESCE(SUM(party_foreign), 0) as foreign_total, COALESCE(SUM(total_visitors), 0) as visitors_total
+            ')
+            ->first();
+
+        return [
+            'male' => (int) $objRow->male_total,
+            'female' => (int) $objRow->female_total,
+            'adults' => (int) $objRow->adults_total,
+            'children' => (int) $objRow->children_total,
+            'seniors' => (int) $objRow->seniors_total,
+            'local' => (int) $objRow->local_total,
+            'foreign' => (int) $objRow->foreign_total,
+            'total' => (int) $objRow->visitors_total,
+        ];
+    } // end provincialVisitorBreakdown
+
+    /**
+     * PTO-verified (APPROVED), latest-revision municipal reports.
+     */
+    private static function _approvedMunicipalReportsQuery(): Builder
+    {
+        return MunicipalReport::query()
+            ->where('status', MunicipalReport::STATUS_APPROVED)
+            ->whereNotNull('municipality_id')
+            ->whereDoesntHave('supersededBy');
+    } // end _approvedMunicipalReportsQuery
+
+    /**
+     * Shared month-record builder: 12 entries for $intYear from
+     * ['Y-m' => ['total' => int, 'count' => int]] (December of the previous
+     * year may be included, only to compare January against it).
+     *
+     * @param  array<string, array{total: int, count: int}>  $arrTotals
+     * @return Collection<int, array<string, mixed>>
+     */
+    private static function _buildMonthlyRecords(int $intYear, array $arrTotals): Collection
+    {
+        $strPreviousKey = CarbonImmutable::create($intYear - 1, 12, 1)->format('Y-m');
+        $intPreviousTotal = isset($arrTotals[$strPreviousKey]) ? $arrTotals[$strPreviousKey]['total'] : null;
+        $arrRecords = [];
+
+        foreach (range(1, 12) as $intMonth) {
+            $dtMonth = CarbonImmutable::create($intYear, $intMonth, 1);
+            $arrMonth = $arrTotals[$dtMonth->format('Y-m')] ?? null;
+            $blnHasData = $arrMonth !== null;
+            $intTotal = $blnHasData ? $arrMonth['total'] : 0;
+
+            [$strChange, $fltPercent] = $blnHasData
+                ? self::changeLabel($intPreviousTotal, $intTotal)
+                : ['No Comparison Available', null];
+
+            $arrRecords[] = [
+                'month' => $intMonth,
+                'label' => $dtMonth->format('F Y'),
+                'shortLabel' => $dtMonth->format('M'),
+                'hasData' => $blnHasData,
+                'total' => $intTotal,
+                'reportCount' => $blnHasData ? $arrMonth['count'] : 0,
+                'change' => $strChange,
+                'changePercent' => $fltPercent,
+            ];
+
+            $intPreviousTotal = $blnHasData ? $intTotal : null;
+        } // end foreach month
+
+        return collect($arrRecords);
+    } // end _buildMonthlyRecords
+
+    /**
+     * Year totals from monthlyRecords(): overall total, highest / lowest
+     * month and average per reported month — computed only over months
+     * that actually have verified data.
+     *
+     * @param  Collection<int, array<string, mixed>>  $objRecords
+     * @return array{total: int, monthsWithData: int, highest: ?array<string, mixed>, lowest: ?array<string, mixed>, average: ?int}
+     */
+    public static function yearSummary(Collection $objRecords): array
+    {
+        $objWithData = $objRecords->where('hasData', true);
+        $intMonthsWithData = $objWithData->count();
+
+        return [
+            'total' => (int) $objWithData->sum('total'),
+            'monthsWithData' => $intMonthsWithData,
+            'highest' => $intMonthsWithData > 0 ? $objWithData->sortByDesc('total')->first() : null,
+            'lowest' => $intMonthsWithData > 0 ? $objWithData->sortBy('total')->first() : null,
+            'average' => $intMonthsWithData > 0 ? (int) round($objWithData->sum('total') / $intMonthsWithData) : null,
+        ];
+    } // end yearSummary
+
+    /**
+     * Q1–Q4 totals derived from monthlyRecords(), with how many of the
+     * quarter's three months have verified data (a quarter with fewer is
+     * marked incomplete, not padded with zeros).
+     *
+     * @param  Collection<int, array<string, mixed>>  $objRecords
+     * @return Collection<int, array{quarter: string, months: string, total: int, monthsWithData: int}>
+     */
+    public static function quarterlySummary(Collection $objRecords): Collection
+    {
+        $arrMonthNames = ['Jan – Mar', 'Apr – Jun', 'Jul – Sep', 'Oct – Dec'];
+
+        return collect(range(1, 4))->map(function (int $intQuarter) use ($objRecords, $arrMonthNames) {
+            $objQuarterMonths = $objRecords->whereBetween('month', [($intQuarter - 1) * 3 + 1, $intQuarter * 3])->where('hasData', true);
+
+            return [
+                'quarter' => "Q{$intQuarter}",
+                'months' => $arrMonthNames[$intQuarter - 1],
+                'total' => (int) $objQuarterMonths->sum('total'),
+                'monthsWithData' => $objQuarterMonths->count(),
+            ];
+        });
+    } // end quarterlySummary
+
+    /**
+     * Same-period year comparison: the selected year's reported months vs
+     * the same calendar months of the previous year, so a year still in
+     * progress is never compared against a full previous year. "No
+     * Comparison Available" when the previous year has no verified data
+     * for those months.
+     *
+     * @param  Collection<int, array<string, mixed>>  $objCurrent  monthlyRecords() of the selected year.
+     * @param  Collection<int, array<string, mixed>>  $objPrevious  monthlyRecords() of the year before.
+     * @return array{label: string, percent: ?float, current: int, previous: ?int, periodLabel: ?string}
+     */
+    public static function yearComparison(Collection $objCurrent, Collection $objPrevious, int $intYear): array
+    {
+        $objCurrentMonths = $objCurrent->where('hasData', true);
+
+        if ($objCurrentMonths->isEmpty()) {
+            return ['label' => 'No Comparison Available', 'percent' => null, 'current' => 0, 'previous' => null, 'periodLabel' => null];
+        }
+
+        $arrMonths = $objCurrentMonths->pluck('month')->all();
+        $objPreviousMonths = $objPrevious->where('hasData', true)->whereIn('month', $arrMonths);
+        $intCurrent = (int) $objCurrentMonths->sum('total');
+
+        $strRange = count($arrMonths) === 12
+            ? 'full year'
+            : CarbonImmutable::create($intYear, min($arrMonths), 1)->format('M').' – '.CarbonImmutable::create($intYear, max($arrMonths), 1)->format('M');
+
+        if ($objPreviousMonths->isEmpty()) {
+            return ['label' => 'No Comparison Available', 'percent' => null, 'current' => $intCurrent, 'previous' => null, 'periodLabel' => $strRange];
+        }
+
+        $intPrevious = (int) $objPreviousMonths->sum('total');
+        [$strLabel, $fltPercent] = self::changeLabel($intPrevious, $intCurrent);
+
+        return ['label' => $strLabel, 'percent' => $fltPercent, 'current' => $intCurrent, 'previous' => $intPrevious, 'periodLabel' => $strRange];
+    } // end yearComparison
+
+    /**
+     * Increased / Decreased / Stable (within 1%, the dashboard's rule) /
+     * No Comparison Available, plus the percentage change when defined.
+     *
+     * @return array{0: string, 1: ?float}
+     */
+    public static function changeLabel(?int $intPrevious, int $intCurrent): array
+    {
+        if ($intPrevious === null) {
+            return ['No Comparison Available', null];
+        }
+
+        if ($intPrevious === 0) {
+            return [$intCurrent === 0 ? 'Stable' : 'Increased', null];
+        }
+
+        $fltPercent = round((($intCurrent - $intPrevious) / $intPrevious) * 100, 1);
+
+        $strLabel = match (true) {
+            abs($fltPercent) < 1 => 'Stable',
+            $fltPercent > 0 => 'Increased',
+            default => 'Decreased',
+        };
+
+        return [$strLabel, $fltPercent];
+    } // end changeLabel
+
+    /**
+     * Verified totals for every visitor classification the system collects
+     * (gender, age group, origin) — no new categories.
+     *
+     * @param  array<string, mixed>  $filters
+     * @return array<string, int>
+     */
+    public static function visitorBreakdown(array $filters): array
+    {
+        $objRow = self::verifiedReportsQuery($filters)
+            ->selectRaw('
+                COALESCE(SUM(party_male), 0) as male_total, COALESCE(SUM(party_female), 0) as female_total,
+                COALESCE(SUM(party_adults), 0) as adults_total, COALESCE(SUM(party_children), 0) as children_total,
+                COALESCE(SUM(party_seniors), 0) as seniors_total, COALESCE(SUM(party_local), 0) as local_total,
+                COALESCE(SUM(party_foreign), 0) as foreign_total, COALESCE(SUM(total_visitors), 0) as visitors_total
+            ')
+            ->first();
+
+        return [
+            'male' => (int) $objRow->male_total,
+            'female' => (int) $objRow->female_total,
+            'adults' => (int) $objRow->adults_total,
+            'children' => (int) $objRow->children_total,
+            'seniors' => (int) $objRow->seniors_total,
+            'local' => (int) $objRow->local_total,
+            'foreign' => (int) $objRow->foreign_total,
+            'total' => (int) $objRow->visitors_total,
+        ];
+    } // end visitorBreakdown
+
+    /**
+     * Verified arrivals per establishment (highest first), with how many
+     * verified monthly reports each contributed.
+     *
+     * @param  array<string, mixed>  $filters
+     * @return Collection<int, array{name: string, category: string, total: int, reportCount: int}>
+     */
+    public static function establishmentBreakdown(array $filters): Collection
+    {
+        return self::verifiedReportsQuery($filters)
+            ->with('listing.categoryRecord')
+            ->get(['listing_id', 'total_visitors'])
+            ->groupBy('listing_id')
+            ->map(fn (Collection $objReports) => [
+                'name' => $objReports->first()->listing?->name ?? 'Unknown establishment',
+                'category' => $objReports->first()->listing?->categoryRecord?->cat_name ?? 'Uncategorized',
+                'total' => (int) $objReports->sum('total_visitors'),
+                'reportCount' => $objReports->count(),
+            ])
+            ->sortByDesc('total')
+            ->values();
+    } // end establishmentBreakdown
+
+    /**
+     * Verified arrivals grouped by establishment category (the stand-in for
+     * "by destination" — destinations do not report arrivals).
+     *
+     * @param  array<string, mixed>  $filters
+     * @return Collection<int, array{category: string, total: int, establishments: int}>
+     */
+    public static function categoryBreakdown(array $filters): Collection
+    {
+        return self::establishmentBreakdown($filters)
+            ->groupBy('category')
+            ->map(fn (Collection $objGroup, string $strCategory) => [
+                'category' => $strCategory,
+                'total' => (int) $objGroup->sum('total'),
+                'establishments' => $objGroup->count(),
+            ])
+            ->sortByDesc('total')
+            ->values();
+    } // end categoryBreakdown
+
+    /**
+     * Years that have any report in the given scope, newest first, always
+     * including the current year.
+     *
+     * @return array<int, int>
+     */
+    public static function scopedYearOptions(?int $intMunicipalityId, ?int $intListingId = null): array
+    {
+        return MonthlyArrivalReport::query()
+            ->when($intMunicipalityId, fn (Builder $q, int $id) => $q->where('municipality_id', $id))
+            ->when($intListingId, fn (Builder $q, int $id) => $q->where('listing_id', $id))
+            ->get(['period_month'])
+            // toBase(): with no rows, map() would keep an Eloquent
+            // collection, and pushing a plain year into it breaks unique().
+            ->toBase()
+            ->map(fn (MonthlyArrivalReport $objRow) => $objRow->period_month->year)
+            ->push(CarbonImmutable::now()->year)
+            ->unique()
+            ->sortDesc()
+            ->values()
+            ->all();
+    } // end scopedYearOptions
+
+    /**
+     * Verified reports for a municipality/establishment scope, with no
+     * year/month constraint (callers add their own date range).
+     *
+     * @param  array<string, mixed>  $filters
+     */
+    private static function _verifiedScopeQuery(array $filters): Builder
+    {
+        return MonthlyArrivalReport::query()
+            ->where('status', MonthlyReportStatus::Verified)
+            ->when($filters['municipalityId'] ?? null, fn (Builder $q, int $id) => $q->where('municipality_id', $id))
+            ->when($filters['listingId'] ?? null, fn (Builder $q, int $id) => $q->where('listing_id', $id));
+    } // end _verifiedScopeQuery
 
     private static function arrivalColumn(array $filters): string
     {

@@ -46,6 +46,6 @@
             </span>
         </div>
 
-        <script type="application/json" id="nearby-map-data">{!! json_encode($places) !!}</script>
+        <script type="application/json" id="nearby-map-data">{!! json_encode($places, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT) !!}</script>
     </div>
 </section>

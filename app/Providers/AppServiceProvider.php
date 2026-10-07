@@ -11,7 +11,11 @@
 namespace App\Providers;
 
 use App\Models\EstablishmentImage;
+use App\Models\Municipality;
+use App\Models\User;
 use App\Policies\ImagePolicy;
+use App\Policies\MunicipalityPolicy;
+use App\Support\SecurityLogger;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -73,11 +77,34 @@ class AppServiceProvider extends ServiceProvider
         // instead of redeclaring the rule. Deliberately no uncompromised():
         // that check calls an external API (Have I Been Pwned) on every
         // password submission.
-        Password::defaults(fn () => Password::min(12)->letters()->numbers());
+        // Shown to users by <x-auth.password-requirements> — keep the two in step.
+        Password::defaults(fn () => Password::min(12)->letters()->numbers()->symbols());
 
         // ImagePolicy doesn't follow Laravel's {Model}Policy auto-discovery
         // naming convention (named ImagePolicy, not EstablishmentImagePolicy)
         // — registered explicitly instead.
         Gate::policy(EstablishmentImage::class, ImagePolicy::class);
+
+        // MunicipalityPolicy auto-discovers fine (Municipality -> MunicipalityPolicy)
+        // but is registered explicitly here for visibility alongside ImagePolicy —
+        // no controller binds a single Municipality by route yet, so this is a
+        // second-layer safety net for whenever one is added.
+        Gate::policy(Municipality::class, MunicipalityPolicy::class);
+
+        Gate::after(function (User $user, string $ability, ?bool $result, array $arguments): void {
+            if ($result === false && $user->isLgu()) {
+                $target = $arguments[0] ?? null;
+                $targetMunicipalityId = is_object($target) && isset($target->municipality_id)
+                    ? (int) $target->municipality_id
+                    : null;
+
+                SecurityLogger::accessDenied(
+                    $user,
+                    $ability,
+                    is_object($target) ? $target::class : null,
+                    $targetMunicipalityId
+                );
+            }
+        });
     }
 }

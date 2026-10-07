@@ -11,6 +11,12 @@
         </x-slot:actions>
     </x-dashboard.page-header>
 
+    {{-- Destinations now live in the Attractions view of the Establishments page (D1); this page stays until the navigation update. --}}
+    <div class="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-md border border-primary-300 bg-primary-100 px-4 py-3 text-sm text-primary-900">
+        <p class="flex items-center gap-2"><i class="ti ti-info-circle" aria-hidden="true"></i> Tourist attractions are now managed under Establishments → Attractions, with photos and PTO review in one place. New destinations appear publicly only after PTO approval.</p>
+        <a href="{{ route('lgu.directory.establishments', ['view' => 'attractions']) }}" class="rounded-sm bg-primary-700 px-3 py-1.5 text-xs font-semibold text-sand-0 hover:bg-primary-900">Go to Attractions</a>
+    </div>
+
     <div data-filterable-table class="mt-6">
         <div class="rounded-md border border-sand-200 bg-sand-0 p-4">
             <div class="flex items-center gap-2 rounded-sm border border-sand-300 bg-sand-50 px-3 py-2.5 sm:max-w-sm">

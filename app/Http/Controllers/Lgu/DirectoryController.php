@@ -4,24 +4,24 @@
  * iTOUR — Davao Oriental Tourism Information System
  *
  * Purpose: LGU destination management (add/edit/archive, municipality-scoped)
- * and read-only monitoring of establishments in the account's municipality.
+ * and the destination listing actions on establishments (submit to PTO,
+ * return to the establishment). Establishment management itself lives in
+ * Lgu\EstablishmentsController.
  * Programmer/s: iTOUR Development Team
  * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
  */
 
 namespace App\Http\Controllers\Lgu;
 
-use App\Enums\ImageStatus;
 use App\Http\Controllers\Concerns\AuthorizesOwnMunicipality;
 use App\Http\Controllers\Concerns\ManagesDestinationListings;
-use App\Models\EstablishmentImage;
 use App\Models\Listing;
+use App\Services\AttractionRecordService;
 use App\Services\ListingPublishWorkflow;
 use App\Support\LguMockData;
 use App\Support\OperationLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -45,48 +45,49 @@ class DirectoryController extends LguController
         ]);
     }
 
-    public function storeDestination(Request $request): RedirectResponse
+    /**
+     * Older Destinations page "Add": the same rule as Establishments ->
+     * Add Tourist Attraction (AttractionRecordService) — a new destination
+     * starts Not Requested and goes public only after PTO approval.
+     */
+    public function storeDestination(Request $request, AttractionRecordService $objRecords): RedirectResponse
     {
         $fields = $this->validatedDestinationFields($request);
-        $lgu = $request->user();
-        $municipality = $lgu->organization_subtitle;
 
         try {
-            $listing = $this->createDestination($fields, $municipality, $lgu->municipality_id);
+            $listing = $objRecords->create($request->user(), $fields);
         } catch (\Throwable $e) {
             Log::error('Failed to create LGU destination.', ['exception' => $e]);
 
             return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
 
-        OperationLogger::created($lgu, 'destination', $listing->id, $lgu->municipality_id, null, [
-            'name' => $listing->name,
-            'barangay' => $listing->barangay,
-            'municipality' => $listing->municipality,
-        ]);
-
-        return back()->with('toast', "{$listing->name} was added.");
+        return redirect()->route('lgu.directory.attractions.show', $listing)
+            ->with('toast', "{$listing->name} was added. Request PTO review when it is ready to be featured.");
     }
 
-    public function updateDestination(Request $request, Listing $listing): RedirectResponse
+    /**
+     * Older Destinations page "Edit": edits to public content of a live
+     * destination are held for PTO review (AttractionRecordService).
+     */
+    public function updateDestination(Request $request, Listing $listing, AttractionRecordService $objRecords): RedirectResponse
     {
         $this->authorizeOwnMunicipality($request, $listing);
         abort_if($listing->category !== 'destinations', 404);
 
         $fields = $this->validatedDestinationFields($request);
-        $before = $listing->getOriginal();
 
         try {
-            $listing->update($fields);
+            $blnIsHeldForReview = $objRecords->update($request->user(), $listing, $fields);
+        } catch (ValidationException $e) {
+            return back()->with('toast', $e->validator->errors()->first())->with('toast_tone', 'danger');
         } catch (\Throwable $e) {
             Log::error('Failed to update LGU destination.', ['exception' => $e, 'listing_id' => $listing->id]);
 
             return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
 
-        OperationLogger::updated($request->user(), 'destination', $listing->id, $request->user()->municipality_id, null, OperationLogger::diff($before, $listing));
-
-        return back()->with('toast', 'Destination saved.');
+        return back()->with('toast', $blnIsHeldForReview ? 'Saved. Changes to the public listing were sent to the PTO for review.' : 'Destination saved.');
     }
 
     public function archiveDestination(Request $request, Listing $listing): RedirectResponse
@@ -110,44 +111,9 @@ class DirectoryController extends LguController
     }
 
     /**
-     * Establishments: view/monitor access only — no edit or delete controls.
-     */
-    public function establishments(Request $request): View
-    {
-        $municipality = $request->user()->organization_subtitle;
-
-        return $this->renderLgu($request, 'lgu.directory.establishments', 'directory.establishments', 'Establishments', [
-            'municipality' => $municipality,
-            'listings' => LguMockData::establishments($municipality),
-            'photoLastUpdated' => $this->_photoLastUpdatedBySlug($request->user()->municipality_id),
-        ]);
-    }
-
-    /**
-     * "Photo last updated" — the date of each establishment's latest
-     * PUBLISHED image, keyed by slug (what the mock-shaped $listings rows
-     * use as their 'id').
-     *
-     * @return array<string, Carbon>
-     */
-    private function _photoLastUpdatedBySlug(?int $municipalityId): array
-    {
-        if ($municipalityId === null) {
-            return [];
-        }
-
-        return EstablishmentImage::query()
-            ->where('img_status', ImageStatus::Published->value)
-            ->whereHas('listing', fn ($query) => $query->where('municipality_id', $municipalityId))
-            ->with('listing:id,slug')
-            ->get()
-            ->groupBy('listing.slug')
-            ->map(fn ($images) => $images->max('img_updated_at'))
-            ->all();
-    }
-
-    /**
-     * DRAFT/UNPUBLISHED → FOR_PTO_REVIEW. See
+     * "Request to feature as tourist destination" (DRAFT/UNPUBLISHED/
+     * FOR_LGU_REVIEW) or "Resubmit to PTO" (FOR_CORRECTION) → Pending PTO
+     * Review. Never publishes. See
      * App\Services\ListingPublishWorkflow::submitToPto().
      */
     public function submitToPto(Request $request, Listing $listing, ListingPublishWorkflow $workflow): RedirectResponse
@@ -160,16 +126,18 @@ class DirectoryController extends LguController
             return back()->with('toast', $e->validator->errors()->first())->with('toast_tone', 'danger');
         }
 
-        return back()->with('toast', "{$listing->name} was submitted to the Provincial Tourism Office.");
+        return back()->with('toast', "{$listing->name} was sent to the Provincial Tourism Office for review. It is not published until the PTO approves it.");
     }
 
     /**
-     * DRAFT or FOR_PTO_REVIEW → DRAFT, with a reason the establishment
-     * sees. See App\Services\ListingPublishWorkflow::returnToEstablishment().
+     * DRAFT, FOR_LGU_REVIEW, FOR_PTO_REVIEW, or FOR_CORRECTION → DRAFT,
+     * with a reason the establishment sees. See App\Services\ListingPublishWorkflow::returnToEstablishment().
      */
     public function returnToEstablishment(Request $request, Listing $listing, ListingPublishWorkflow $workflow): RedirectResponse
     {
         abort_unless($request->user()->can('submit', $listing), 403);
+        // A destination-only record has no establishment to return it to.
+        abort_if($listing->isDestinationOnly(), 404);
 
         $data = $request->validate(['reason' => ['required', 'string', 'max:500']]);
 

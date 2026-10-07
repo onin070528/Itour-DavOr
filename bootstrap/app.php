@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\EnsureLguHasMunicipality;
 use App\Http\Middleware\EnsureUserHasRole;
+use App\Http\Middleware\ForcePasswordChange;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -18,6 +19,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => EnsureUserHasRole::class,
             'lgu.municipality' => EnsureLguHasMunicipality::class,
         ]);
+
+        // Every web route, so no URL bypasses the first-login password change.
+        $middleware->web(append: [ForcePasswordChange::class]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

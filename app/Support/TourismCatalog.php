@@ -44,7 +44,11 @@ class TourismCatalog
      */
     public static function categoryLabel(string $slug): string
     {
-        return collect(self::categories())->firstWhere('slug', $slug)['label'] ?? $slug;
+        // Summary comment: slugs for the newer categories (e.g.
+        // recreation-activities) only exist in exploreCategories().
+        return collect(self::categories())->firstWhere('slug', $slug)['label']
+            ?? collect(self::exploreCategories())->firstWhere('slug', $slug)['label']
+            ?? $slug;
     }
 
     /**
@@ -54,7 +58,9 @@ class TourismCatalog
      */
     public static function categoryIcon(string $slug): string
     {
-        return collect(self::categories())->firstWhere('slug', $slug)['icon'] ?? 'ti-photo';
+        return collect(self::categories())->firstWhere('slug', $slug)['icon']
+            ?? collect(self::exploreCategories())->firstWhere('slug', $slug)['icon']
+            ?? 'ti-photo';
     }
 
     /**
@@ -362,7 +368,7 @@ class TourismCatalog
             [
                 'id' => 'dahican-surf-guides',
                 'name' => 'Dahican Surf Guides & Tours',
-                'category' => 'tour-guides',
+                'category' => 'recreation-activities',
                 'municipality' => 'City of Mati',
                 'barangay' => 'Brgy. Dahican',
                 'lat' => 6.9585,

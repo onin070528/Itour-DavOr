@@ -47,9 +47,13 @@ class NewPasswordController extends Controller
         $status = Password::reset(
             $request->only('email', 'password', 'password_confirmation', 'token'),
             function (User $user, string $password): void {
+                // The holder chose this password themselves, so a pending
+                // first-login change is satisfied too.
                 $user->forceFill([
                     'password' => $password,
                     'remember_token' => Str::random(60),
+                    'usr_must_change_password' => false,
+                    'usr_password_changed_at' => now(),
                 ])->save();
 
                 // Fires Illuminate\Auth\Events\PasswordReset, which

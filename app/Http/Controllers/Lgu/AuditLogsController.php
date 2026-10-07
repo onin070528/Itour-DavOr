@@ -12,6 +12,7 @@
 namespace App\Http\Controllers\Lgu;
 
 use App\Http\Controllers\Concerns\ExportsAuditLogs;
+use App\Models\SecurityLog;
 use App\Support\AuditLogQuery;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -23,6 +24,7 @@ class AuditLogsController extends LguController
 
     public function index(Request $request): View
     {
+        abort_unless($request->user()->can('viewAny', SecurityLog::class), 403);
         $request->validate(['tab' => ['nullable', Rule::in(['security', 'operation'])]]);
         $tab = $request->query('tab', 'security');
         $filters = AuditLogQuery::validatedFilters($request);

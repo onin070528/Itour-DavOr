@@ -175,7 +175,7 @@
         <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             @foreach ([
                 ['icon' => 'ti-calendar-event', 'label' => 'Monthly Reports', 'href' => route('lgu.monthlyReports.index')],
-                ['icon' => 'ti-map-pin', 'label' => 'Manage Destinations', 'href' => route('lgu.directory.destinations')],
+                ['icon' => 'ti-mountain', 'label' => 'View Attractions', 'href' => route('lgu.directory.establishments', ['view' => 'attractions'])],
                 ['icon' => 'ti-building-store', 'label' => 'View Establishments', 'href' => route('lgu.directory.establishments')],
                 ['icon' => 'ti-message-2', 'label' => 'View Feedback', 'href' => route('lgu.feedback.index')],
             ] as $action)

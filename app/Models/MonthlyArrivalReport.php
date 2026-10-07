@@ -68,7 +68,8 @@ class MonthlyArrivalReport extends Model
 
     /**
      * The user who submitted this report — the establishment user for
-     * Digital, or the LGU user who encoded it for ManualPaper.
+     * Digital, or the LGU user who encoded it for ManualPaper. Null while
+     * the report is still a Draft.
      */
     public function submitter(): BelongsTo
     {
@@ -115,7 +116,11 @@ class MonthlyArrivalReport extends Model
         return [
             'withinProvince' => (int) $arrivals->where('local_origin_scope', ArrivalOriginScope::WithinProvince)->sum('party_local'),
             'outsideProvince' => (int) $arrivals->where('local_origin_scope', ArrivalOriginScope::OutsideProvince)->sum('party_local'),
-            'topOriginPlaces' => $arrivals->whereNotNull('local_origin_place')
+            // Provinces only: a within-province row's local_origin_place is
+            // a Davao Oriental municipality, not a province, and must never
+            // show up in the "Top Origin Provinces" line of the reports.
+            'topOriginPlaces' => $arrivals->where('local_origin_scope', ArrivalOriginScope::OutsideProvince)
+                ->whereNotNull('local_origin_place')
                 ->groupBy('local_origin_place')
                 ->map(fn ($group) => $group->sum('party_local'))
                 ->sortDesc()

@@ -1,7 +1,15 @@
 <?php
 
+/*
+ * System     : iTOUR - Integrated Tourism Information and Monitoring System
+ * Purpose    : Seeds the destinations and establishments authored in App\Support\TourismCatalog into `listings`.
+ * Programmer : <name(s)>
+ * Copyright  : 2026 University of Mindanao. All rights reserved.
+ */
+
 namespace Database\Seeders;
 
+use App\Enums\ReportingMethod;
 use App\Models\Listing;
 use App\Support\TourismCatalog;
 use Illuminate\Database\Seeder;
@@ -16,6 +24,30 @@ class ListingSeeder extends Seeder
      * gallery isn't empty the moment it becomes DB-backed.
      */
     private const GALLERY_EXTRAS = ['dahican.jpg', 'pujada-bay.jpg', 'sunrise-point.jpg', 'cove.jpg'];
+
+    /**
+     * Establishment type per seeded establishment (config/
+     * establishment_categories.php), matching the approved Phase 1
+     * backfill and the confirmed dahican-surf-guides classification.
+     *
+     * @var array<string, string>
+     */
+    private const ESTABLISHMENT_TYPES = [
+        'botanika-nature-resort' => 'Resort',
+        'badjao-seafront' => 'Restaurant',
+        'dahican-surf-guides' => 'Diving / Water Activity',
+        'pasalubong-center' => 'Other Food & Dining',
+        'delicacies-hub' => 'Other Food & Dining',
+        'tourist-transport-terminal' => 'Van / Shuttle Service',
+    ];
+
+    /**
+     * Seeded establishments that report on paper through their LGU (no
+     * linked account). Every other seeded establishment reports online.
+     *
+     * @var array<int, string>
+     */
+    private const MANUAL_PAPER_SLUGS = ['pasalubong-center', 'delicacies-hub', 'tourist-transport-terminal'];
 
     /**
      * Moves every destination/establishment already authored in
@@ -42,9 +74,22 @@ class ListingSeeder extends Seeder
                 default => 'PUBLISHED',
             };
 
+            // Summary comment: type and reporting method apply to establishments only.
+            $arrClassification = [];
+
+            if ($listing['category'] !== 'destinations') {
+                $blnIsManualPaper = in_array($listing['id'], self::MANUAL_PAPER_SLUGS, true);
+
+                $arrClassification = [
+                    'type' => self::ESTABLISHMENT_TYPES[$listing['id']] ?? null,
+                    'reporting_mode' => $blnIsManualPaper ? ReportingMethod::ManualPaper : ReportingMethod::OnlineItour,
+                ];
+            }
+
             $model = Listing::query()->updateOrCreate(
                 ['slug' => $listing['id']],
                 [
+                    ...$arrClassification,
                     'name' => $listing['name'],
                     'category' => $listing['category'],
                     'municipality' => $listing['municipality'],

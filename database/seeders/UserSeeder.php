@@ -1,5 +1,12 @@
 <?php
 
+/*
+ * System     : iTOUR - Integrated Tourism Information and Monitoring System
+ * Purpose    : Seeds the illustrative demo accounts shown on the User Management pages.
+ * Programmer : <name(s)>
+ * Copyright  : 2026 University of Mindanao. All rights reserved.
+ */
+
 namespace Database\Seeders;
 
 use App\Enums\UserRole;
@@ -18,6 +25,14 @@ class UserSeeder extends Seeder
      *
      * All demo accounts use the password "password" — change these before
      * any non-local deployment.
+     *
+     * Every LGU account here, and the PTO account, is seeded Inactive: the
+     *
+     * official accounts are the tourism.*@itourdavor.gov.ph ones from
+     * RbacDemoAccountSeeder, and the database allows only one active LGU
+     * account per municipality (users_one_active_lgu_per_municipality_unique).
+     * Inactive keeps these rows (and the report history that references
+     * them) without letting them sign in.
      */
     public function run(): void
     {
@@ -30,7 +45,7 @@ class UserSeeder extends Seeder
                 'role' => UserRole::PtoAdministrator,
                 'organization_name' => 'Provincial Tourism Office',
                 'organization_subtitle' => 'Province of Davao Oriental',
-                'status' => 'Active',
+                'status' => 'Inactive',
                 'last_login_at' => Carbon::parse('2026-08-22'),
             ]
         );
@@ -44,7 +59,7 @@ class UserSeeder extends Seeder
                 'role' => UserRole::Lgu,
                 'organization_name' => 'Mati City Tourism Office',
                 'organization_subtitle' => 'City of Mati',
-                'status' => 'Active',
+                'status' => 'Inactive',
                 'last_login_at' => Carbon::parse('2026-08-22'),
             ]
         );
@@ -80,16 +95,18 @@ class UserSeeder extends Seeder
             // mock's single "assignment" value verbatim — documented in
             // Pto\UsersController as the same mapping real account creation
             // uses, not a one-off guess for seed data.
+            $objRole = $roleByTitle[$row['role']] ?? UserRole::Lgu;
+
             User::query()->updateOrCreate(
                 ['email' => $row['email']],
                 [
                     'name' => $row['name'],
                     'password' => 'password',
                     'email_verified_at' => now(),
-                    'role' => $roleByTitle[$row['role']] ?? UserRole::Lgu,
+                    'role' => $objRole,
                     'organization_name' => $row['assignment'],
                     'organization_subtitle' => $row['assignment'],
-                    'status' => $row['status'],
+                    'status' => $objRole === UserRole::Lgu ? 'Inactive' : $row['status'],
                     'last_login_at' => Carbon::parse($row['lastActive']),
                 ]
             );

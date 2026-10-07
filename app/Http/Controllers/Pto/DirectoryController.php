@@ -11,6 +11,7 @@
 
 namespace App\Http\Controllers\Pto;
 
+use App\Http\Requests\SaveEstablishmentRequest;
 use App\Models\Category;
 use App\Models\Listing;
 use App\Models\Municipality;
@@ -38,7 +39,7 @@ class DirectoryController extends PtoController
         $categories = Category::query()->orderBy('cat_sort_order')->get();
 
         $listings = Listing::query()
-            ->with(['categoryRecord', 'establishmentImages' => fn ($query) => $query->where('img_status', 'PUBLISHED')])
+            ->with(['categoryRecord', 'establishmentUser', 'establishmentImages' => fn ($query) => $query->where('img_status', 'PUBLISHED')])
             ->orderBy('name')
             ->get();
 
@@ -154,12 +155,15 @@ class DirectoryController extends PtoController
     }
 
     /**
-     * FOR_PTO_REVIEW → PUBLISHED, in one transaction. P1: only the PTO may
-     * do this — see App\Policies\ListingPolicy::publish().
+     * "Approve & Publish": FOR_PTO_REVIEW → PUBLISHED, or held changes to a
+     * Published listing applied to the live listing, in one transaction.
+     * P1: only the PTO may do this — see App\Policies\ListingPolicy::publish().
      */
     public function publish(Request $request, Listing $listing, ListingPublishWorkflow $workflow): RedirectResponse
     {
         abort_unless($request->user()->can('publish', $listing), 403);
+
+        $blnIsChangeRequest = $listing->hasPendingChanges();
 
         try {
             $workflow->publish($request->user(), $listing);
@@ -167,12 +171,14 @@ class DirectoryController extends PtoController
             return back()->with('toast', $e->validator->errors()->first())->with('toast_tone', 'danger');
         }
 
-        return back()->with('toast', "{$listing->name} is now live.");
+        return back()->with('toast', $blnIsChangeRequest ? "The changes to {$listing->name} are now live." : "{$listing->name} is now live.");
     }
 
     /**
-     * FOR_PTO_REVIEW → DRAFT, with a reason every LGU user in that
-     * municipality sees.
+     * "Return for Correction" (remarks required): FOR_PTO_REVIEW →
+     * FOR_CORRECTION, or held changes to a Published listing returned while
+     * the published version stays live. Every LGU user in that
+     * municipality is notified and sees the remarks.
      */
     public function returnToLgu(Request $request, Listing $listing, ListingPublishWorkflow $workflow): RedirectResponse
     {
@@ -186,7 +192,7 @@ class DirectoryController extends PtoController
             return back()->with('toast', $e->validator->errors()->first())->with('toast_tone', 'danger');
         }
 
-        return back()->with('toast', "{$listing->name} was returned to the LGU.");
+        return back()->with('toast', "{$listing->name} was returned to the LGU for correction.");
     }
 
     /**
@@ -219,26 +225,15 @@ class DirectoryController extends PtoController
     private function validatedListingFields(Request $request): array
     {
         $category = Category::query()->find($request->input('cat_id'));
-        $isGuide = $request->input('type') === 'Tour Guide';
+        $isGuide = Listing::isTourGuideType($request->input('type'));
 
+        // Summary comment: the establishment detail rules (including R13's
+        // Category -> Type check) are shared with the LGU form; PTO adds the
+        // unrestricted category and its municipality picker.
         $data = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
+            ...SaveEstablishmentRequest::listingFieldRules($category, $isGuide),
             'cat_id' => ['required', 'integer', 'exists:tblcategories,cat_id'],
-            'type' => ['nullable', 'string', Rule::in(['Tour Operator', 'Tour Guide'])],
-            'owner_name' => ['nullable', 'string', 'max:255'],
             'municipality' => ['required', 'string', Rule::in(Municipality::query()->pluck('name'))],
-            'barangay' => [$isGuide ? 'nullable' : 'required', 'string', 'max:255'],
-            'lat' => [$isGuide ? 'prohibited' : 'nullable', 'numeric', 'between:-90,90'],
-            'lng' => [$isGuide ? 'prohibited' : 'nullable', 'numeric', 'between:-180,180'],
-            'description' => ['nullable', 'string'],
-            'contact_office' => ['nullable', 'string', 'max:255'],
-            'contact_phone' => ['nullable', 'string', 'max:255'],
-            'email' => ['nullable', 'email', 'max:255'],
-            'website' => ['nullable', 'string', 'max:255'],
-            'hours' => ['nullable', 'string', 'max:255'],
-            'license_number' => [$isGuide ? 'required' : 'nullable', 'string', 'max:255'],
-            'accreditation_status' => ['nullable', 'string', 'max:255'],
-            'category_note' => [$category?->isOthers() ? 'required' : 'nullable', 'string', 'max:255'],
         ]);
 
         $data['owner_name'] ??= null;
@@ -264,18 +259,7 @@ class DirectoryController extends PtoController
      */
     private function legacyCategorySlug(int $categoryId): string
     {
-        return match (Category::query()->find($categoryId)?->cat_name) {
-            'Tourist Destinations' => 'destinations',
-            'Accommodation' => 'accommodation',
-            'Food & Dining' => 'restaurants',
-            'Tourist Transport' => 'transportation',
-            'Travel & Tours' => 'tour-guides',
-            'Farm & Agri-Tourism' => 'farm-agri-tourism',
-            'Wellness & Spa' => 'wellness-spa',
-            'Recreation & Activities' => 'recreation-activities',
-            'MICE & Events' => 'mice-events',
-            default => 'others',
-        };
+        return Category::query()->find($categoryId)?->legacySlug() ?? 'others';
     }
 
     private function uniqueListingSlug(string $name): string

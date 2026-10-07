@@ -3,41 +3,34 @@
 /**
  * iTOUR — Davao Oriental Tourism Information System
  *
- * Purpose: LGU-only establishment registration and account management —
- * register an establishment (listing + its login account) and edit/deactivate
- * Establishment accounts within the LGU's own municipality. LGU cannot
- * create LGU or PTO accounts (see Pto\UsersController for that side of
- * the account-creation chain: PTO creates LGU accounts).
+ * Purpose: LGU-only Establishment Accounts page — list, edit (account fields
+ * only), and enable/disable the Establishment accounts in the LGU's own
+ * municipality. Accounts are created from an existing establishment
+ * (Lgu\EstablishmentAdoptionController, "Switch to Online iTOUR"), never
+ * here. LGU cannot create LGU or PTO accounts (see Pto\UsersController for
+ * that side of the account-creation chain: PTO creates LGU accounts).
  * Programmer/s: iTOUR Development Team
  * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
  */
 
 namespace App\Http\Controllers\Lgu;
 
-use App\Enums\UserRole;
 use App\Events\UserAccountStatusChanged;
-use App\Http\Controllers\Concerns\ManagesDestinationListings;
 use App\Mail\WelcomeAccountCreated;
+use App\Models\Category;
 use App\Models\Listing;
 use App\Models\User;
-use App\Services\UserAccountProvisioner;
-use App\Support\BusinessHours;
 use App\Support\OperationLogger;
-use App\Support\TourismCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Unique;
 use Illuminate\View\View;
 
 class UsersController extends LguController
 {
-    use ManagesDestinationListings;
-
     /**
      * Users: Establishment accounts in this municipality only.
      */
@@ -45,106 +38,61 @@ class UsersController extends LguController
     {
         $users = User::query()
             ->visibleTo($request->user())
-            ->with('establishment')
+            ->with(['establishment.categoryRecord'])
             ->orderBy('name')
             ->get();
 
         return $this->renderLgu($request, 'lgu.users', 'users', 'Users', [
             'users' => $users,
-            'categories' => $this->establishmentCategories(),
+            'categories' => Category::query()->active()->forEstablishments()->get(),
         ]);
     }
 
     /**
-     * Registers a new establishment (listing) in this LGU's municipality
-     * together with the login account linked to it.
+     * The old "Add Establishment" form posted here and created an
+     * establishment and its account together. That is replaced by the
+     * establishment-first flow (register the establishment, then switch it
+     * to Online iTOUR to create its account). The route stays so an open
+     * old form or bookmark lands somewhere useful; nothing is created.
      */
-    public function store(Request $request, UserAccountProvisioner $objProvisioner): RedirectResponse
+    public function store(): RedirectResponse
     {
-        $data = $this->validatedEstablishmentFields($request, Rule::unique('users', 'email'));
-        $lgu = $request->user();
-
-        try {
-            $arrCreated = DB::transaction(function () use ($data, $lgu, $objProvisioner): array {
-                // Municipality always comes from the LGU's own account, never
-                // from the request — an LGU can only register establishments
-                // inside its own jurisdiction.
-                $listing = Listing::query()->create([
-                    ...$data['listing'],
-                    'slug' => $this->uniqueDestinationSlug($data['listing']['name']),
-                    'municipality' => $lgu->organization_subtitle,
-                    'municipality_id' => $lgu->municipality_id,
-                    // Not public yet — the LGU reviews and submits it to
-                    // PTO (App\Services\ListingPublishWorkflow) before it
-                    // goes live, same as any other establishment.
-                    'status' => 'DRAFT',
-                ]);
-
-                return $objProvisioner->createWithPassphrase([
-                    'name' => $data['account']['name'],
-                    'email' => $data['account']['email'],
-                    'email_verified_at' => now(),
-                    'role' => UserRole::Establishment,
-                    'organization_name' => $listing->name,
-                    'organization_subtitle' => "{$listing->barangay}, {$listing->municipality}",
-                    'municipality_id' => $lgu->municipality_id,
-                    'establishment_id' => $listing->id,
-                    'status' => 'Active',
-                    'created_by' => $lgu->id,
-                ]);
-            });
-        } catch (\Throwable $e) {
-            Log::error('Failed to register establishment and its user account.', ['exception' => $e]);
-
-            return back()->withInput()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
-        }
-
-        $user = $arrCreated['user'];
-        $blnEmailSent = $objProvisioner->notifyCreated($lgu, $user, $arrCreated['passphrase']);
-
-        return back()->with('accountCreated', [
-            'userId' => $user->id,
-            'name' => $user->name,
-            'role' => UserRole::Establishment->title(),
-            'municipality' => $lgu->organization_subtitle,
-            'passphrase' => $arrCreated['passphrase'],
-            'emailSent' => $blnEmailSent,
-        ]);
+        return redirect()->route('lgu.directory.establishments')
+            ->with('toast', 'Accounts are now created from the establishment itself: open the establishment, then choose "Activate Online iTOUR account".');
     }
 
+    /**
+     * Edits the account itself — the account holder's name and sign-in
+     * email. Establishment details are edited on the establishment page
+     * (Lgu\EstablishmentsController). Role, municipality_id,
+     * establishment_id, and status are never accepted from this endpoint.
+     */
     public function update(Request $request, User $user): RedirectResponse
     {
-        $this->authorizeOwnEstablishmentUser($request, $user);
+        abort_unless($request->user()->can('update', $user), 403);
 
-        // Role, municipality_id, establishment_id, and status are never
-        // accepted from this endpoint.
-        $data = $this->validatedEstablishmentFields($request, Rule::unique('users', 'email')->ignore($user));
-        $listing = $user->establishment;
-        $before = $listing?->getOriginal();
+        $arrData = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user)],
+        ]);
+
+        $arrBefore = $user->getOriginal();
 
         try {
-            DB::transaction(function () use ($data, $user, $listing): void {
-                $userFields = $data['account'];
-
-                if ($listing) {
-                    $listing->update($data['listing']);
-                    $userFields['organization_name'] = $listing->name;
-                    $userFields['organization_subtitle'] = "{$listing->barangay}, {$listing->municipality}";
-                }
-
-                $user->update($userFields);
-            });
+            $user->update([
+                'name' => $arrData['name'],
+                'email' => $arrData['email'],
+            ]);
         } catch (\Throwable $e) {
-            Log::error('Failed to update establishment and its user account.', ['exception' => $e, 'user_id' => $user->id]);
+            Log::error('Failed to update establishment user account.', ['exception' => $e, 'user_id' => $user->id]);
 
             return back()->withInput()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
 
-        if ($listing) {
-            OperationLogger::updated($request->user(), 'establishment', $listing->id, $listing->municipality_id, $listing->id, OperationLogger::diff($before, $listing));
-        }
+        // OperationLogger::diff() masks the email in the log.
+        OperationLogger::updated($request->user(), 'user', $user->id, $user->municipality_id, $user->establishment_id, OperationLogger::diff($arrBefore, $user));
 
-        return back()->with('toast', 'Establishment information saved.');
+        return back()->with('toast', 'Account saved.');
     }
 
     /**
@@ -160,7 +108,7 @@ class UsersController extends LguController
         ]);
 
         $user = User::query()->findOrFail($data['user_id']);
-        $this->authorizeOwnEstablishmentUser($request, $user);
+        abort_unless($request->user()->can('view', $user), 403);
 
         try {
             Mail::to($user->email)->send(new WelcomeAccountCreated($user, $data['passphrase']));
@@ -173,12 +121,28 @@ class UsersController extends LguController
         }
     }
 
+    /**
+     * Disable / enable an account. Enabling is refused while the linked
+     * establishment reports on paper — reactivation goes through "Switch to
+     * Online iTOUR" on the establishment, so the account and the reporting
+     * method never disagree.
+     */
     public function toggleStatus(Request $request, User $user): RedirectResponse
     {
-        $this->authorizeOwnEstablishmentUser($request, $user);
-        abort_if($user->id === $request->user()->id, 403, 'You cannot change the status of your own account.');
+        // UserPolicy::deactivate() also covers "nobody can change their own status".
+        abort_unless($request->user()->can('deactivate', $user), 403);
 
-        $next = $user->status === 'Active' ? 'Inactive' : 'Active';
+        $next = $user->status === Listing::ACCOUNT_STATUS_ACTIVE ? 'Inactive' : Listing::ACCOUNT_STATUS_ACTIVE;
+        $objListing = $user->establishment;
+        $blnIsEnablingPaperEstablishment = $next === Listing::ACCOUNT_STATUS_ACTIVE
+            && $objListing !== null
+            && ! $objListing->reportingMethod()->isOnline();
+
+        if ($blnIsEnablingPaperEstablishment) {
+            return back()
+                ->with('toast', "{$objListing->name} reports on paper. Open the establishment and choose \"Switch to Online iTOUR\" to reactivate its account.")
+                ->with('toast_tone', 'danger');
+        }
 
         try {
             $user->update(['status' => $next]);
@@ -190,81 +154,8 @@ class UsersController extends LguController
 
         event(new UserAccountStatusChanged($request->user(), $user, $next));
 
-        $verb = $next === 'Active' ? 'enabled' : 'disabled';
+        $verb = $next === Listing::ACCOUNT_STATUS_ACTIVE ? 'enabled' : 'disabled';
 
         return back()->with('toast', "{$user->name}'s account was {$verb}.");
-    }
-
-    /**
-     * @return array{
-     *     listing: array{name: string, category: string, barangay: string, owner_name: string, contact_phone: string, email: string, hours: ?string, website: ?string, description: ?string},
-     *     account: array{name: string, email: string}
-     * }
-     */
-    private function validatedEstablishmentFields(Request $request, Unique $uniqueEmail): array
-    {
-        $data = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'category' => ['required', 'string', Rule::in(array_column($this->establishmentCategories(), 'slug'))],
-            'barangay' => ['required', 'string', 'max:255'],
-            'ownerName' => ['required', 'string', 'max:255'],
-            'contactPhone' => ['required', 'string', 'max:50'],
-            'email' => ['required', 'email', 'max:255', $uniqueEmail],
-            'hoursDays' => ['nullable', 'required_with:hoursOpen', Rule::in(array_keys(BusinessHours::days()))],
-            'hoursOpen' => ['nullable', 'required_with:hoursDays', Rule::in([...array_keys(BusinessHours::times()), BusinessHours::OPEN_24_HOURS])],
-            'hoursClose' => [
-                'nullable',
-                Rule::requiredIf(fn (): bool => $request->filled('hoursOpen') && $request->input('hoursOpen') !== BusinessHours::OPEN_24_HOURS),
-                Rule::in(array_keys(BusinessHours::times())),
-                'different:hoursOpen',
-            ],
-            'website' => ['nullable', 'url', 'max:255'],
-            'description' => ['nullable', 'string', 'max:2000'],
-        ], [
-            'hoursDays.required_with' => 'Choose which days the establishment is open.',
-            'hoursOpen.required_with' => 'Choose an opening time.',
-            'hoursClose.required' => 'Choose a closing time.',
-            'hoursClose.different' => 'The closing time must be different from the opening time.',
-        ]);
-
-        return [
-            'listing' => [
-                'name' => $data['name'],
-                'category' => $data['category'],
-                'barangay' => $data['barangay'],
-                'owner_name' => $data['ownerName'],
-                'contact_phone' => $data['contactPhone'],
-                'email' => $data['email'],
-                'hours' => BusinessHours::format($data['hoursDays'] ?? null, $data['hoursOpen'] ?? null, $data['hoursClose'] ?? null),
-                'website' => $data['website'] ?? null,
-                'description' => $data['description'] ?? null,
-            ],
-            'account' => [
-                'name' => $data['ownerName'],
-                'email' => $data['email'],
-            ],
-        ];
-    }
-
-    /**
-     * Every directory category except destinations — the only kinds of
-     * listing that can be registered as an establishment.
-     *
-     * @return array<int, array{slug: string, label: string, icon: string}>
-     */
-    private function establishmentCategories(): array
-    {
-        return array_values(array_filter(
-            TourismCatalog::categories(),
-            fn (array $category): bool => $category['slug'] !== 'destinations',
-        ));
-    }
-
-    private function authorizeOwnEstablishmentUser(Request $request, User $user): void
-    {
-        abort_unless(
-            $user->role === UserRole::Establishment && $user->municipality_id === $request->user()->municipality_id,
-            403
-        );
     }
 }

@@ -1,0 +1,141 @@
+<?php
+
+/*
+ * System     : iTOUR - Integrated Tourism Information and Monitoring System
+ * Purpose    : PTO destination listing review — the queue of LGU requests (and changes to Published listings) and the review screen.
+ * Programmer : <name(s)>
+ * Copyright  : 2026 University of Mindanao. All rights reserved.
+ */
+
+namespace App\Http\Controllers\Pto;
+
+use App\Enums\ImageStatus;
+use App\Models\Category;
+use App\Models\Listing;
+use App\Models\OperationLog;
+use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Illuminate\View\View;
+
+/**
+ * Read-only screens: the decisions themselves stay on the existing
+ * Pto\DirectoryController::publish() ("Approve & Publish") and
+ * ::returnToLgu() ("Return for Correction", remarks required), both gated
+ * by ListingPolicy::publish() — so there is still exactly one publish path.
+ * Reached from the PTO notification bell and the Tourism Directory; the
+ * PTO sidebar is unchanged.
+ */
+class DestinationReviewsController extends PtoController
+{
+    /**
+     * Field labels for the review screen, in display order.
+     *
+     * @var array<string, string>
+     */
+    private const FIELD_LABELS = [
+        'name' => 'Name',
+        'cat_id' => 'Category',
+        'type' => 'Type',
+        'category_note' => 'Category note',
+        'barangay' => 'Barangay / Address',
+        'lat' => 'Latitude',
+        'lng' => 'Longitude',
+        'description' => 'Description',
+    ];
+
+    /**
+     * The review queue: what the PTO has to decide (new requests and
+     * changes to Published listings), and what is back with the LGUs.
+     */
+    public function index(Request $request): View
+    {
+        $objAwaiting = Listing::query()
+            ->awaitingPtoDecision()
+            ->with('categoryRecord')
+            ->orderBy('updated_at')
+            ->get();
+
+        $objReturned = Listing::query()
+            ->where('category', '!=', 'destinations')
+            ->where(fn ($objQuery) => $objQuery
+                ->where('status', Listing::STATUS_FOR_CORRECTION)
+                ->orWhere(fn ($objPublished) => $objPublished
+                    ->where('status', 'PUBLISHED')
+                    ->whereNotNull('lst_pending_changes')
+                    ->whereNotNull('lst_review_remarks')))
+            ->with('categoryRecord')
+            ->orderByDesc('updated_at')
+            ->get();
+
+        return $this->renderPto($request, 'pto.destination-reviews.index', 'directory', 'Destination Listing Reviews', [
+            'awaitingListings' => $objAwaiting,
+            'returnedListings' => $objReturned,
+        ]);
+    } // end index
+
+    /**
+     * Review screen: name, description, photos, location, municipality,
+     * category/type, and contact details; for changes to a Published
+     * listing, the live value beside the proposed one. Approve & Publish
+     * and Return for Correction appear only while the PTO has something
+     * to decide.
+     */
+    public function show(Request $request, Listing $listing): View
+    {
+        abort_unless($request->user()->can('publish', $listing), 403);
+
+        $listing->load(['categoryRecord', 'establishmentImages']);
+
+        $objHistory = OperationLog::query()
+            ->with('user')
+            ->where('entity_type', 'establishment')
+            ->where('entity_id', $listing->id)
+            ->whereIn('action', ['submit', 'publish', 'return', 'unpublish'])
+            ->latest('id')
+            ->limit(10)
+            ->get();
+
+        return $this->renderPto($request, 'pto.destination-reviews.show', 'directory', "Review {$listing->name}", [
+            'listing' => $listing,
+            'changeRows' => $listing->hasPendingChanges() ? $this->_changeRows($listing) : collect(),
+            'publishedImages' => $listing->establishmentImages->where('img_status', ImageStatus::Published)->values(),
+            'pendingImageCount' => $listing->establishmentImages->where('img_status', ImageStatus::Pending)->count(),
+            'lastSubmission' => $objHistory->firstWhere('action', 'submit'),
+            'history' => $objHistory,
+            'blnIsAwaitingDecision' => $listing->isAwaitingPtoDecision(),
+        ]);
+    } // end show
+
+    /**
+     * One row per held change: the field, its live value, and the
+     * proposed value, both in display form.
+     *
+     * @return Collection<int, array{label: string, current: string, proposed: string}>
+     */
+    private function _changeRows(Listing $objListing): Collection
+    {
+        $arrPending = $objListing->lst_pending_changes;
+
+        return collect(self::FIELD_LABELS)
+            ->filter(fn (string $strLabel, string $strField) => array_key_exists($strField, $arrPending))
+            ->map(fn (string $strLabel, string $strField) => [
+                'label' => $strLabel,
+                'current' => $this->_displayValue($strField, $objListing->getAttribute($strField)),
+                'proposed' => $this->_displayValue($strField, $arrPending[$strField]),
+            ])
+            ->values();
+    } // end _changeRows
+
+    private function _displayValue(string $strField, mixed $mixValue): string
+    {
+        if ($mixValue === null || $mixValue === '') {
+            return '—';
+        }
+
+        if ($strField === 'cat_id') {
+            return Category::query()->find($mixValue)?->cat_name ?? (string) $mixValue;
+        }
+
+        return (string) $mixValue;
+    } // end _displayValue
+}

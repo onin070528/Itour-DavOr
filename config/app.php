@@ -65,7 +65,11 @@ return [
     |
     */
 
-    'timezone' => 'UTC',
+    // Philippine time: arrival dates (QR check-in "today", the staff form's
+    // default date) and monthly report periods must follow the local day,
+    // not UTC (which is 8 hours behind and shifted early-morning arrivals
+    // to the previous day).
+    'timezone' => 'Asia/Manila',
 
     /*
     |--------------------------------------------------------------------------

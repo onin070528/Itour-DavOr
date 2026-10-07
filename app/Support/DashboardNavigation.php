@@ -15,7 +15,7 @@ namespace App\Support;
 use App\Models\User;
 
 /**
- * Every role's sidebar is built from the same six-section vocabulary — Main,
+ * Every role's sidebar is built from the same section vocabulary — Main,
  * Work, Reports, Feedback, Management, Administration — in that fixed
  * order; a role that has nothing for a section simply never adds to it, and
  * sections() drops any section left empty. Photos and the old, separate
@@ -85,6 +85,8 @@ class DashboardNavigation
     {
         $item = self::_itemBuilder($active);
         $group = self::_groupBuilder($active);
+        $objAttractions = $item('directory.attractions', 'ti-mountain', 'Attractions', 'lgu.directory.establishments');
+        $objAttractions['href'] = route('lgu.directory.establishments', ['view' => 'attractions']);
 
         return [
             'Main' => [
@@ -92,18 +94,24 @@ class DashboardNavigation
             ],
             'Work' => [
                 $group('directory', 'ti-list-details', 'Tourism Directory', [
-                    $item('directory.destinations', 'ti-map-pin', 'Destinations', 'lgu.directory.destinations'),
                     $item('directory.establishments', 'ti-building-store', 'Establishments', 'lgu.directory.establishments'),
+                    $objAttractions,
                 ]),
-                $item('images.index', 'ti-camera', 'Photos', 'lgu.images.index', $intImageApprovalCount ?: null),
-            ],
-            'Reports' => [
-                $item('monthlyReports', 'ti-calendar-event', 'Monthly Reports', 'lgu.monthlyReports.index'),
-            ],
-            'Feedback' => [
                 $group('feedback', 'ti-message-2', 'Tourist Feedback', [
                     $item('feedback.index', 'ti-messages', 'All Feedback', 'lgu.feedback.index'),
                     $item('feedback.analytics', 'ti-heart-handshake', 'Experience Analytics', 'lgu.feedback.analytics'),
+                ]),
+            ],
+            'Reports' => [
+                // One Tourism Reports area. Monthly Reports = process
+                // establishment reports (Receive -> Review -> Verify).
+                // Municipal Reports = the municipality's consolidated records,
+                // statistics, A4 reports, Submit to PTO. Manual Entry = encode
+                // the paper reports of Manual/Paper establishments.
+                $group('reports', 'ti-report-analytics', 'Tourism Reports', [
+                    $item('reports.monthly', 'ti-calendar-event', 'Monthly Reports', 'lgu.monthlyReports.index'),
+                    $item('reports.municipal', 'ti-chart-bar', 'Municipal Reports', 'lgu.monthlyReports.municipal'),
+                    $item('reports.manualEntry', 'ti-file-pencil', 'Manual Entry', 'lgu.monthlyReports.manualEntry.index'),
                 ]),
             ],
             'Management' => [
@@ -145,7 +153,7 @@ class DashboardNavigation
                 $item('establishment.qr', 'ti-qrcode', 'QR Code', 'establishment.qr'),
             ],
             'Reports' => [
-                $item('arrivals.monthly', 'ti-calendar-event', 'Monthly Report', 'establishment.arrivals.monthly'),
+                $item('arrivals.monthly', 'ti-calendar-event', 'Monthly Reports', 'establishment.arrivals.monthly'),
             ],
             'Feedback' => [
                 $group('feedback', 'ti-message-2', 'Feedback & Reviews', [
