@@ -1,12 +1,13 @@
 {{--
-    System     : iTOUR - Integrated Tourism Information and Monitoring System
-    Purpose    : LGU photo management for one establishment in its own municipality.
-    Programmer : <name(s)>
-    Copyright  : 2026 University of Mindanao. All rights reserved.
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: LGU photo management for one establishment in its own municipality.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
 --}}
 <x-layouts.dashboard :user="$user" :nav-sections="$navSections" :page-title="$pageTitle" account-heading="System" :settings-href="route('lgu.settings')">
     <x-dashboard.page-header
-        :title="$listing->name.' — Photos'"
+        :title="$listing->lst_name.' — Photos'"
         description="Replacements and new uploads on behalf of a no-account/paper establishment are reviewed by the PTO. Removing, setting a cover, and reordering apply immediately."
     >
         <x-slot:actions>

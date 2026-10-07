@@ -22,7 +22,7 @@ use LogicException;
  */
 trait AppendOnly
 {
-    public function update(array $attributes = [], array $options = []): bool
+    public function update(array $arrAttributes = [], array $arrOptions = []): bool
     {
         throw new LogicException(static::class.' rows are append-only and cannot be updated.');
     }

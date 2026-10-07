@@ -23,72 +23,72 @@ use Throwable;
 
 class SecurityLogger
 {
-    public static function loginSuccess(User $user): void
+    public static function loginSuccess(User $objUser): void
     {
-        self::write('login_success', user: $user);
+        self::write('login_success', user: $objUser);
     }
 
     /**
-     * @param  string|null  $reason  Non-sensitive context only, e.g.
-     *                               'invalid_credentials' or
-     *                               'account_suspended' — never a password.
+     * @param  string|null  $strReason  Non-sensitive context only, e.g.
+     *                                  'invalid_credentials' or
+     *                                  'account_suspended' — never a password.
      */
-    public static function loginFailed(?User $user, ?string $attemptedEmail, ?string $reason = null): void
+    public static function loginFailed(?User $objUser, ?string $strAttemptedEmail, ?string $strReason = null): void
     {
-        self::write('login_failed', user: $user, attemptedEmail: $user ? null : $attemptedEmail, details: $reason ? ['reason' => $reason] : []);
+        self::write('login_failed', user: $objUser, attemptedEmail: $objUser ? null : $strAttemptedEmail, details: $strReason ? ['reason' => $strReason] : []);
     }
 
-    public static function logout(User $user): void
+    public static function logout(User $objUser): void
     {
-        self::write('logout', user: $user);
+        self::write('logout', user: $objUser);
     }
 
-    public static function passwordChanged(User $user): void
+    public static function passwordChanged(User $objUser): void
     {
-        self::write('password_changed', user: $user);
+        self::write('password_changed', user: $objUser);
     }
 
-    public static function passwordResetRequested(User $user): void
+    public static function passwordResetRequested(User $objUser): void
     {
-        self::write('password_reset_requested', user: $user);
+        self::write('password_reset_requested', user: $objUser);
     }
 
-    public static function passwordResetCompleted(User $user): void
+    public static function passwordResetCompleted(User $objUser): void
     {
-        self::write('password_reset_completed', user: $user);
+        self::write('password_reset_completed', user: $objUser);
     }
 
-    public static function accountCreated(User $actor, User $account): void
+    public static function accountCreated(User $objActor, User $objAccount): void
     {
-        self::write('account_created', user: $actor, targetUser: $account);
+        self::write('account_created', user: $objActor, targetUser: $objAccount);
     }
 
     /**
-     * @param  string  $newStatus  'Active' or 'Inactive'.
+     * @param  string  $strNewStatus  'Active' or 'Inactive'.
      */
-    public static function accountStatusChanged(User $actor, User $account, string $newStatus): void
+    public static function accountStatusChanged(User $objActor, User $objAccount, string $strNewStatus): void
     {
-        self::write($newStatus === 'Inactive' ? 'account_suspended' : 'account_reactivated', user: $actor, targetUser: $account);
+        self::write($strNewStatus === 'Inactive' ? 'account_suspended' : 'account_reactivated', user: $objActor, targetUser: $objAccount);
     }
 
     /**
      * Records a denied authorization attempt without recording request
      * payloads or other sensitive data.
      */
-    public static function accessDenied(User $user, string $ability, ?string $resource = null, ?int $targetMunicipalityId = null): void
+    public static function accessDenied(User $objUser, string $strAbility, ?string $strResource = null, ?int $intTargetMunicipalityId = null): void
     {
-        self::write('access_denied', user: $user, details: array_filter([
-            'ability' => $ability,
-            'resource' => $resource,
-            'target_municipality_id' => $targetMunicipalityId,
-        ], static fn (mixed $value): bool => $value !== null));
+        self::write('access_denied', user: $objUser, details: array_filter([
+            'ability' => $strAbility,
+            'resource' => $strResource,
+            'target_municipality_id' => $intTargetMunicipalityId,
+        ], static fn (mixed $mixedValue): bool => $mixedValue !== null));
     }
 
-    public static function roleChanged(User $actor, User $account, UserRole $fromRole, UserRole $toRole): void
+    public static function roleChanged(User $objActor, User $objAccount, UserRole $objFromRole, UserRole $objToRole): void
     {
-        self::write('role_changed', user: $actor, targetUser: $account, details: [
-            'from' => $fromRole->value,
-            'to' => $toRole->value,
+        self::write('role_changed', user: $objActor, targetUser: $objAccount, details: [
+            'from' => $objFromRole->value,
+            'to' => $objToRole->value,
         ]);
     }
 
@@ -104,18 +104,18 @@ class SecurityLogger
     ): void {
         try {
             SecurityLog::query()->create([
-                'event_type' => $eventType,
-                'user_id' => $user?->id,
-                'attempted_email' => $attemptedEmail,
-                'target_user_id' => $targetUser?->id,
-                'municipality_id' => $user?->municipality_id ?? $targetUser?->municipality_id,
-                'ip_address' => Request::ip(),
-                'user_agent' => Str::limit((string) Request::userAgent(), 255, ''),
-                'details' => $details ?: null,
+                'sec_event_type' => $eventType,
+                'usr_id' => $user?->usr_id,
+                'sec_attempted_email' => $attemptedEmail,
+                'sec_target_user_id' => $targetUser?->usr_id,
+                'mun_id' => $user?->mun_id ?? $targetUser?->mun_id,
+                'sec_ip_address' => Request::ip(),
+                'sec_user_agent' => Str::limit((string) Request::userAgent(), 255, ''),
+                'sec_details' => $details ?: null,
             ]);
-        } catch (Throwable $e) {
+        } catch (Throwable $objException) {
             // Never let a logging failure break the action it's logging.
-            Log::error('Failed to write security log.', ['event_type' => $eventType, 'exception' => $e]);
+            Log::error('Failed to write security log.', ['event_type' => $eventType, 'exception' => $objException]);
         }
     }
 }

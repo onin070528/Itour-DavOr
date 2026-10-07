@@ -1,5 +1,13 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Tests — privacy and storage notice.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 use App\Enums\ReportingMethod;
 use App\Enums\UserRole;
 use App\Models\Category;
@@ -47,7 +55,7 @@ test('the storage and cache usage notice markup appears on a public page', funct
 });
 
 test('the storage and cache usage notice does not appear inside a portal', function () {
-    $pto = User::factory()->create(['role' => UserRole::PtoAdministrator]);
+    $pto = User::factory()->create(['usr_role' => UserRole::PtoAdministrator]);
 
     test()->actingAs($pto)->get(route('pto.dashboard'))
         ->assertOk()
@@ -61,23 +69,23 @@ test('the QR arrival form links to the privacy notice above its submit button', 
     );
 
     $listing = Listing::query()->create([
-        'slug' => Str::slug('privacy-qr-fixture-'.Str::random(6)),
-        'name' => 'Privacy QR Fixture Inn',
-        'category' => 'accommodation',
+        'lst_slug' => Str::slug('privacy-qr-fixture-'.Str::random(6)),
+        'lst_name' => 'Privacy QR Fixture Inn',
+        'lst_category' => 'accommodation',
         'cat_id' => $category->cat_id,
-        'municipality' => 'City of Mati',
-        'barangay' => 'Dahican',
-        'status' => 'PUBLISHED',
+        'lst_municipality' => 'City of Mati',
+        'lst_barangay' => 'Dahican',
+        'lst_status' => 'PUBLISHED',
     ]);
-    $listing->forceFill(['reporting_mode' => ReportingMethod::OnlineItour])->save();
+    $listing->forceFill(['lst_reporting_mode' => ReportingMethod::OnlineItour])->save();
     User::factory()->create([
-        'role' => UserRole::Establishment,
-        'organization_name' => $listing->name,
-        'organization_subtitle' => 'Brgy. Dahican, City of Mati',
-        'establishment_id' => $listing->id,
+        'usr_role' => UserRole::Establishment,
+        'usr_organization_name' => $listing->lst_name,
+        'usr_organization_subtitle' => 'Brgy. Dahican, City of Mati',
+        'lst_id' => $listing->lst_id,
     ]);
 
-    test()->get(route('lgu.establishmentQr', $listing->uuid))
+    test()->get(route('lgu.establishmentQr', $listing->lst_uuid))
         ->assertOk()
         ->assertSee('Provincial Tourism Office of Davao Oriental')
         ->assertSee(route('privacy'), false);

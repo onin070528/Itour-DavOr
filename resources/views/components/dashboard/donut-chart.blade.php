@@ -1,3 +1,10 @@
+{{--
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: Dashboard donut chart with legend.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+--}}
 @props(['segments', 'centerLabel' => null, 'centerSublabel' => null])
 
 @php

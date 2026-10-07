@@ -28,33 +28,33 @@ class Turnstile implements ValidationRule
 
     public function __construct(private readonly ?string $remoteIp = null) {}
 
-    public function validate(string $attribute, mixed $value, Closure $fail): void
+    public function validate(string $strAttribute, mixed $value, Closure $fnFail): void
     {
         if (! is_string($value) || $value === '') {
-            $fail('Please complete the verification check.');
+            $fnFail('Please complete the verification check.');
 
             return;
         }
 
         try {
-            $response = Http::asForm()->post(self::VERIFY_URL, [
+            $objResponse = Http::asForm()->post(self::VERIFY_URL, [
                 'secret' => config('services.turnstile.secret_key'),
                 'response' => $value,
                 'remoteip' => $this->remoteIp,
             ]);
 
-            if (! $response->successful() || ! ($response->json('success') === true)) {
+            if (! $objResponse->successful() || ! ($objResponse->json('success') === true)) {
                 Log::warning('Turnstile verification failed.', [
-                    'status' => $response->status(),
-                    'response' => $response->json(),
+                    'status' => $objResponse->status(),
+                    'response' => $objResponse->json(),
                 ]);
 
-                $fail('Verification check failed. Please try again.');
+                $fnFail('Verification check failed. Please try again.');
             }
-        } catch (\Throwable $e) {
-            Log::error('Turnstile verification request failed.', ['exception' => $e]);
+        } catch (\Throwable $objException) {
+            Log::error('Turnstile verification request failed.', ['exception' => $objException]);
 
-            $fail('Verification check failed. Please try again.');
+            $fnFail('Verification check failed. Please try again.');
         }
     }
 }

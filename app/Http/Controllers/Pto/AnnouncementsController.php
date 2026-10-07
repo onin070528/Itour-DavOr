@@ -24,68 +24,74 @@ class AnnouncementsController extends PtoController
 {
     private const TYPES = ['Promotion', 'Advisory', 'Event', 'Announcement'];
 
-    public function index(Request $request): View
+    public function index(Request $objRequest): View
     {
-        $announcements = Announcement::query()->orderByDesc('ann_start_date')->get();
+        $objAnnouncements = Announcement::query()->orderByDesc('ann_start_date')->get();
 
-        return $this->renderPto($request, 'pto.announcements.index', 'announcements', 'Announcements', [
-            'announcements' => $announcements,
+        return $this->renderPto($objRequest, 'pto.announcements.index', 'announcements', 'Announcements', [
+            'announcements' => $objAnnouncements,
             'types' => self::TYPES,
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $objRequest): RedirectResponse
     {
-        abort_unless($request->user()->can('create', Announcement::class), 403);
+        abort_unless($objRequest->user()->can('create', Announcement::class), 403);
 
-        $data = $this->validatedFields($request);
+        $arrData = $this->validatedFields($objRequest);
 
         try {
-            $announcement = Announcement::query()->create([
-                ...$data,
+            $objAnnouncement = Announcement::query()->create([
+                ...$arrData,
                 'ann_is_published' => false,
-                'ann_created_by' => $request->user()->id,
+                'ann_created_by' => $objRequest->user()->usr_id,
             ]);
-        } catch (\Throwable $e) {
-            Log::error('Failed to create announcement.', ['exception' => $e]);
+        } catch (\Throwable $objException) {
+            Log::error('Failed to create announcement.', ['exception' => $objException]);
 
             return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
 
-        OperationLogger::created($request->user(), 'announcement', $announcement->ann_id, null, null, $data);
+        OperationLogger::created($objRequest->user(), 'announcement', $objAnnouncement->ann_id, null, null, $arrData);
 
-        return back()->with('toast', "{$announcement->ann_title} was created as a draft.");
+        return back()->with('toast', "{$objAnnouncement->ann_title} was created as a draft.");
     }
 
-    public function update(Request $request, Announcement $announcement): RedirectResponse
+    public function update(Request $objRequest, Announcement $announcement): RedirectResponse
     {
-        abort_unless($request->user()->can('update', $announcement), 403);
+        abort_unless($objRequest->user()->can('update', $announcement), 403);
 
-        $data = $this->validatedFields($request);
-        $before = $announcement->getOriginal();
+        $arrData = $this->validatedFields($objRequest);
+        $arrBefore = $announcement->getOriginal();
 
         try {
-            $announcement->update([...$data, 'ann_updated_by' => $request->user()->id]);
-        } catch (\Throwable $e) {
-            Log::error('Failed to update announcement.', ['exception' => $e, 'announcement_id' => $announcement->ann_id]);
+            $announcement->update([...$arrData, 'ann_updated_by' => $objRequest->user()->usr_id]);
+        } catch (\Throwable $objException) {
+            Log::error('Failed to update announcement.', ['exception' => $objException, 'announcement_id' => $announcement->ann_id]);
 
             return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
 
-        OperationLogger::updated($request->user(), 'announcement', $announcement->ann_id, null, null, OperationLogger::diff($before, $announcement));
+        OperationLogger::updated($objRequest->user(), 'announcement', $announcement->ann_id, null, null, OperationLogger::diff($arrBefore, $announcement));
 
         return back()->with('toast', 'Announcement saved.');
     }
 
-    public function togglePublish(Request $request, Announcement $announcement): RedirectResponse
+    public function togglePublish(Request $objRequest, Announcement $announcement): RedirectResponse
     {
-        abort_unless($request->user()->can('togglePublish', $announcement), 403);
+        abort_unless($objRequest->user()->can('togglePublish', $announcement), 403);
 
-        $before = $announcement->getOriginal();
+        $arrBefore = $announcement->getOriginal();
 
-        $announcement->update(['ann_is_published' => ! $announcement->ann_is_published, 'ann_updated_by' => $request->user()->id]);
+        try {
+            $announcement->update(['ann_is_published' => ! $announcement->ann_is_published, 'ann_updated_by' => $objRequest->user()->usr_id]);
+        } catch (\Throwable $objException) {
+            Log::error('Failed to toggle announcement publication.', ['exception' => $objException, 'ann_id' => $announcement->ann_id]);
 
-        OperationLogger::updated($request->user(), 'announcement', $announcement->ann_id, null, null, OperationLogger::diff($before, $announcement));
+            return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
+        }
+
+        OperationLogger::updated($objRequest->user(), 'announcement', $announcement->ann_id, null, null, OperationLogger::diff($arrBefore, $announcement));
 
         return back()->with('toast', $announcement->ann_is_published ? "{$announcement->ann_title} published." : "{$announcement->ann_title} unpublished.");
     }
@@ -93,9 +99,9 @@ class AnnouncementsController extends PtoController
     /**
      * @return array<string, mixed>
      */
-    private function validatedFields(Request $request): array
+    private function validatedFields(Request $objRequest): array
     {
-        return $request->validate([
+        return $objRequest->validate([
             'ann_title' => ['required', 'string', 'max:255'],
             'ann_body' => ['required', 'string'],
             'ann_type' => ['required', 'string', Rule::in(self::TYPES)],

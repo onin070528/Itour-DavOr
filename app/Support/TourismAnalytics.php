@@ -30,20 +30,20 @@ class TourismAnalytics
     /**
      * @return array{year: int, month: ?int, municipalityId: ?int, listingId: ?int, classification: ?string}
      */
-    public static function resolveFilters(Request $request): array
+    public static function resolveFilters(Request $objRequest): array
     {
-        $year = (int) ($request->query('year') ?: CarbonImmutable::now()->year);
+        $year = (int) ($objRequest->query('year') ?: CarbonImmutable::now()->year);
 
-        $month = $request->query('month');
+        $month = $objRequest->query('month');
         $month = ($month !== null && $month !== '') ? (int) $month : null;
 
-        $municipalityId = $request->query('municipality_id');
+        $municipalityId = $objRequest->query('municipality_id');
         $municipalityId = ($municipalityId !== null && $municipalityId !== '') ? (int) $municipalityId : null;
 
-        $listingId = $request->query('listing_id');
+        $listingId = $objRequest->query('listing_id');
         $listingId = ($listingId !== null && $listingId !== '') ? (int) $listingId : null;
 
-        $classification = $request->query('classification');
+        $classification = $objRequest->query('classification');
         $classification = in_array($classification, ['local', 'foreign'], true) ? $classification : null;
 
         return compact('year', 'month', 'municipalityId', 'listingId', 'classification');
@@ -58,81 +58,81 @@ class TourismAnalytics
      */
     public static function yearOptions(): array
     {
-        $years = MonthlyArrivalReport::query()
-            ->get(['period_month'])
-            ->map(fn (MonthlyArrivalReport $row) => $row->period_month->year)
+        $arrYears = MonthlyArrivalReport::query()
+            ->get(['mar_period_month'])
+            ->map(fn (MonthlyArrivalReport $objRow) => $objRow->mar_period_month->year)
             ->unique()
             ->sortDesc()
             ->values()
             ->all();
 
-        return $years ?: [CarbonImmutable::now()->year];
+        return $arrYears ?: [CarbonImmutable::now()->year];
     }
 
     /**
-     * @param  array<string, mixed>  $filters
+     * @param  array<string, mixed>  $arrFilters
      * @return array<int, array{label: string, value: string, delta: ?string, tone: string}>
      */
-    public static function kpis(array $filters, array $comparison): array
+    public static function kpis(array $arrFilters, array $arrComparison): array
     {
-        $column = self::arrivalColumn($filters);
+        $strColumn = self::arrivalColumn($arrFilters);
 
-        $totalArrivals = (int) self::verifiedReportsQuery($filters)->sum($column);
-        $domestic = (int) self::verifiedReportsQuery($filters)->sum('party_local');
-        $foreign = (int) self::verifiedReportsQuery($filters)->sum('party_foreign');
-        $verifiedReportsCount = (int) self::verifiedReportsQuery($filters)->count();
+        $intTotalArrivals = (int) self::verifiedReportsQuery($arrFilters)->sum($strColumn);
+        $intDomestic = (int) self::verifiedReportsQuery($arrFilters)->sum('mar_party_local');
+        $intForeign = (int) self::verifiedReportsQuery($arrFilters)->sum('mar_party_foreign');
+        $intVerifiedReportsCount = (int) self::verifiedReportsQuery($arrFilters)->count();
 
-        $totalMunicipalities = $filters['municipalityId'] ? 1 : Municipality::query()->count();
+        $intTotalMunicipalities = $arrFilters['municipalityId'] ? 1 : Municipality::query()->count();
 
-        $municipalReportRows = MunicipalReport::query()
-            ->whereYear('period_start', $filters['year'])
-            ->when($filters['month'] ?? null, fn (Builder $q, int $m) => $q->whereMonth('period_start', $m))
-            ->when($filters['municipalityId'] ?? null, fn (Builder $q, int $id) => $q->where('municipality_id', $id))
-            ->whereNotNull('municipality_id')
+        $objMunicipalReportRows = MunicipalReport::query()
+            ->whereYear('mrp_period_start', $arrFilters['year'])
+            ->when($arrFilters['month'] ?? null, fn (Builder $objQuery, int $m) => $objQuery->whereMonth('mrp_period_start', $m))
+            ->when($arrFilters['municipalityId'] ?? null, fn (Builder $objQuery, int $intId) => $objQuery->where('mun_id', $intId))
+            ->whereNotNull('mun_id')
             ->whereDoesntHave('supersededBy')
-            ->get(['id', 'municipality_id', 'status']);
+            ->get(['mrp_id', 'mun_id', 'mrp_status']);
 
-        $reportingMunicipalities = $municipalReportRows->where('status', '!=', MunicipalReport::STATUS_RETURNED)->pluck('municipality_id')->unique()->count();
-        $forClarificationMunicipalities = $municipalReportRows->where('status', MunicipalReport::STATUS_RETURNED)->pluck('municipality_id')->unique()->count();
-        $notSubmittedMunicipalities = max(0, $totalMunicipalities - $reportingMunicipalities - $forClarificationMunicipalities);
+        $intReportingMunicipalities = $objMunicipalReportRows->where('mrp_status', '!=', MunicipalReport::STATUS_RETURNED)->pluck('mun_id')->unique()->count();
+        $intForClarificationMunicipalities = $objMunicipalReportRows->where('mrp_status', MunicipalReport::STATUS_RETURNED)->pluck('mun_id')->unique()->count();
+        $notSubmittedMunicipalities = max(0, $intTotalMunicipalities - $intReportingMunicipalities - $intForClarificationMunicipalities);
 
-        $forReviewCount = (int) MonthlyArrivalReport::query()
-            ->whereIn('status', MonthlyReportStatus::awaitingReview())
-            ->whereYear('period_month', $filters['year'])
-            ->when($filters['month'] ?? null, fn (Builder $q, int $m) => $q->whereMonth('period_month', $m))
-            ->when($filters['municipalityId'] ?? null, fn (Builder $q, int $id) => $q->where('municipality_id', $id))
-            ->when($filters['listingId'] ?? null, fn (Builder $q, int $id) => $q->where('listing_id', $id))
+        $intForReviewCount = (int) MonthlyArrivalReport::query()
+            ->whereIn('mar_status', MonthlyReportStatus::awaitingReview())
+            ->whereYear('mar_period_month', $arrFilters['year'])
+            ->when($arrFilters['month'] ?? null, fn (Builder $objQuery, int $m) => $objQuery->whereMonth('mar_period_month', $m))
+            ->when($arrFilters['municipalityId'] ?? null, fn (Builder $objQuery, int $intId) => $objQuery->where('mun_id', $intId))
+            ->when($arrFilters['listingId'] ?? null, fn (Builder $objQuery, int $intId) => $objQuery->where('lst_id', $intId))
             ->count();
 
-        $attentionCount = $forReviewCount + $forClarificationMunicipalities + $notSubmittedMunicipalities;
+        $intAttentionCount = $intForReviewCount + $intForClarificationMunicipalities + $notSubmittedMunicipalities;
 
-        $arrivalsDelta = match ($comparison['label']) {
-            'Increased' => '+'.number_format(abs($comparison['percentageChange']), 1).'% '.$comparison['periodLabel'],
-            'Decreased' => '-'.number_format(abs($comparison['percentageChange']), 1).'% '.$comparison['periodLabel'],
-            'Stable' => 'Stable '.$comparison['periodLabel'],
+        $strArrivalsDelta = match ($arrComparison['label']) {
+            'Increased' => '+'.number_format(abs($arrComparison['percentageChange']), 1).'% '.$arrComparison['periodLabel'],
+            'Decreased' => '-'.number_format(abs($arrComparison['percentageChange']), 1).'% '.$arrComparison['periodLabel'],
+            'Stable' => 'Stable '.$arrComparison['periodLabel'],
             default => 'No comparison available',
         };
-        $arrivalsTone = match ($comparison['label']) {
+        $strArrivalsTone = match ($arrComparison['label']) {
             'Increased' => 'success',
             'Decreased' => 'danger',
             default => 'neutral',
         };
 
         return [
-            ['label' => 'Total Tourist Arrivals', 'value' => number_format($totalArrivals), 'delta' => $arrivalsDelta, 'tone' => $arrivalsTone],
-            ['label' => 'Local Visitors', 'value' => number_format($domestic), 'delta' => null, 'tone' => 'neutral'],
-            ['label' => 'Foreign Visitors', 'value' => number_format($foreign), 'delta' => null, 'tone' => 'neutral'],
-            ['label' => 'Reporting LGUs', 'value' => "{$reportingMunicipalities}/{$totalMunicipalities}", 'delta' => null, 'tone' => $reportingMunicipalities === $totalMunicipalities ? 'success' : 'warning'],
-            ['label' => 'Verified Reports', 'value' => number_format($verifiedReportsCount), 'delta' => null, 'tone' => 'success'],
+            ['label' => 'Total Tourist Arrivals', 'value' => number_format($intTotalArrivals), 'delta' => $strArrivalsDelta, 'tone' => $strArrivalsTone],
+            ['label' => 'Local Visitors', 'value' => number_format($intDomestic), 'delta' => null, 'tone' => 'neutral'],
+            ['label' => 'Foreign Visitors', 'value' => number_format($intForeign), 'delta' => null, 'tone' => 'neutral'],
+            ['label' => 'Reporting LGUs', 'value' => "{$intReportingMunicipalities}/{$intTotalMunicipalities}", 'delta' => null, 'tone' => $intReportingMunicipalities === $intTotalMunicipalities ? 'success' : 'warning'],
+            ['label' => 'Verified Reports', 'value' => number_format($intVerifiedReportsCount), 'delta' => null, 'tone' => 'success'],
             [
                 'label' => 'Reports Requiring Attention',
-                'value' => number_format($attentionCount),
-                'delta' => $attentionCount ? "{$forReviewCount} For Review · {$forClarificationMunicipalities} For Clarification · {$notSubmittedMunicipalities} Not Submitted" : null,
-                'tone' => $attentionCount ? 'warning' : 'success',
+                'value' => number_format($intAttentionCount),
+                'delta' => $intAttentionCount ? "{$intForReviewCount} For Review · {$intForClarificationMunicipalities} For Clarification · {$notSubmittedMunicipalities} Not Submitted" : null,
+                'tone' => $intAttentionCount ? 'warning' : 'success',
                 'href' => route('pto.municipalReports.index', [
                     'status' => 'attention',
-                    'year' => $filters['year'],
-                    'month' => $filters['month'],
+                    'year' => $arrFilters['year'],
+                    'month' => $arrFilters['month'],
                 ]),
             ],
         ];
@@ -146,67 +146,67 @@ class TourismAnalytics
      * since a single month has nothing to trend against); 'year' = one
      * point per year that has any verified data at all.
      *
-     * @param  array<string, mixed>  $filters
+     * @param  array<string, mixed>  $arrFilters
      * @return array{month: array<int, array{label: string, value: int}>, year: array<int, array{label: string, value: int}>}
      */
-    public static function arrivalTrend(array $filters): array
+    public static function arrivalTrend(array $arrFilters): array
     {
-        $column = self::arrivalColumn($filters);
+        $strColumn = self::arrivalColumn($arrFilters);
 
-        $yearRows = MonthlyArrivalReport::query()
-            ->where('status', MonthlyReportStatus::Verified)
-            ->whereYear('period_month', $filters['year'])
-            ->when($filters['municipalityId'] ?? null, fn (Builder $q, int $id) => $q->where('municipality_id', $id))
-            ->when($filters['listingId'] ?? null, fn (Builder $q, int $id) => $q->where('listing_id', $id))
-            ->get(['period_month', $column]);
+        $objYearRows = MonthlyArrivalReport::query()
+            ->where('mar_status', MonthlyReportStatus::Verified)
+            ->whereYear('mar_period_month', $arrFilters['year'])
+            ->when($arrFilters['municipalityId'] ?? null, fn (Builder $objQuery, int $intId) => $objQuery->where('mun_id', $intId))
+            ->when($arrFilters['listingId'] ?? null, fn (Builder $objQuery, int $intId) => $objQuery->where('lst_id', $intId))
+            ->get(['mar_period_month', $strColumn]);
 
-        $byMonth = $yearRows->groupBy(fn (MonthlyArrivalReport $row) => $row->period_month->month)
-            ->map(fn (Collection $rows) => (int) $rows->sum($column));
+        $objByMonth = $objYearRows->groupBy(fn (MonthlyArrivalReport $objRow) => $objRow->mar_period_month->month)
+            ->map(fn (Collection $objRows) => (int) $objRows->sum($strColumn));
 
-        $monthSeries = collect(range(1, 12))->map(fn (int $m) => [
-            'label' => CarbonImmutable::create($filters['year'], $m, 1)->format('M'),
-            'value' => (int) ($byMonth[$m] ?? 0),
+        $arrMonthSeries = collect(range(1, 12))->map(fn (int $m) => [
+            'label' => CarbonImmutable::create($arrFilters['year'], $m, 1)->format('M'),
+            'value' => (int) ($objByMonth[$m] ?? 0),
         ])->all();
 
-        $allRows = MonthlyArrivalReport::query()
-            ->where('status', MonthlyReportStatus::Verified)
-            ->when($filters['municipalityId'] ?? null, fn (Builder $q, int $id) => $q->where('municipality_id', $id))
-            ->when($filters['listingId'] ?? null, fn (Builder $q, int $id) => $q->where('listing_id', $id))
-            ->get(['period_month', $column]);
+        $objAllRows = MonthlyArrivalReport::query()
+            ->where('mar_status', MonthlyReportStatus::Verified)
+            ->when($arrFilters['municipalityId'] ?? null, fn (Builder $objQuery, int $intId) => $objQuery->where('mun_id', $intId))
+            ->when($arrFilters['listingId'] ?? null, fn (Builder $objQuery, int $intId) => $objQuery->where('lst_id', $intId))
+            ->get(['mar_period_month', $strColumn]);
 
-        $yearSeries = $allRows->groupBy(fn (MonthlyArrivalReport $row) => $row->period_month->year)
+        $arrYearSeries = $objAllRows->groupBy(fn (MonthlyArrivalReport $objRow) => $objRow->mar_period_month->year)
             ->sortKeys()
-            ->map(fn (Collection $rows, int $year) => ['label' => (string) $year, 'value' => (int) $rows->sum($column)])
+            ->map(fn (Collection $objRows, int $intYear) => ['label' => (string) $intYear, 'value' => (int) $objRows->sum($strColumn)])
             ->values()
             ->all();
 
-        return ['month' => $monthSeries, 'year' => $yearSeries];
+        return ['month' => $arrMonthSeries, 'year' => $arrYearSeries];
     }
 
     /**
      * Verified arrivals grouped by municipality, each row carrying a
      * percentage-of-max for a plain CSS-width bar — no chart library.
      *
-     * @param  array<string, mixed>  $filters
+     * @param  array<string, mixed>  $arrFilters
      * @return Collection<int, array{municipality: Municipality, total: int, percentage: int}>
      */
-    public static function municipalityComparison(array $filters): Collection
+    public static function municipalityComparison(array $arrFilters): Collection
     {
-        $column = self::arrivalColumn($filters);
+        $strColumn = self::arrivalColumn($arrFilters);
 
-        $rows = self::verifiedReportsQuery($filters)->get(['municipality_id', $column]);
+        $objRows = self::verifiedReportsQuery($arrFilters)->get(['mun_id', $strColumn]);
 
-        $totals = $rows->groupBy('municipality_id')
-            ->map(fn (Collection $group) => (int) $group->sum($column));
+        $objTotals = $objRows->groupBy('mun_id')
+            ->map(fn (Collection $objGroup) => (int) $objGroup->sum($strColumn));
 
-        $municipalities = Municipality::query()->whereIn('id', $totals->keys())->get()->keyBy('id');
-        $max = $totals->max() ?: 1;
+        $objMunicipalities = Municipality::query()->whereIn('mun_id', $objTotals->keys())->get()->keyBy('mun_id');
+        $intMax = $objTotals->max() ?: 1;
 
-        return $totals->map(fn (int $total, int $municipalityId) => [
-            'municipality' => $municipalities->get($municipalityId),
-            'total' => $total,
-            'percentage' => (int) round(($total / $max) * 100),
-        ])->filter(fn (array $row) => $row['municipality'] !== null)
+        return $objTotals->map(fn (int $intTotal, int $intMunicipalityId) => [
+            'municipality' => $objMunicipalities->get($intMunicipalityId),
+            'total' => $intTotal,
+            'percentage' => (int) round(($intTotal / $intMax) * 100),
+        ])->filter(fn (array $arrRow) => $arrRow['municipality'] !== null)
             ->sortByDesc('total')
             ->values();
     }
@@ -215,31 +215,31 @@ class TourismAnalytics
      * One row per municipality for the selected period — "Not Submitted"
      * is a literal label, never a stored or displayed zero.
      *
-     * @param  array<string, mixed>  $filters
+     * @param  array<string, mixed>  $arrFilters
      * @return Collection<int, array{municipality: Municipality, report: ?MunicipalReport, status: string}>
      */
-    public static function reportingStatus(array $filters): Collection
+    public static function reportingStatus(array $arrFilters): Collection
     {
-        $municipalities = Municipality::query()
-            ->when($filters['municipalityId'] ?? null, fn (Builder $q, int $id) => $q->where('id', $id))
-            ->orderBy('name')
+        $objMunicipalities = Municipality::query()
+            ->when($arrFilters['municipalityId'] ?? null, fn (Builder $objQuery, int $intId) => $objQuery->where('mun_id', $intId))
+            ->orderBy('mun_name')
             ->get();
 
-        $reports = MunicipalReport::query()
-            ->whereYear('period_start', $filters['year'])
-            ->when($filters['month'] ?? null, fn (Builder $q, int $m) => $q->whereMonth('period_start', $m))
-            ->whereNotNull('municipality_id')
+        $objReports = MunicipalReport::query()
+            ->whereYear('mrp_period_start', $arrFilters['year'])
+            ->when($arrFilters['month'] ?? null, fn (Builder $objQuery, int $m) => $objQuery->whereMonth('mrp_period_start', $m))
+            ->whereNotNull('mun_id')
             ->whereDoesntHave('supersededBy')
             ->get()
-            ->keyBy('municipality_id');
+            ->keyBy('mun_id');
 
-        return $municipalities->map(function (Municipality $municipality) use ($reports) {
-            $report = $reports->get($municipality->id);
+        return $objMunicipalities->map(function (Municipality $objMunicipality) use ($objReports) {
+            $objReport = $objReports->get($objMunicipality->mun_id);
 
             return [
-                'municipality' => $municipality,
-                'report' => $report,
-                'status' => match ($report?->status) {
+                'municipality' => $objMunicipality,
+                'report' => $objReport,
+                'status' => match ($objReport?->mrp_status) {
                     'SUBMITTED', 'REVIEWED' => 'For Review',
                     'APPROVED' => 'Verified',
                     'RETURNED' => 'For Clarification',
@@ -254,33 +254,33 @@ class TourismAnalytics
      * selected, else previous year). Null-safe: an absent previous period
      * never produces a misleading percentage.
      *
-     * @param  array<string, mixed>  $filters
+     * @param  array<string, mixed>  $arrFilters
      * @return array{current: int, previous: ?int, difference: ?int, percentageChange: ?float, label: string, periodLabel: string}
      */
-    public static function periodComparison(array $filters): array
+    public static function periodComparison(array $arrFilters): array
     {
-        $column = self::arrivalColumn($filters);
-        $current = (int) self::verifiedReportsQuery($filters)->sum($column);
+        $strColumn = self::arrivalColumn($arrFilters);
+        $current = (int) self::verifiedReportsQuery($arrFilters)->sum($strColumn);
 
-        if ($filters['month'] ?? null) {
-            $previousMonth = CarbonImmutable::create($filters['year'], $filters['month'], 1)->subMonthNoOverflow();
-            $previousFilters = array_merge($filters, ['year' => $previousMonth->year, 'month' => $previousMonth->month]);
+        if ($arrFilters['month'] ?? null) {
+            $dtmPreviousMonth = CarbonImmutable::create($arrFilters['year'], $arrFilters['month'], 1)->subMonthNoOverflow();
+            $arrPreviousFilters = array_merge($arrFilters, ['year' => $dtmPreviousMonth->year, 'month' => $dtmPreviousMonth->month]);
             $periodLabel = 'vs last month';
         } else {
-            $previousFilters = array_merge($filters, ['year' => $filters['year'] - 1, 'month' => null]);
+            $arrPreviousFilters = array_merge($arrFilters, ['year' => $arrFilters['year'] - 1, 'month' => null]);
             $periodLabel = 'vs last year';
         }
 
-        $previousExists = self::verifiedReportsQuery($previousFilters)->exists();
+        $blnPreviousExists = self::verifiedReportsQuery($arrPreviousFilters)->exists();
 
-        if (! $previousExists) {
+        if (! $blnPreviousExists) {
             return [
                 'current' => $current, 'previous' => null, 'difference' => null,
                 'percentageChange' => null, 'label' => 'No comparison available', 'periodLabel' => $periodLabel,
             ];
         }
 
-        $previous = (int) self::verifiedReportsQuery($previousFilters)->sum($column);
+        $previous = (int) self::verifiedReportsQuery($arrPreviousFilters)->sum($strColumn);
         $difference = $current - $previous;
         $percentageChange = $previous > 0 ? round(($difference / $previous) * 100, 1) : null;
 
@@ -299,20 +299,20 @@ class TourismAnalytics
      * Local/Foreign and Male/Female totals from the same verified rows —
      * only existing party_* columns, no new visitor categories.
      *
-     * @param  array<string, mixed>  $filters
+     * @param  array<string, mixed>  $arrFilters
      * @return array{local: int, foreign: int, male: int, female: int}
      */
-    public static function classificationBreakdown(array $filters): array
+    public static function classificationBreakdown(array $arrFilters): array
     {
-        $row = self::verifiedReportsQuery($filters)
-            ->selectRaw('SUM(party_local) as local_total, SUM(party_foreign) as foreign_total, SUM(party_male) as male_total, SUM(party_female) as female_total')
+        $objRow = self::verifiedReportsQuery($arrFilters)
+            ->selectRaw('SUM(mar_party_local) as local_total, SUM(mar_party_foreign) as foreign_total, SUM(mar_party_male) as male_total, SUM(mar_party_female) as female_total')
             ->first();
 
         return [
-            'local' => (int) ($row->local_total ?? 0),
-            'foreign' => (int) ($row->foreign_total ?? 0),
-            'male' => (int) ($row->male_total ?? 0),
-            'female' => (int) ($row->female_total ?? 0),
+            'local' => (int) ($objRow->local_total ?? 0),
+            'foreign' => (int) ($objRow->foreign_total ?? 0),
+            'male' => (int) ($objRow->male_total ?? 0),
+            'female' => (int) ($objRow->female_total ?? 0),
         ];
     }
 
@@ -322,66 +322,66 @@ class TourismAnalytics
      *
      * @return Collection<int, array{icon: string, title: string, description: string, time: CarbonImmutable}>
      */
-    public static function recentActivity(?int $municipalityId, int $limit = 6): Collection
+    public static function recentActivity(?int $intMunicipalityId, int $intLimit = 6): Collection
     {
         return OperationLog::query()
-            ->whereIn('entity_type', ['monthly_arrival_report', 'municipal_report'])
-            ->whereIn('action', ['create', 'validate', 'consolidate', 'approve', 'return', 'reopen'])
-            ->when($municipalityId, fn (Builder $q, int $id) => $q->where('municipality_id', $id))
+            ->whereIn('opl_entity_type', ['monthly_arrival_report', 'municipal_report'])
+            ->whereIn('opl_action', ['create', 'validate', 'consolidate', 'approve', 'return', 'reopen'])
+            ->when($intMunicipalityId, fn (Builder $objQuery, int $intId) => $objQuery->where('mun_id', $intId))
             ->with('user')
-            ->orderByDesc('created_at')
-            ->limit($limit)
+            ->orderByDesc('opl_created_at')
+            ->limit($intLimit)
             ->get()
-            ->map(fn (OperationLog $log) => self::describeActivity($log));
+            ->map(fn (OperationLog $objLog) => self::describeActivity($objLog));
     }
 
-    private static function describeActivity(OperationLog $log): array
+    private static function describeActivity(OperationLog $objLog): array
     {
-        $entity = $log->entity_type === 'municipal_report' ? 'LGU consolidated report' : 'establishment report';
+        $strEntity = $objLog->opl_entity_type === 'municipal_report' ? 'LGU consolidated report' : 'establishment report';
 
-        [$icon, $verb] = match ($log->action) {
+        [$strIcon, $strVerb] = match ($objLog->opl_action) {
             'create' => ['ti-plus', 'encoded/submitted'],
             'validate' => ['ti-check', 'verified'],
             'consolidate' => ['ti-report', 'consolidated and submitted to PTO'],
             'approve' => ['ti-circle-check', 'verified'],
             'return' => ['ti-arrow-back-up', 'returned for clarification'],
             'reopen' => ['ti-lock-open', 'reopened a verified report with a new submission'],
-            default => ['ti-info-circle', $log->action],
+            default => ['ti-info-circle', $objLog->opl_action],
         };
 
         return [
-            'icon' => $icon,
-            'title' => ucfirst($verb).' an '.$entity,
-            'description' => $log->user->name ?? 'Unknown user',
-            'time' => $log->created_at,
+            'icon' => $strIcon,
+            'title' => ucfirst($strVerb).' an '.$strEntity,
+            'description' => $objLog->user->usr_name ?? 'Unknown user',
+            'time' => $objLog->opl_created_at,
         ];
     }
 
     /**
-     * One entry per calendar month of $filters['year'] for the given scope
-     * (municipalityId and/or listingId), from Verified reports only. A month
-     * with no Verified report has hasData = false and is shown as "No
+     * One entry per calendar month of $arrFilters['year'] for the given
+     * scope (municipalityId and/or listingId), from Verified reports only. A
+     * month with no Verified report has hasData = false and is shown as "No
      * report" — never as a zero-arrival month. Each month also carries its
      * change vs the previous calendar month (December of the previous year
      * for January) when both months have verified data.
      *
-     * @param  array<string, mixed>  $filters
+     * @param  array<string, mixed>  $arrFilters
      * @return Collection<int, array{month: int, label: string, shortLabel: string, hasData: bool, total: int, reportCount: int, change: string, changePercent: ?float}>
      */
-    public static function monthlyRecords(array $filters): Collection
+    public static function monthlyRecords(array $arrFilters): Collection
     {
-        $intYear = (int) $filters['year'];
+        $intYear = (int) $arrFilters['year'];
         $dtStart = CarbonImmutable::create($intYear - 1, 12, 1);
         $dtEnd = CarbonImmutable::create($intYear, 12, 31);
 
-        $objRows = self::_verifiedScopeQuery($filters)
-            ->whereDate('period_month', '>=', $dtStart->toDateString())
-            ->whereDate('period_month', '<=', $dtEnd->toDateString())
-            ->get(['period_month', 'total_visitors']);
+        $objRows = self::_verifiedScopeQuery($arrFilters)
+            ->whereDate('mar_period_month', '>=', $dtStart->toDateString())
+            ->whereDate('mar_period_month', '<=', $dtEnd->toDateString())
+            ->get(['mar_period_month', 'mar_total_visitors']);
 
         $arrTotals = $objRows
-            ->groupBy(fn (MonthlyArrivalReport $objRow) => $objRow->period_month->format('Y-m'))
-            ->map(fn (Collection $objMonthRows) => ['total' => (int) $objMonthRows->sum('total_visitors'), 'count' => $objMonthRows->count()])
+            ->groupBy(fn (MonthlyArrivalReport $objRow) => $objRow->mar_period_month->format('Y-m'))
+            ->map(fn (Collection $objMonthRows) => ['total' => (int) $objMonthRows->sum('mar_total_visitors'), 'count' => $objMonthRows->count()])
             ->all();
 
         return self::_buildMonthlyRecords($intYear, $arrTotals);
@@ -399,12 +399,12 @@ class TourismAnalytics
     public static function provincialMonthlyRecords(int $intYear): Collection
     {
         $arrTotals = self::_approvedMunicipalReportsQuery()
-            ->whereDate('period_start', '>=', CarbonImmutable::create($intYear - 1, 12, 1)->toDateString())
-            ->whereDate('period_start', '<=', CarbonImmutable::create($intYear, 12, 31)->toDateString())
-            ->get(['id', 'period_start', 'total_arrivals'])
+            ->whereDate('mrp_period_start', '>=', CarbonImmutable::create($intYear - 1, 12, 1)->toDateString())
+            ->whereDate('mrp_period_start', '<=', CarbonImmutable::create($intYear, 12, 31)->toDateString())
+            ->get(['mrp_id', 'mrp_period_start', 'mrp_total_arrivals'])
             ->toBase()
-            ->groupBy(fn (MunicipalReport $objReport) => $objReport->period_start->format('Y-m'))
-            ->map(fn (Collection $objMonthReports) => ['total' => (int) $objMonthReports->sum('total_arrivals'), 'count' => $objMonthReports->count()])
+            ->groupBy(fn (MunicipalReport $objReport) => $objReport->mrp_period_start->format('Y-m'))
+            ->map(fn (Collection $objMonthReports) => ['total' => (int) $objMonthReports->sum('mrp_total_arrivals'), 'count' => $objMonthReports->count()])
             ->all();
 
         return self::_buildMonthlyRecords($intYear, $arrTotals);
@@ -420,17 +420,17 @@ class TourismAnalytics
     public static function provincialVisitorBreakdown(int $intYear, ?int $intMonth = null): array
     {
         $objApprovedIds = self::_approvedMunicipalReportsQuery()
-            ->whereYear('period_start', $intYear)
-            ->when($intMonth, fn (Builder $q, int $m) => $q->whereMonth('period_start', $m))
-            ->pluck('id');
+            ->whereYear('mrp_period_start', $intYear)
+            ->when($intMonth, fn (Builder $objQuery, int $m) => $objQuery->whereMonth('mrp_period_start', $m))
+            ->pluck('mrp_id');
 
         $objRow = MonthlyArrivalReport::query()
-            ->whereIn('municipal_report_id', $objApprovedIds)
+            ->whereIn('mrp_id', $objApprovedIds)
             ->selectRaw('
-                COALESCE(SUM(party_male), 0) as male_total, COALESCE(SUM(party_female), 0) as female_total,
-                COALESCE(SUM(party_adults), 0) as adults_total, COALESCE(SUM(party_children), 0) as children_total,
-                COALESCE(SUM(party_seniors), 0) as seniors_total, COALESCE(SUM(party_local), 0) as local_total,
-                COALESCE(SUM(party_foreign), 0) as foreign_total, COALESCE(SUM(total_visitors), 0) as visitors_total
+                COALESCE(SUM(mar_party_male), 0) as male_total, COALESCE(SUM(mar_party_female), 0) as female_total,
+                COALESCE(SUM(mar_party_adults), 0) as adults_total, COALESCE(SUM(mar_party_children), 0) as children_total,
+                COALESCE(SUM(mar_party_seniors), 0) as seniors_total, COALESCE(SUM(mar_party_local), 0) as local_total,
+                COALESCE(SUM(mar_party_foreign), 0) as foreign_total, COALESCE(SUM(mar_total_visitors), 0) as visitors_total
             ')
             ->first();
 
@@ -452,8 +452,8 @@ class TourismAnalytics
     private static function _approvedMunicipalReportsQuery(): Builder
     {
         return MunicipalReport::query()
-            ->where('status', MunicipalReport::STATUS_APPROVED)
-            ->whereNotNull('municipality_id')
+            ->where('mrp_status', MunicipalReport::STATUS_APPROVED)
+            ->whereNotNull('mun_id')
             ->whereDoesntHave('supersededBy');
     } // end _approvedMunicipalReportsQuery
 
@@ -612,17 +612,17 @@ class TourismAnalytics
      * Verified totals for every visitor classification the system collects
      * (gender, age group, origin) — no new categories.
      *
-     * @param  array<string, mixed>  $filters
+     * @param  array<string, mixed>  $arrFilters
      * @return array<string, int>
      */
-    public static function visitorBreakdown(array $filters): array
+    public static function visitorBreakdown(array $arrFilters): array
     {
-        $objRow = self::verifiedReportsQuery($filters)
+        $objRow = self::verifiedReportsQuery($arrFilters)
             ->selectRaw('
-                COALESCE(SUM(party_male), 0) as male_total, COALESCE(SUM(party_female), 0) as female_total,
-                COALESCE(SUM(party_adults), 0) as adults_total, COALESCE(SUM(party_children), 0) as children_total,
-                COALESCE(SUM(party_seniors), 0) as seniors_total, COALESCE(SUM(party_local), 0) as local_total,
-                COALESCE(SUM(party_foreign), 0) as foreign_total, COALESCE(SUM(total_visitors), 0) as visitors_total
+                COALESCE(SUM(mar_party_male), 0) as male_total, COALESCE(SUM(mar_party_female), 0) as female_total,
+                COALESCE(SUM(mar_party_adults), 0) as adults_total, COALESCE(SUM(mar_party_children), 0) as children_total,
+                COALESCE(SUM(mar_party_seniors), 0) as seniors_total, COALESCE(SUM(mar_party_local), 0) as local_total,
+                COALESCE(SUM(mar_party_foreign), 0) as foreign_total, COALESCE(SUM(mar_total_visitors), 0) as visitors_total
             ')
             ->first();
 
@@ -642,19 +642,19 @@ class TourismAnalytics
      * Verified arrivals per establishment (highest first), with how many
      * verified monthly reports each contributed.
      *
-     * @param  array<string, mixed>  $filters
+     * @param  array<string, mixed>  $arrFilters
      * @return Collection<int, array{name: string, category: string, total: int, reportCount: int}>
      */
-    public static function establishmentBreakdown(array $filters): Collection
+    public static function establishmentBreakdown(array $arrFilters): Collection
     {
-        return self::verifiedReportsQuery($filters)
+        return self::verifiedReportsQuery($arrFilters)
             ->with('listing.categoryRecord')
-            ->get(['listing_id', 'total_visitors'])
-            ->groupBy('listing_id')
+            ->get(['lst_id', 'mar_total_visitors'])
+            ->groupBy('lst_id')
             ->map(fn (Collection $objReports) => [
-                'name' => $objReports->first()->listing?->name ?? 'Unknown establishment',
+                'name' => $objReports->first()->listing?->lst_name ?? 'Unknown establishment',
                 'category' => $objReports->first()->listing?->categoryRecord?->cat_name ?? 'Uncategorized',
-                'total' => (int) $objReports->sum('total_visitors'),
+                'total' => (int) $objReports->sum('mar_total_visitors'),
                 'reportCount' => $objReports->count(),
             ])
             ->sortByDesc('total')
@@ -665,12 +665,12 @@ class TourismAnalytics
      * Verified arrivals grouped by establishment category (the stand-in for
      * "by destination" — destinations do not report arrivals).
      *
-     * @param  array<string, mixed>  $filters
+     * @param  array<string, mixed>  $arrFilters
      * @return Collection<int, array{category: string, total: int, establishments: int}>
      */
-    public static function categoryBreakdown(array $filters): Collection
+    public static function categoryBreakdown(array $arrFilters): Collection
     {
-        return self::establishmentBreakdown($filters)
+        return self::establishmentBreakdown($arrFilters)
             ->groupBy('category')
             ->map(fn (Collection $objGroup, string $strCategory) => [
                 'category' => $strCategory,
@@ -690,13 +690,13 @@ class TourismAnalytics
     public static function scopedYearOptions(?int $intMunicipalityId, ?int $intListingId = null): array
     {
         return MonthlyArrivalReport::query()
-            ->when($intMunicipalityId, fn (Builder $q, int $id) => $q->where('municipality_id', $id))
-            ->when($intListingId, fn (Builder $q, int $id) => $q->where('listing_id', $id))
-            ->get(['period_month'])
+            ->when($intMunicipalityId, fn (Builder $objQuery, int $id) => $objQuery->where('mun_id', $id))
+            ->when($intListingId, fn (Builder $objQuery, int $id) => $objQuery->where('lst_id', $id))
+            ->get(['mar_period_month'])
             // toBase(): with no rows, map() would keep an Eloquent
             // collection, and pushing a plain year into it breaks unique().
             ->toBase()
-            ->map(fn (MonthlyArrivalReport $objRow) => $objRow->period_month->year)
+            ->map(fn (MonthlyArrivalReport $objRow) => $objRow->mar_period_month->year)
             ->push(CarbonImmutable::now()->year)
             ->unique()
             ->sortDesc()
@@ -708,32 +708,32 @@ class TourismAnalytics
      * Verified reports for a municipality/establishment scope, with no
      * year/month constraint (callers add their own date range).
      *
-     * @param  array<string, mixed>  $filters
+     * @param  array<string, mixed>  $arrFilters
      */
-    private static function _verifiedScopeQuery(array $filters): Builder
+    private static function _verifiedScopeQuery(array $arrFilters): Builder
     {
         return MonthlyArrivalReport::query()
-            ->where('status', MonthlyReportStatus::Verified)
-            ->when($filters['municipalityId'] ?? null, fn (Builder $q, int $id) => $q->where('municipality_id', $id))
-            ->when($filters['listingId'] ?? null, fn (Builder $q, int $id) => $q->where('listing_id', $id));
+            ->where('mar_status', MonthlyReportStatus::Verified)
+            ->when($arrFilters['municipalityId'] ?? null, fn (Builder $objQuery, int $id) => $objQuery->where('mun_id', $id))
+            ->when($arrFilters['listingId'] ?? null, fn (Builder $objQuery, int $id) => $objQuery->where('lst_id', $id));
     } // end _verifiedScopeQuery
 
-    private static function arrivalColumn(array $filters): string
+    private static function arrivalColumn(array $arrFilters): string
     {
-        return match ($filters['classification'] ?? null) {
-            'local' => 'party_local',
-            'foreign' => 'party_foreign',
-            default => 'total_visitors',
+        return match ($arrFilters['classification'] ?? null) {
+            'local' => 'mar_party_local',
+            'foreign' => 'mar_party_foreign',
+            default => 'mar_total_visitors',
         };
     }
 
-    private static function verifiedReportsQuery(array $filters): Builder
+    private static function verifiedReportsQuery(array $arrFilters): Builder
     {
         return MonthlyArrivalReport::query()
-            ->where('status', MonthlyReportStatus::Verified)
-            ->whereYear('period_month', $filters['year'])
-            ->when($filters['month'] ?? null, fn (Builder $q, int $m) => $q->whereMonth('period_month', $m))
-            ->when($filters['municipalityId'] ?? null, fn (Builder $q, int $id) => $q->where('municipality_id', $id))
-            ->when($filters['listingId'] ?? null, fn (Builder $q, int $id) => $q->where('listing_id', $id));
+            ->where('mar_status', MonthlyReportStatus::Verified)
+            ->whereYear('mar_period_month', $arrFilters['year'])
+            ->when($arrFilters['month'] ?? null, fn (Builder $objQuery, int $m) => $objQuery->whereMonth('mar_period_month', $m))
+            ->when($arrFilters['municipalityId'] ?? null, fn (Builder $objQuery, int $intId) => $objQuery->where('mun_id', $intId))
+            ->when($arrFilters['listingId'] ?? null, fn (Builder $objQuery, int $intId) => $objQuery->where('lst_id', $intId));
     }
 }

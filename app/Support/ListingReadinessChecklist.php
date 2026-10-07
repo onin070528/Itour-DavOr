@@ -28,19 +28,19 @@ class ListingReadinessChecklist
     {
         $arrMissing = [];
 
-        if (blank($objListing->name)) {
+        if (blank($objListing->lst_name)) {
             $arrMissing[] = 'Name';
         }
 
-        if (blank($objListing->category)) {
+        if (blank($objListing->lst_category)) {
             $arrMissing[] = 'Category';
         }
 
-        if (blank($objListing->description)) {
+        if (blank($objListing->lst_description)) {
             $arrMissing[] = 'Description';
         }
 
-        if (blank($objListing->contact_phone) && blank($objListing->email)) {
+        if (blank($objListing->lst_contact_phone) && blank($objListing->lst_email)) {
             $arrMissing[] = 'A public phone number or email';
         }
 

@@ -10,42 +10,42 @@
     Programmer/s: iTOUR Development Team
     Copyright (c) 2026 iTOUR Development Team. All rights reserved.
 --}}
-@php($isForCorrection = $report->status === \App\Enums\MonthlyReportStatus::ForCorrection)
+@php($isForCorrection = $report->mar_status === \App\Enums\MonthlyReportStatus::ForCorrection)
 
-<x-dashboard.modal :id="'report-modal-'.$report->id" :title="$report->period_month->format('F Y').' Report'" max-width="max-w-2xl">
+<x-dashboard.modal :id="'report-modal-'.$report->mar_id" :title="$report->mar_period_month->format('F Y').' Report'" max-width="max-w-2xl">
     @if ($isForCorrection)
         <div class="rounded-md border border-danger/30 bg-danger-bg px-4 py-3 text-sm text-danger">
             <p class="font-semibold">Returned by the LGU for correction</p>
-            <p class="mt-1">What to fix: {{ $report->remarks ?: '—' }}</p>
+            <p class="mt-1">What to fix: {{ $report->mar_remarks ?: '—' }}</p>
         </div>
     @endif
 
     <dl @class(['grid grid-cols-2 gap-4 text-sm sm:grid-cols-3', 'mt-4' => $isForCorrection])>
         <div>
             <dt class="text-xs font-semibold text-sand-500 uppercase">Status</dt>
-            <dd class="mt-1"><x-dashboard.status-badge :tone="$report->status->badgeTone()">{{ $report->status->label() }}</x-dashboard.status-badge></dd>
+            <dd class="mt-1"><x-dashboard.status-badge :tone="$report->mar_status->badgeTone()">{{ $report->mar_status->label() }}</x-dashboard.status-badge></dd>
         </div>
         <div>
             <dt class="text-xs font-semibold text-sand-500 uppercase">Tourist Arrivals</dt>
-            <dd class="mt-1 text-lg font-bold text-sand-900">{{ number_format($report->total_visitors) }}</dd>
+            <dd class="mt-1 text-lg font-bold text-sand-900">{{ number_format($report->mar_total_visitors) }}</dd>
         </div>
         <div>
             <dt class="text-xs font-semibold text-sand-500 uppercase">Source</dt>
-            <dd class="mt-1 text-sand-800">{{ $report->submission_source->label() }}</dd>
+            <dd class="mt-1 text-sand-800">{{ $report->mar_submission_source->label() }}</dd>
         </div>
         <div>
             <dt class="text-xs font-semibold text-sand-500 uppercase">Submitted</dt>
-            <dd class="mt-1 text-sand-800">{{ $report->submitted_at ? ($report->submitter->name ?? '—').' · '.$report->submitted_at->format('M j, Y') : 'Not yet' }}</dd>
+            <dd class="mt-1 text-sand-800">{{ $report->mar_submitted_at ? ($report->submitter->usr_name ?? '—').' · '.$report->mar_submitted_at->format('M j, Y') : 'Not yet' }}</dd>
         </div>
         <div>
             <dt class="text-xs font-semibold text-sand-500 uppercase">Verified</dt>
-            <dd class="mt-1 text-sand-800">{{ $report->verified_at ? ($report->verifier->name ?? 'LGU').' · '.$report->verified_at->format('M j, Y') : 'Not yet' }}</dd>
+            <dd class="mt-1 text-sand-800">{{ $report->mar_verified_at ? ($report->verifier->usr_name ?? 'LGU').' · '.$report->mar_verified_at->format('M j, Y') : 'Not yet' }}</dd>
         </div>
     </dl>
 
     <h3 class="mt-5 text-xs font-semibold text-sand-500 uppercase">Visitor Classifications</h3>
     <dl class="mt-2 grid grid-cols-4 gap-3 rounded-md border border-sand-200 p-3 text-sm sm:grid-cols-7">
-        @foreach (['Male' => 'party_male', 'Female' => 'party_female', 'Adults' => 'party_adults', 'Children' => 'party_children', 'Seniors' => 'party_seniors', 'Local' => 'party_local', 'Foreign' => 'party_foreign'] as $label => $column)
+        @foreach (['Male' => 'mar_party_male', 'Female' => 'mar_party_female', 'Adults' => 'mar_party_adults', 'Children' => 'mar_party_children', 'Seniors' => 'mar_party_seniors', 'Local' => 'mar_party_local', 'Foreign' => 'mar_party_foreign'] as $label => $column)
             <div>
                 <dt class="text-xs text-sand-500">{{ $label }}</dt>
                 <dd class="font-semibold text-sand-900">{{ number_format($report->{$column}) }}</dd>

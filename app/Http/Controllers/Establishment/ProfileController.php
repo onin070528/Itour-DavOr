@@ -34,18 +34,18 @@ class ProfileController extends EstablishmentController
      * (both fields and photo management) once the package has been
      * submitted, until it's returned.
      */
-    public function edit(Request $request): View
+    public function edit(Request $objRequest): View
     {
-        $listing = $this->ownListing($request);
+        $objListing = $this->ownListing($objRequest);
 
-        return $this->renderEstablishment($request, 'establishment.profile', 'establishment.profile', 'Establishment Profile', [
-            'listing' => $listing,
-            'images' => $listing->establishmentImages,
+        return $this->renderEstablishment($objRequest, 'establishment.profile', 'establishment.profile', 'Establishment Profile', [
+            'listing' => $objListing,
+            'images' => $objListing->establishmentImages,
             'categories' => Category::query()->active()->forEstablishments()->get(),
-            'blnIsReadOnly' => $this->isReadOnly($listing),
-            'strStatusLabel' => $this->statusLabel($listing),
-            'strStatusTone' => $this->statusTone($listing),
-            'strReturnReason' => $this->returnReason($listing),
+            'blnIsReadOnly' => $this->isReadOnly($objListing),
+            'strStatusLabel' => $this->statusLabel($objListing),
+            'strStatusTone' => $this->statusTone($objListing),
+            'strReturnReason' => $this->returnReason($objListing),
         ]);
     }
 
@@ -53,14 +53,14 @@ class ProfileController extends EstablishmentController
      * "Save draft" — saves the details form without validating required
      * fields and never changes status. Always available in DRAFT/UNPUBLISHED.
      */
-    public function update(Request $request): RedirectResponse
+    public function update(Request $objRequest): RedirectResponse
     {
-        $listing = $this->ownListing($request);
-        abort_unless($request->user()->can('update', $listing), 403);
+        $objListing = $this->ownListing($objRequest);
+        abort_unless($objRequest->user()->can('update', $objListing), 403);
 
-        $data = $this->validateDetails($request, $listing);
+        $arrData = $this->validateDetails($objRequest, $objListing);
 
-        if (! $this->saveDetails($request, $listing, $data)) {
+        if (! $this->saveDetails($objRequest, $objListing, $arrData)) {
             return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
 
@@ -72,28 +72,28 @@ class ProfileController extends EstablishmentController
      * to-publish checklist, and only submits (DRAFT/UNPUBLISHED →
      * FOR_LGU_REVIEW) when everything required is present.
      */
-    public function submit(Request $request, ListingPublishWorkflow $objWorkflow): RedirectResponse
+    public function submit(Request $objRequest, ListingPublishWorkflow $objWorkflow): RedirectResponse
     {
-        $listing = $this->ownListing($request);
-        abort_unless($request->user()->can('update', $listing), 403);
-        abort_unless($request->user()->can('submitToLgu', $listing), 403);
+        $objListing = $this->ownListing($objRequest);
+        abort_unless($objRequest->user()->can('update', $objListing), 403);
+        abort_unless($objRequest->user()->can('submitToLgu', $objListing), 403);
 
-        $data = $this->validateDetails($request, $listing);
+        $arrData = $this->validateDetails($objRequest, $objListing);
 
-        if (! $this->saveDetails($request, $listing, $data)) {
+        if (! $this->saveDetails($objRequest, $objListing, $arrData)) {
             return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
 
-        $arrMissingFields = ListingReadinessChecklist::missingFields($listing->fresh());
+        $arrMissingFields = ListingReadinessChecklist::missingFields($objListing->fresh());
 
         if ($arrMissingFields !== []) {
             return back()->with('arrMissingFields', $arrMissingFields)->with('toast', 'A few things are missing before this can be submitted.')->with('toast_tone', 'danger');
         }
 
         try {
-            $objWorkflow->submitToLgu($request->user(), $listing);
-        } catch (\Throwable $e) {
-            Log::error('Failed to submit establishment profile to LGU.', ['exception' => $e, 'listing_id' => $listing->id]);
+            $objWorkflow->submitToLgu($objRequest->user(), $objListing);
+        } catch (\Throwable $objException) {
+            Log::error('Failed to submit establishment profile to LGU.', ['exception' => $objException, 'listing_id' => $objListing->lst_id]);
 
             return back()->with('toast', 'Something went wrong while submitting. Please try again.')->with('toast_tone', 'danger');
         }
@@ -110,18 +110,18 @@ class ProfileController extends EstablishmentController
      *
      * @return array{name: ?string, cat_id: ?int, type: ?string, address: ?string, description: ?string, phone: ?string, hours: ?string, email: ?string, website: ?string}
      */
-    private function validateDetails(Request $request, Listing $listing): array
+    private function validateDetails(Request $objRequest, Listing $objListing): array
     {
-        $objCategory = $request->filled('cat_id')
-            ? Category::query()->forEstablishments()->find($request->input('cat_id'))
-            : $listing->categoryRecord;
+        $objCategory = $objRequest->filled('cat_id')
+            ? Category::query()->forEstablishments()->find($objRequest->input('cat_id'))
+            : $objListing->categoryRecord;
 
-        return $request->validate([
+        return $objRequest->validate([
             'name' => ['nullable', 'string', 'max:255'],
             'cat_id' => [
                 'nullable',
                 'integer',
-                Rule::exists('tblcategories', 'cat_id')
+                Rule::exists('tbl_categories', 'cat_id')
                     ->where('cat_is_active', true)
                     ->whereNot('cat_name', Category::DESTINATION_CATEGORY_NAME),
             ],
@@ -136,42 +136,42 @@ class ProfileController extends EstablishmentController
     }
 
     /**
-     * @param  array<string, mixed>  $data
+     * @param  array<string, mixed>  $arrData
      */
-    private function saveDetails(Request $request, Listing $listing, array $data): bool
+    private function saveDetails(Request $objRequest, Listing $objListing, array $arrData): bool
     {
-        $before = $listing->getOriginal();
-        $objCategory = isset($data['cat_id']) ? Category::query()->find($data['cat_id']) : null;
+        $arrBefore = $objListing->getOriginal();
+        $objCategory = isset($arrData['cat_id']) ? Category::query()->find($arrData['cat_id']) : null;
 
         try {
-            $listing->update([
-                'name' => $data['name'] ?? $listing->name,
-                // cat_id and the legacy `category` slug always change together.
-                'cat_id' => $objCategory?->cat_id ?? $listing->cat_id,
-                'category' => $objCategory?->legacySlug() ?? $listing->category,
-                'type' => $data['type'] ?? $listing->type,
-                'barangay' => $data['address'] ?? $listing->barangay,
-                'description' => $data['description'] ?? null,
-                'contact_phone' => $data['phone'] ?? null,
-                'hours' => $data['hours'] ?? null,
-                'email' => $data['email'] ?? null,
-                'website' => $data['website'] ?? null,
+            $objListing->update([
+                'lst_name' => $arrData['name'] ?? $objListing->lst_name,
+                // cat_id and the legacy `lst_category` slug always change together.
+                'cat_id' => $objCategory?->cat_id ?? $objListing->cat_id,
+                'lst_category' => $objCategory?->legacySlug() ?? $objListing->lst_category,
+                'lst_type' => $arrData['type'] ?? $objListing->lst_type,
+                'lst_barangay' => $arrData['address'] ?? $objListing->lst_barangay,
+                'lst_description' => $arrData['description'] ?? null,
+                'lst_contact_phone' => $arrData['phone'] ?? null,
+                'lst_hours' => $arrData['hours'] ?? null,
+                'lst_email' => $arrData['email'] ?? null,
+                'lst_website' => $arrData['website'] ?? null,
             ]);
 
-            // The account's organization_name is a display label only (the
-            // join to $listing is via establishment_id, not this string) —
+            // The account's usr_organization_name is a display label only (the
+            // join to $objListing is via lst_id, not this string) —
             // still kept in sync so EstablishmentMockData's name-keyed
             // lookups (arrivals/feedback reads) don't go stale.
-            if ($listing->name !== $request->user()->organization_name) {
-                $request->user()->update(['organization_name' => $listing->name]);
+            if ($objListing->lst_name !== $objRequest->user()->usr_organization_name) {
+                $objRequest->user()->update(['usr_organization_name' => $objListing->lst_name]);
             }
-        } catch (\Throwable $e) {
-            Log::error('Failed to save establishment profile.', ['exception' => $e, 'listing_id' => $listing->id]);
+        } catch (\Throwable $objException) {
+            Log::error('Failed to save establishment profile.', ['exception' => $objException, 'listing_id' => $objListing->lst_id]);
 
             return false;
         }
 
-        OperationLogger::updated($request->user(), 'establishment', $listing->id, $listing->municipality_id, $listing->id, OperationLogger::diff($before, $listing));
+        OperationLogger::updated($objRequest->user(), 'establishment', $objListing->lst_id, $objListing->mun_id, $objListing->lst_id, OperationLogger::diff($arrBefore, $objListing));
 
         return true;
     }
@@ -180,35 +180,35 @@ class ProfileController extends EstablishmentController
      * Read-only once the package leaves the establishment's hands — only
      * DRAFT/UNPUBLISHED are editable (matches ListingPolicy::update()).
      */
-    private function isReadOnly(Listing $listing): bool
+    private function isReadOnly(Listing $objListing): bool
     {
-        return ! in_array($listing->status, ['DRAFT', 'UNPUBLISHED'], true);
+        return ! in_array($objListing->lst_status, ['DRAFT', 'UNPUBLISHED'], true);
     }
 
-    private function statusLabel(Listing $listing): string
+    private function statusLabel(Listing $objListing): string
     {
-        if ($this->returnReason($listing) !== null) {
+        if ($this->returnReason($objListing) !== null) {
             return 'Returned';
         }
 
-        return match ($listing->status) {
+        return match ($objListing->lst_status) {
             'DRAFT', 'UNPUBLISHED' => 'Draft',
             'FOR_LGU_REVIEW' => 'Waiting for LGU Review',
             'FOR_PTO_REVIEW' => 'Waiting for PTO',
             // The PTO returned it to the LGU, which corrects and resubmits it.
             'FOR_CORRECTION' => 'With your LGU for correction',
             'PUBLISHED' => 'Live',
-            default => $listing->status,
+            default => $objListing->lst_status,
         };
     }
 
-    private function statusTone(Listing $listing): string
+    private function statusTone(Listing $objListing): string
     {
-        if ($this->returnReason($listing) !== null) {
+        if ($this->returnReason($objListing) !== null) {
             return 'warning';
         }
 
-        return match ($listing->status) {
+        return match ($objListing->lst_status) {
             'FOR_LGU_REVIEW', 'FOR_PTO_REVIEW' => 'info',
             'FOR_CORRECTION' => 'warning',
             'PUBLISHED' => 'success',
@@ -222,20 +222,20 @@ class ProfileController extends EstablishmentController
      * recent relevant transition matters: a later submit/publish means the
      * listing has moved on since the return and the reason is stale.
      */
-    private function returnReason(Listing $listing): ?string
+    private function returnReason(Listing $objListing): ?string
     {
-        if (! in_array($listing->status, ['DRAFT', 'UNPUBLISHED'], true)) {
+        if (! in_array($objListing->lst_status, ['DRAFT', 'UNPUBLISHED'], true)) {
             return null;
         }
 
         $objLastTransition = OperationLog::query()
-            ->where('entity_type', 'establishment')
-            ->where('entity_id', $listing->id)
-            ->whereIn('action', ['submit', 'return', 'publish', 'unpublish'])
-            ->latest('id')
+            ->where('opl_entity_type', 'establishment')
+            ->where('opl_entity_id', $objListing->lst_id)
+            ->whereIn('opl_action', ['submit', 'return', 'publish', 'unpublish'])
+            ->latest('opl_id')
             ->first();
 
-        return $objLastTransition?->action === 'return' ? $objLastTransition->reason : null;
+        return $objLastTransition?->opl_action === 'return' ? $objLastTransition->opl_reason : null;
     }
 
     /**
@@ -246,37 +246,37 @@ class ProfileController extends EstablishmentController
      * registrations (Listing::isAcceptingRegistrations()) — otherwise the
      * page explains why instead of offering a code that would not work.
      */
-    public function qr(Request $request, QrCodeService $qrCodeService): View
+    public function qr(Request $objRequest, QrCodeService $qrCodeService): View
     {
-        abort_if($request->user()->establishment_id === null, 403, 'Your account is not linked to an establishment yet.');
-        $listing = $request->user()->establishment()->firstOrFail();
-        $blnIsAcceptingRegistrations = $listing->isAcceptingRegistrations();
+        abort_if($objRequest->user()->lst_id === null, 403, 'Your account is not linked to an establishment yet.');
+        $objListing = $objRequest->user()->establishment()->firstOrFail();
+        $blnIsAcceptingRegistrations = $objListing->isAcceptingRegistrations();
 
-        return $this->renderEstablishment($request, 'establishment.qr', 'establishment.qr', 'QR Code', [
-            'establishmentName' => $listing->name,
+        return $this->renderEstablishment($objRequest, 'establishment.qr', 'establishment.qr', 'QR Code', [
+            'establishmentName' => $objListing->lst_name,
             'isAcceptingRegistrations' => $blnIsAcceptingRegistrations,
-            'checkinUrl' => $blnIsAcceptingRegistrations ? $qrCodeService->buildCheckinUrl($listing) : null,
-            'qrSvg' => $blnIsAcceptingRegistrations ? $qrCodeService->generateSvg($listing) : null,
+            'checkinUrl' => $blnIsAcceptingRegistrations ? $qrCodeService->buildCheckinUrl($objListing) : null,
+            'qrSvg' => $blnIsAcceptingRegistrations ? $qrCodeService->generateSvg($objListing) : null,
             // The on/off switch only matters while everything else about the
             // listing allows QR check-in (eligible category, Online iTOUR, active account).
-            'isQrSwitchedOff' => $listing->isQrEnabled() && $listing->lst_is_qr_enabled === false,
-            'canManageQr' => $request->user()->can('manageQr', $listing),
-            'qrStatusUrl' => route('qrCodes.updateStatus', $listing),
-            'qrDownloadUrl' => route('qrCodes.download', $listing),
-            'qrPosterUrl' => route('qrCodes.poster', $listing),
+            'isQrSwitchedOff' => $objListing->isQrEnabled() && $objListing->lst_is_qr_enabled === false,
+            'canManageQr' => $objRequest->user()->can('manageQr', $objListing),
+            'qrStatusUrl' => route('qrCodes.updateStatus', $objListing),
+            'qrDownloadUrl' => route('qrCodes.download', $objListing),
+            'qrPosterUrl' => route('qrCodes.poster', $objListing),
         ]);
     }
 
     /**
-     * Resolved via the account's establishment_id FK — not by matching
-     * Listing.name against organization_name, which is a mutable display
+     * Resolved via the account's lst_id FK — not by matching
+     * Listing.name against usr_organization_name, which is a mutable display
      * string an account could otherwise rename to collide with a different
      * establishment's listing.
      */
-    private function ownListing(Request $request): Listing
+    private function ownListing(Request $objRequest): Listing
     {
-        abort_if($request->user()->establishment_id === null, 403, 'Your account is not linked to an establishment yet.');
+        abort_if($objRequest->user()->lst_id === null, 403, 'Your account is not linked to an establishment yet.');
 
-        return $request->user()->establishment()->firstOrFail();
+        return $objRequest->user()->establishment()->firstOrFail();
     }
 }

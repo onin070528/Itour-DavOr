@@ -1,4 +1,11 @@
 {{--
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: Blade component — establishment / status banner.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+--}}
+{{--
     System     : iTOUR - Integrated Tourism Information and Monitoring System
     Purpose    : Status banner for the merged Establishment Profile page — first thing on
                  the page, per the Profile/Photos merge spec.

@@ -1,10 +1,11 @@
 <?php
 
-/*
- * System     : iTOUR - Integrated Tourism Information and Monitoring System
- * Purpose    : Create tblhotlines, the province-wide emergency hotline directory.
- * Programmer : <name(s)>
- * Copyright  : 2026 University of Mindanao. All rights reserved.
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Create tbl_hotlines, the province-wide emergency hotline directory.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
  */
 
 use Illuminate\Database\Migrations\Migration;

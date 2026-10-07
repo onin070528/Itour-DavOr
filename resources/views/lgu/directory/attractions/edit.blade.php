@@ -6,7 +6,7 @@
 --}}
 <x-layouts.dashboard :user="$user" :nav-sections="$navSections" :page-title="$pageTitle" account-heading="System" :settings-href="route('lgu.settings')">
     <x-dashboard.page-header
-        :title="'Edit '.$listing->name"
+        :title="'Edit '.$listing->lst_name"
         description="Update this attraction's details and photos."
     >
         <x-slot:actions>

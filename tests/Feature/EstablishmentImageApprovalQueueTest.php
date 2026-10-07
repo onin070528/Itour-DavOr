@@ -1,5 +1,13 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Tests — establishment image approval queue.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 use App\Enums\ImageSourceRole;
 use App\Enums\ImageStatus;
 use App\Enums\UserRole;
@@ -18,10 +26,10 @@ use Illuminate\Validation\ValidationException;
 function secondEstablishmentImageFixture(EstablishmentImage $image): EstablishmentImage
 {
     return EstablishmentImage::query()->create([
-        'listing_id' => $image->listing_id,
-        'img_path' => 'establishment-images/'.$image->listing_id.'/second.jpg',
-        'img_thumbnail_path' => 'establishment-images/'.$image->listing_id.'/second_thumb.jpg',
-        'img_alt_text' => $image->listing->name,
+        'lst_id' => $image->lst_id,
+        'img_path' => 'establishment-images/'.$image->lst_id.'/second.jpg',
+        'img_thumbnail_path' => 'establishment-images/'.$image->lst_id.'/second_thumb.jpg',
+        'img_alt_text' => $image->listing->lst_name,
         'img_source_role' => ImageSourceRole::Establishment,
         'img_status' => ImageStatus::Pending,
         'img_is_cover' => false,
@@ -33,16 +41,16 @@ function secondEstablishmentImageFixture(EstablishmentImage $image): Establishme
 }
 
 test('two photos from one establishment appear on one card', function () {
-    $mati = Municipality::query()->firstOrCreate(['code' => 'MATI'], ['name' => 'City of Mati']);
-    $image = establishmentImageFixture(['listing_overrides' => ['municipality' => 'City of Mati']]);
-    $image->listing->update(['municipality_id' => $mati->id]);
+    $mati = Municipality::query()->firstOrCreate(['mun_code' => 'MATI'], ['mun_name' => 'City of Mati']);
+    $image = establishmentImageFixture(['listing_overrides' => ['lst_municipality' => 'City of Mati']]);
+    $image->listing->update(['mun_id' => $mati->mun_id]);
     $second = secondEstablishmentImageFixture($image);
-    $lgu = User::factory()->create(['role' => UserRole::Lgu, 'municipality_id' => $mati->id]);
+    $lgu = User::factory()->create(['usr_role' => UserRole::Lgu, 'mun_id' => $mati->mun_id]);
 
     $response = test()->actingAs($lgu)->get(route('lgu.images.index', ['tab' => 'approval']));
 
     $response->assertOk();
-    $response->assertSee($image->listing->name);
+    $response->assertSee($image->listing->lst_name);
     // One card heading line, not one per photo.
     expect(substr_count($response->getContent(), 'Uploaded by'))->toBe(1);
     $response->assertSee('2 photos waiting');
@@ -50,11 +58,11 @@ test('two photos from one establishment appear on one card', function () {
 
 test('Approve all publishes both photos and sends one notification', function () {
     Notification::fake();
-    $mati = Municipality::query()->firstOrCreate(['code' => 'MATI'], ['name' => 'City of Mati']);
-    $image = establishmentImageFixture(['listing_overrides' => ['municipality' => 'City of Mati']]);
-    $image->listing->update(['municipality_id' => $mati->id]);
+    $mati = Municipality::query()->firstOrCreate(['mun_code' => 'MATI'], ['mun_name' => 'City of Mati']);
+    $image = establishmentImageFixture(['listing_overrides' => ['lst_municipality' => 'City of Mati']]);
+    $image->listing->update(['mun_id' => $mati->mun_id]);
     $second = secondEstablishmentImageFixture($image);
-    $lgu = User::factory()->create(['role' => UserRole::Lgu, 'municipality_id' => $mati->id]);
+    $lgu = User::factory()->create(['usr_role' => UserRole::Lgu, 'mun_id' => $mati->mun_id]);
 
     $response = test()->actingAs($lgu)->patch(route('lgu.images.approveBatch', $image->listing), [
         'image_ids' => [$image->img_id, $second->img_id],
@@ -69,11 +77,11 @@ test('Approve all publishes both photos and sends one notification', function ()
 
 test('Return all rejects both photos with the same note', function () {
     Notification::fake();
-    $mati = Municipality::query()->firstOrCreate(['code' => 'MATI'], ['name' => 'City of Mati']);
-    $image = establishmentImageFixture(['listing_overrides' => ['municipality' => 'City of Mati']]);
-    $image->listing->update(['municipality_id' => $mati->id]);
+    $mati = Municipality::query()->firstOrCreate(['mun_code' => 'MATI'], ['mun_name' => 'City of Mati']);
+    $image = establishmentImageFixture(['listing_overrides' => ['lst_municipality' => 'City of Mati']]);
+    $image->listing->update(['mun_id' => $mati->mun_id]);
     $second = secondEstablishmentImageFixture($image);
-    $lgu = User::factory()->create(['role' => UserRole::Lgu, 'municipality_id' => $mati->id]);
+    $lgu = User::factory()->create(['usr_role' => UserRole::Lgu, 'mun_id' => $mati->mun_id]);
 
     $response = test()->actingAs($lgu)->patch(route('lgu.images.returnBatch', $image->listing), [
         'image_ids' => [$image->img_id, $second->img_id],
@@ -89,11 +97,11 @@ test('Return all rejects both photos with the same note', function () {
 });
 
 test('Return one, then Approve all: one returned, the rest published', function () {
-    $mati = Municipality::query()->firstOrCreate(['code' => 'MATI'], ['name' => 'City of Mati']);
-    $image = establishmentImageFixture(['listing_overrides' => ['municipality' => 'City of Mati']]);
-    $image->listing->update(['municipality_id' => $mati->id]);
+    $mati = Municipality::query()->firstOrCreate(['mun_code' => 'MATI'], ['mun_name' => 'City of Mati']);
+    $image = establishmentImageFixture(['listing_overrides' => ['lst_municipality' => 'City of Mati']]);
+    $image->listing->update(['mun_id' => $mati->mun_id]);
     $second = secondEstablishmentImageFixture($image);
-    $lgu = User::factory()->create(['role' => UserRole::Lgu, 'municipality_id' => $mati->id]);
+    $lgu = User::factory()->create(['usr_role' => UserRole::Lgu, 'mun_id' => $mati->mun_id]);
 
     test()->actingAs($lgu)->patch(route('lgu.images.returnBatch', $image->listing), [
         'image_ids' => [$image->img_id],
@@ -112,17 +120,17 @@ test('Return one, then Approve all: one returned, the rest published', function 
 });
 
 test('an LGU cannot act on its own uploads routed to PTO instead', function () {
-    $mati = Municipality::query()->firstOrCreate(['code' => 'MATI'], ['name' => 'City of Mati']);
-    $listing = establishmentImageListingFixture(['municipality' => 'City of Mati']);
-    $listing->update(['municipality_id' => $mati->id]);
-    $lgu = User::factory()->create(['role' => UserRole::Lgu, 'municipality_id' => $mati->id]);
+    $mati = Municipality::query()->firstOrCreate(['mun_code' => 'MATI'], ['mun_name' => 'City of Mati']);
+    $listing = establishmentImageListingFixture(['lst_municipality' => 'City of Mati']);
+    $listing->update(['mun_id' => $mati->mun_id]);
+    $lgu = User::factory()->create(['usr_role' => UserRole::Lgu, 'mun_id' => $mati->mun_id]);
 
     $ownUpload = EstablishmentImage::query()->create([
-        'listing_id' => $listing->id,
-        'img_path' => 'x.jpg', 'img_thumbnail_path' => 'x_thumb.jpg', 'img_alt_text' => $listing->name,
+        'lst_id' => $listing->lst_id,
+        'img_path' => 'x.jpg', 'img_thumbnail_path' => 'x_thumb.jpg', 'img_alt_text' => $listing->lst_name,
         'img_source_role' => ImageSourceRole::Lgu, 'img_status' => ImageStatus::Pending,
         'img_is_cover' => false, 'img_sort_order' => 1, 'img_hash' => hash('sha256', uniqid()),
-        'img_uploaded_by' => $lgu->id, 'img_has_ownership_declared' => true,
+        'img_uploaded_by' => $lgu->usr_id, 'img_has_ownership_declared' => true,
     ]);
 
     // Not visible as a card on the LGU's own Photos page's approval tab —
@@ -143,11 +151,11 @@ test('an LGU cannot act on its own uploads routed to PTO instead', function () {
 });
 
 test('an LGU cannot act on another municipality\'s queue', function () {
-    $mati = Municipality::query()->firstOrCreate(['code' => 'MATI'], ['name' => 'City of Mati']);
-    $baganga = Municipality::query()->firstOrCreate(['code' => 'BAG'], ['name' => 'Baganga']);
-    $image = establishmentImageFixture(['listing_overrides' => ['municipality' => 'City of Mati']]);
-    $image->listing->update(['municipality_id' => $mati->id]);
-    $otherLgu = User::factory()->create(['role' => UserRole::Lgu, 'municipality_id' => $baganga->id]);
+    $mati = Municipality::query()->firstOrCreate(['mun_code' => 'MATI'], ['mun_name' => 'City of Mati']);
+    $baganga = Municipality::query()->firstOrCreate(['mun_code' => 'BAG'], ['mun_name' => 'Baganga']);
+    $image = establishmentImageFixture(['listing_overrides' => ['lst_municipality' => 'City of Mati']]);
+    $image->listing->update(['mun_id' => $mati->mun_id]);
+    $otherLgu = User::factory()->create(['usr_role' => UserRole::Lgu, 'mun_id' => $baganga->mun_id]);
 
     test()->actingAs($otherLgu)->patch(route('lgu.images.approveBatch', $image->listing), [
         'image_ids' => [$image->img_id],
@@ -175,11 +183,11 @@ test('an establishment cannot approve anything', function () {
 });
 
 test('a partially failing batch changes nothing', function () {
-    $mati = Municipality::query()->firstOrCreate(['code' => 'MATI'], ['name' => 'City of Mati']);
-    $image = establishmentImageFixture(['listing_overrides' => ['municipality' => 'City of Mati']]);
-    $image->listing->update(['municipality_id' => $mati->id]);
+    $mati = Municipality::query()->firstOrCreate(['mun_code' => 'MATI'], ['mun_name' => 'City of Mati']);
+    $image = establishmentImageFixture(['listing_overrides' => ['lst_municipality' => 'City of Mati']]);
+    $image->listing->update(['mun_id' => $mati->mun_id]);
     $second = secondEstablishmentImageFixture($image);
-    $lgu = User::factory()->create(['role' => UserRole::Lgu, 'municipality_id' => $mati->id]);
+    $lgu = User::factory()->create(['usr_role' => UserRole::Lgu, 'mun_id' => $mati->mun_id]);
 
     // Forces the second image's own update to blow up mid-batch — a
     // legitimate, scoped way to prove the whole transaction rolls back,
@@ -204,11 +212,11 @@ test('a partially failing batch changes nothing', function () {
 });
 
 test('a photo already decided elsewhere is skipped with a message', function () {
-    $mati = Municipality::query()->firstOrCreate(['code' => 'MATI'], ['name' => 'City of Mati']);
-    $image = establishmentImageFixture(['listing_overrides' => ['municipality' => 'City of Mati']]);
-    $image->listing->update(['municipality_id' => $mati->id]);
+    $mati = Municipality::query()->firstOrCreate(['mun_code' => 'MATI'], ['mun_name' => 'City of Mati']);
+    $image = establishmentImageFixture(['listing_overrides' => ['lst_municipality' => 'City of Mati']]);
+    $image->listing->update(['mun_id' => $mati->mun_id]);
     $second = secondEstablishmentImageFixture($image);
-    $lgu = User::factory()->create(['role' => UserRole::Lgu, 'municipality_id' => $mati->id]);
+    $lgu = User::factory()->create(['usr_role' => UserRole::Lgu, 'mun_id' => $mati->mun_id]);
 
     // Someone else already approved the second image before this request
     // is processed.
@@ -223,14 +231,14 @@ test('a photo already decided elsewhere is skipped with a message', function () 
 });
 
 test('a replacement approved in a batch swaps atomically with exactly one cover', function () {
-    $mati = Municipality::query()->firstOrCreate(['code' => 'MATI'], ['name' => 'City of Mati']);
-    $image = establishmentImageFixture(['listing_overrides' => ['municipality' => 'City of Mati'], 'img_status' => ImageStatus::Published, 'img_is_cover' => true]);
-    $image->listing->update(['municipality_id' => $mati->id]);
-    $lgu = User::factory()->create(['role' => UserRole::Lgu, 'municipality_id' => $mati->id]);
+    $mati = Municipality::query()->firstOrCreate(['mun_code' => 'MATI'], ['mun_name' => 'City of Mati']);
+    $image = establishmentImageFixture(['listing_overrides' => ['lst_municipality' => 'City of Mati'], 'img_status' => ImageStatus::Published, 'img_is_cover' => true]);
+    $image->listing->update(['mun_id' => $mati->mun_id]);
+    $lgu = User::factory()->create(['usr_role' => UserRole::Lgu, 'mun_id' => $mati->mun_id]);
 
     $replacement = EstablishmentImage::query()->create([
-        'listing_id' => $image->listing_id,
-        'img_path' => 'new.jpg', 'img_thumbnail_path' => 'new_thumb.jpg', 'img_alt_text' => $image->listing->name,
+        'lst_id' => $image->lst_id,
+        'img_path' => 'new.jpg', 'img_thumbnail_path' => 'new_thumb.jpg', 'img_alt_text' => $image->listing->lst_name,
         'img_source_role' => ImageSourceRole::Establishment, 'img_status' => ImageStatus::Pending,
         'img_is_cover' => false, 'img_sort_order' => 99, 'img_hash' => hash('sha256', 'replacement'),
         'img_uploaded_by' => $image->img_uploaded_by, 'img_has_ownership_declared' => true,
@@ -248,7 +256,7 @@ test('a replacement approved in a batch swaps atomically with exactly one cover'
     expect($image->fresh()->img_is_cover)->toBeFalse();
 
     $intPublishedCovers = EstablishmentImage::query()
-        ->where('listing_id', $image->listing_id)
+        ->where('lst_id', $image->lst_id)
         ->where('img_status', 'PUBLISHED')
         ->where('img_is_cover', true)
         ->count();
@@ -256,15 +264,15 @@ test('a replacement approved in a batch swaps atomically with exactly one cover'
 });
 
 test('the badge counts establishments, not images', function () {
-    $mati = Municipality::query()->firstOrCreate(['code' => 'MATI'], ['name' => 'City of Mati']);
-    $image = establishmentImageFixture(['listing_overrides' => ['municipality' => 'City of Mati']]);
-    $image->listing->update(['municipality_id' => $mati->id]);
+    $mati = Municipality::query()->firstOrCreate(['mun_code' => 'MATI'], ['mun_name' => 'City of Mati']);
+    $image = establishmentImageFixture(['listing_overrides' => ['lst_municipality' => 'City of Mati']]);
+    $image->listing->update(['mun_id' => $mati->mun_id]);
     secondEstablishmentImageFixture($image);
 
-    $otherListingImage = establishmentImageFixture(['listing_overrides' => ['municipality' => 'City of Mati', 'name' => 'Another Establishment']]);
-    $otherListingImage->listing->update(['municipality_id' => $mati->id]);
+    $otherListingImage = establishmentImageFixture(['listing_overrides' => ['lst_municipality' => 'City of Mati', 'name' => 'Another Establishment']]);
+    $otherListingImage->listing->update(['mun_id' => $mati->mun_id]);
 
-    $lgu = User::factory()->create(['role' => UserRole::Lgu, 'municipality_id' => $mati->id]);
+    $lgu = User::factory()->create(['usr_role' => UserRole::Lgu, 'mun_id' => $mati->mun_id]);
 
     // 3 pending photos across 2 establishments — the badge shows 2. Uses
     // the Photos page itself (not the dashboard) so this test doesn't also

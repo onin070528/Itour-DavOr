@@ -1,5 +1,13 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Tests — establishment scoping.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 use App\Enums\ImageSourceRole;
 use App\Enums\ImageStatus;
 use App\Enums\UserRole;
@@ -28,37 +36,37 @@ function qrEnabledCategoryFixture(): Category
 function makeEstablishmentListing(string $municipalityName, string $municipalityCode, string $name, array $overrides = []): Listing
 {
     $municipality = Municipality::query()->firstOrCreate(
-        ['code' => $municipalityCode],
-        ['name' => $municipalityName]
+        ['mun_code' => $municipalityCode],
+        ['mun_name' => $municipalityName]
     );
 
     return Listing::query()->create(array_merge([
-        'slug' => Str::slug($name.'-'.Str::random(6)),
-        'name' => $name,
-        'category' => 'accommodation',
+        'lst_slug' => Str::slug($name.'-'.Str::random(6)),
+        'lst_name' => $name,
+        'lst_category' => 'accommodation',
         'cat_id' => qrEnabledCategoryFixture()->cat_id,
-        'municipality' => $municipality->name,
-        'municipality_id' => $municipality->id,
-        'barangay' => 'Poblacion',
-        'status' => 'PUBLISHED',
+        'lst_municipality' => $municipality->mun_name,
+        'mun_id' => $municipality->mun_id,
+        'lst_barangay' => 'Poblacion',
+        'lst_status' => 'PUBLISHED',
     ], $overrides));
 }
 
 function makeEstablishmentUser(Listing $listing): User
 {
     return User::factory()->create([
-        'role' => UserRole::Establishment,
-        'organization_name' => $listing->name,
-        'organization_subtitle' => "{$listing->barangay}, {$listing->municipality}",
-        'municipality_id' => $listing->municipality_id,
-        'establishment_id' => $listing->id,
+        'usr_role' => UserRole::Establishment,
+        'usr_organization_name' => $listing->lst_name,
+        'usr_organization_subtitle' => "{$listing->lst_barangay}, {$listing->lst_municipality}",
+        'mun_id' => $listing->mun_id,
+        'lst_id' => $listing->lst_id,
     ]);
 }
 
 test('an establishment user can update only its own listing', function () {
     // DRAFT: establishment self-edits are only allowed while the package
     // is editable (see App\Policies\ListingPolicy, the self-review merge).
-    $own = makeEstablishmentListing('City of Mati', 'MATI', 'My Own Inn', ['status' => 'DRAFT']);
+    $own = makeEstablishmentListing('City of Mati', 'MATI', 'My Own Inn', ['lst_status' => 'DRAFT']);
     $user = makeEstablishmentUser($own);
 
     test()->actingAs($user)->put(route('establishment.profile.update'), [
@@ -69,7 +77,7 @@ test('an establishment user can update only its own listing', function () {
         'hours' => '24/7',
     ])->assertRedirect();
 
-    expect($own->fresh()->name)->toBe('My Own Inn — Renamed');
+    expect($own->fresh()->lst_name)->toBe('My Own Inn — Renamed');
 });
 
 test('an establishment user cannot touch another establishment\'s photo via a guessed image id', function () {
@@ -77,16 +85,16 @@ test('an establishment user cannot touch another establishment\'s photo via a gu
     $other = makeEstablishmentListing('City of Mati', 'MATI', 'A Different Inn');
     $otherUser = makeEstablishmentUser($other);
     $otherImage = EstablishmentImage::query()->create([
-        'listing_id' => $other->id,
+        'lst_id' => $other->lst_id,
         'img_path' => 'fixture.jpg',
         'img_thumbnail_path' => 'fixture_thumb.jpg',
-        'img_alt_text' => $other->name,
+        'img_alt_text' => $other->lst_name,
         'img_source_role' => ImageSourceRole::Establishment,
         'img_status' => ImageStatus::Published,
         'img_is_cover' => true,
         'img_sort_order' => 0,
         'img_hash' => hash('sha256', 'guessed-id-fixture'),
-        'img_uploaded_by' => $otherUser->id,
+        'img_uploaded_by' => $otherUser->usr_id,
         'img_has_ownership_declared' => true,
     ]);
 
@@ -121,16 +129,16 @@ test('an establishment user in one municipality cannot reach another establishme
         'hours' => '24/7',
     ]);
 
-    expect($baganga->fresh()->name)->toBe('Baganga Inn');
+    expect($baganga->fresh()->lst_name)->toBe('Baganga Inn');
 });
 
 test('an establishment account with no linked listing is blocked from profile actions, not crashed', function () {
     $user = User::factory()->create([
-        'role' => UserRole::Establishment,
-        'organization_name' => 'Unlinked Establishment',
-        'organization_subtitle' => 'Nowhere',
-        'municipality_id' => null,
-        'establishment_id' => null,
+        'usr_role' => UserRole::Establishment,
+        'usr_organization_name' => 'Unlinked Establishment',
+        'usr_organization_subtitle' => 'Nowhere',
+        'mun_id' => null,
+        'lst_id' => null,
     ]);
 
     test()->actingAs($user)->put(route('establishment.profile.update'), [

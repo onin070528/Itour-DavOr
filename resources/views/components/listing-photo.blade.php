@@ -1,3 +1,10 @@
+{{--
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: Listing photo with a category placeholder when no image exists.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+--}}
 @props(['listing'])
 
 {{-- Shared cover-photo slot for every public card (Explore, landing preview

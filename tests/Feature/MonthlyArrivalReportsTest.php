@@ -1,5 +1,13 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Tests — monthly arrival reports.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 use App\Enums\MonthlyReportStatus;
 use App\Enums\ReportSubmissionSource;
 use App\Enums\UserRole;
@@ -23,42 +31,42 @@ test('an establishment can digitally submit a month, aggregating its recorded ar
     $user = makeEstablishmentUser($listing);
 
     $listing->arrivals()->create([
-        'source' => 'staff', 'date' => '2026-09-05', 'visit_type' => 'Daytour',
-        'party_male' => 2, 'party_female' => 1, 'party_adults' => 3, 'party_children' => 0,
-        'party_seniors' => 0, 'party_local' => 3, 'party_foreign' => 0, 'party_size' => 3, 'status' => 'Recorded',
+        'arr_source' => 'staff', 'arr_date' => '2026-09-05', 'arr_visit_type' => 'Daytour',
+        'arr_party_male' => 2, 'arr_party_female' => 1, 'arr_party_adults' => 3, 'arr_party_children' => 0,
+        'arr_party_seniors' => 0, 'arr_party_local' => 3, 'arr_party_foreign' => 0, 'arr_party_size' => 3, 'arr_status' => 'Recorded',
     ]);
     $listing->arrivals()->create([
-        'source' => 'self_checkin', 'date' => '2026-09-20', 'visit_type' => 'Overnight',
-        'party_male' => 1, 'party_female' => 1, 'party_adults' => 1, 'party_children' => 1,
-        'party_seniors' => 0, 'party_local' => 1, 'party_foreign' => 1, 'party_size' => 2, 'status' => 'Recorded',
+        'arr_source' => 'self_checkin', 'arr_date' => '2026-09-20', 'arr_visit_type' => 'Overnight',
+        'arr_party_male' => 1, 'arr_party_female' => 1, 'arr_party_adults' => 1, 'arr_party_children' => 1,
+        'arr_party_seniors' => 0, 'arr_party_local' => 1, 'arr_party_foreign' => 1, 'arr_party_size' => 2, 'arr_status' => 'Recorded',
     ]);
 
     test()->actingAs($user)
         ->post(route('establishment.arrivals.monthly.draft'), ['period_month' => '2026-09'])
         ->assertRedirect();
 
-    $report = MonthlyArrivalReport::query()->where('listing_id', $listing->id)->sole();
+    $report = MonthlyArrivalReport::query()->where('lst_id', $listing->lst_id)->sole();
 
-    expect($report->submission_source)->toBe(ReportSubmissionSource::Digital);
-    expect($report->status)->toBe(MonthlyReportStatus::Draft);
-    expect($report->party_male)->toBe(3);
-    expect($report->party_female)->toBe(2);
-    expect($report->total_visitors)->toBe(5);
-    expect($report->submitted_by)->toBeNull();
-    expect($report->submitted_at)->toBeNull();
-    expect($listing->arrivals()->whereNull('monthly_arrival_report_id')->count())->toBe(0);
-    expect($listing->arrivals()->where('monthly_arrival_report_id', $report->id)->count())->toBe(2);
+    expect($report->mar_submission_source)->toBe(ReportSubmissionSource::Digital);
+    expect($report->mar_status)->toBe(MonthlyReportStatus::Draft);
+    expect($report->mar_party_male)->toBe(3);
+    expect($report->mar_party_female)->toBe(2);
+    expect($report->mar_total_visitors)->toBe(5);
+    expect($report->mar_submitted_by)->toBeNull();
+    expect($report->mar_submitted_at)->toBeNull();
+    expect($listing->arrivals()->whereNull('mar_id')->count())->toBe(0);
+    expect($listing->arrivals()->where('mar_id', $report->mar_id)->count())->toBe(2);
 
     test()->actingAs($user)
         ->post(route('establishment.arrivals.monthly.submit'), ['period_month' => '2026-09'])
         ->assertRedirect(route('establishment.arrivals.monthly', ['year' => 2026, 'tab' => 'records']));
 
     $report->refresh();
-    expect($report->status)->toBe(MonthlyReportStatus::Submitted);
-    expect($report->submitted_by)->toBe($user->id);
-    expect($report->submitted_at)->not->toBeNull();
-    expect($report->total_visitors)->toBe(5);
-    expect(OperationLog::where('entity_type', 'monthly_arrival_report')->where('entity_id', $report->id)->where('action', 'submit')->value('establishment_id'))->toBe($listing->id);
+    expect($report->mar_status)->toBe(MonthlyReportStatus::Submitted);
+    expect($report->mar_submitted_by)->toBe($user->usr_id);
+    expect($report->mar_submitted_at)->not->toBeNull();
+    expect($report->mar_total_visitors)->toBe(5);
+    expect(OperationLog::where('opl_entity_type', 'monthly_arrival_report')->where('opl_entity_id', $report->mar_id)->where('opl_action', 'submit')->value('lst_id'))->toBe($listing->lst_id);
 });
 
 test('a month with no recorded arrivals still submits as a zero-arrival report', function () {
@@ -68,9 +76,9 @@ test('a month with no recorded arrivals still submits as a zero-arrival report',
     test()->actingAs($user)->post(route('establishment.arrivals.monthly.draft'), ['period_month' => '2026-09'])->assertRedirect();
     test()->actingAs($user)->post(route('establishment.arrivals.monthly.submit'), ['period_month' => '2026-09'])->assertRedirect();
 
-    $report = MonthlyArrivalReport::query()->where('listing_id', $listing->id)->sole();
-    expect($report->total_visitors)->toBe(0);
-    expect($report->status)->toBe(MonthlyReportStatus::Submitted);
+    $report = MonthlyArrivalReport::query()->where('lst_id', $listing->lst_id)->sole();
+    expect($report->mar_total_visitors)->toBe(0);
+    expect($report->mar_status)->toBe(MonthlyReportStatus::Submitted);
 });
 
 test('an establishment cannot submit the same month twice', function () {
@@ -79,14 +87,14 @@ test('an establishment cannot submit the same month twice', function () {
 
     test()->actingAs($user)->post(route('establishment.arrivals.monthly.draft'), ['period_month' => '2026-09'])->assertRedirect();
     test()->actingAs($user)->post(route('establishment.arrivals.monthly.submit'), ['period_month' => '2026-09'])->assertRedirect();
-    $submittedAt = MonthlyArrivalReport::query()->where('listing_id', $listing->id)->sole()->submitted_at;
+    $submittedAt = MonthlyArrivalReport::query()->where('lst_id', $listing->lst_id)->sole()->mar_submitted_at;
 
     test()->actingAs($user)->post(route('establishment.arrivals.monthly.submit'), ['period_month' => '2026-09'])->assertRedirect();
     test()->actingAs($user)->post(route('establishment.arrivals.monthly.draft'), ['period_month' => '2026-09'])->assertRedirect();
 
-    $report = MonthlyArrivalReport::query()->where('listing_id', $listing->id)->sole();
-    expect($report->status)->toBe(MonthlyReportStatus::Submitted);
-    expect($report->submitted_at->equalTo($submittedAt))->toBeTrue();
+    $report = MonthlyArrivalReport::query()->where('lst_id', $listing->lst_id)->sole();
+    expect($report->mar_status)->toBe(MonthlyReportStatus::Submitted);
+    expect($report->mar_submitted_at->equalTo($submittedAt))->toBeTrue();
 });
 
 test('LGU can encode a manual/paper report for an establishment in its own municipality', function () {
@@ -101,20 +109,20 @@ test('LGU can encode a manual/paper report for an establishment in its own munic
     ])->assertRedirect();
 
     // Saved as a Draft first — nothing reaches the review queue yet.
-    $report = MonthlyArrivalReport::query()->where('listing_id', $listing->id)->sole();
-    expect($report->submission_source)->toBe(ReportSubmissionSource::ManualPaper);
-    expect($report->status)->toBe(MonthlyReportStatus::Draft);
-    expect($report->total_visitors)->toBe(230);
-    expect($report->submitted_by)->toBeNull();
-    expect($report->submitted_at)->toBeNull();
+    $report = MonthlyArrivalReport::query()->where('lst_id', $listing->lst_id)->sole();
+    expect($report->mar_submission_source)->toBe(ReportSubmissionSource::ManualPaper);
+    expect($report->mar_status)->toBe(MonthlyReportStatus::Draft);
+    expect($report->mar_total_visitors)->toBe(230);
+    expect($report->mar_submitted_by)->toBeNull();
+    expect($report->mar_submitted_at)->toBeNull();
 
     // Submitting puts it into the same review queue as a digital report,
     // recording the encoding LGU user and time.
     test()->actingAs($lgu)->patch(route('lgu.monthlyReports.submit', $report))->assertRedirect();
     $report->refresh();
-    expect($report->status)->toBe(MonthlyReportStatus::Submitted);
-    expect($report->submitted_by)->toBe($lgu->id);
-    expect($report->submitted_at)->not->toBeNull();
+    expect($report->mar_status)->toBe(MonthlyReportStatus::Submitted);
+    expect($report->mar_submitted_by)->toBe($lgu->usr_id);
+    expect($report->mar_submitted_at)->not->toBeNull();
     expect($listing->arrivals()->count())->toBe(0);
 });
 
@@ -137,15 +145,15 @@ test('LGU can verify a For Review report exactly once', function () {
     $establishmentUser = makeEstablishmentUser($listing);
 
     $report = MonthlyArrivalReport::query()->create([
-        'listing_id' => $listing->id, 'municipality_id' => $municipality->id,
-        'period_month' => '2026-09-01', 'submission_source' => ReportSubmissionSource::Digital,
-        'status' => MonthlyReportStatus::ForReview, 'total_visitors' => 10,
-        'submitted_by' => $establishmentUser->id, 'submitted_at' => now(),
+        'lst_id' => $listing->lst_id, 'mun_id' => $municipality->mun_id,
+        'mar_period_month' => '2026-09-01', 'mar_submission_source' => ReportSubmissionSource::Digital,
+        'mar_status' => MonthlyReportStatus::ForReview, 'mar_total_visitors' => 10,
+        'mar_submitted_by' => $establishmentUser->usr_id, 'mar_submitted_at' => now(),
     ]);
 
     test()->actingAs($lgu)->patch(route('lgu.monthlyReports.verify', $report))->assertRedirect();
-    expect($report->fresh()->status)->toBe(MonthlyReportStatus::Verified);
-    expect($report->fresh()->verified_by)->toBe($lgu->id);
+    expect($report->fresh()->mar_status)->toBe(MonthlyReportStatus::Verified);
+    expect($report->fresh()->mar_verified_by)->toBe($lgu->usr_id);
 
     test()->actingAs($lgu)->patch(route('lgu.monthlyReports.verify', $report))->assertForbidden();
 });
@@ -165,26 +173,26 @@ test('LGU index page shows Not Submitted for establishments with no report that 
 test('LGU consolidate only counts Verified reports and computes the total automatically', function () {
     $listingA = makeEstablishmentListing('Manay', 'MAN', 'ABC Resort');
     $municipality = $listingA->municipalityRecord;
-    $listingB = DB::table('listings')->insertGetId([
-        'slug' => 'xyz-hotel-'.Str::random(6), 'name' => 'XYZ Hotel', 'category' => 'accommodation',
-        'municipality' => $municipality->name, 'municipality_id' => $municipality->id,
-        'barangay' => 'Poblacion', 'status' => 'PUBLISHED', 'created_at' => now(), 'updated_at' => now(),
+    $listingB = DB::table('tbl_listings')->insertGetId([
+        'lst_slug' => 'xyz-hotel-'.Str::random(6), 'lst_name' => 'XYZ Hotel', 'lst_category' => 'accommodation',
+        'lst_municipality' => $municipality->mun_name, 'mun_id' => $municipality->mun_id,
+        'lst_barangay' => 'Poblacion', 'lst_status' => 'PUBLISHED', 'lst_created_at' => now(), 'lst_updated_at' => now(),
     ]);
     $lgu = makeLguUser($municipality);
     $establishmentUser = makeEstablishmentUser($listingA);
 
     $verified = MonthlyArrivalReport::query()->create([
-        'listing_id' => $listingA->id, 'municipality_id' => $municipality->id,
-        'period_month' => '2026-09-01', 'submission_source' => ReportSubmissionSource::Digital,
-        'status' => MonthlyReportStatus::Verified, 'total_visitors' => 150,
-        'submitted_by' => $establishmentUser->id, 'submitted_at' => now(),
-        'verified_by' => $lgu->id, 'verified_at' => now(),
+        'lst_id' => $listingA->lst_id, 'mun_id' => $municipality->mun_id,
+        'mar_period_month' => '2026-09-01', 'mar_submission_source' => ReportSubmissionSource::Digital,
+        'mar_status' => MonthlyReportStatus::Verified, 'mar_total_visitors' => 150,
+        'mar_submitted_by' => $establishmentUser->usr_id, 'mar_submitted_at' => now(),
+        'mar_verified_by' => $lgu->usr_id, 'mar_verified_at' => now(),
     ]);
     $forReview = MonthlyArrivalReport::query()->create([
-        'listing_id' => $listingB, 'municipality_id' => $municipality->id,
-        'period_month' => '2026-09-01', 'submission_source' => ReportSubmissionSource::ManualPaper,
-        'status' => MonthlyReportStatus::ForReview, 'total_visitors' => 230,
-        'submitted_by' => $lgu->id, 'submitted_at' => now(),
+        'lst_id' => $listingB, 'mun_id' => $municipality->mun_id,
+        'mar_period_month' => '2026-09-01', 'mar_submission_source' => ReportSubmissionSource::ManualPaper,
+        'mar_status' => MonthlyReportStatus::ForReview, 'mar_total_visitors' => 230,
+        'mar_submitted_by' => $lgu->usr_id, 'mar_submitted_at' => now(),
     ]);
 
     // A report still awaiting review blocks Submit to PTO.
@@ -195,16 +203,16 @@ test('LGU consolidate only counts Verified reports and computes the total automa
 
     // Once it is decided (here: still an unsubmitted establishment draft,
     // i.e. Not Submitted), only the Verified report counts.
-    $forReview->update(['status' => MonthlyReportStatus::Draft, 'submission_source' => ReportSubmissionSource::Digital]);
+    $forReview->update(['mar_status' => MonthlyReportStatus::Draft, 'mar_submission_source' => ReportSubmissionSource::Digital]);
 
     test()->actingAs($lgu)->post(route('lgu.monthlyReports.consolidate'), ['period_month' => '2026-09'])
         ->assertRedirect(route('lgu.monthlyReports.municipal.show', '2026-09'));
 
-    $municipalReport = MunicipalReport::query()->where('municipality_id', $municipality->id)->sole();
-    expect($municipalReport->total_arrivals)->toBe(150);
-    expect($municipalReport->status)->toBe(MunicipalReport::STATUS_SUBMITTED);
-    expect($verified->fresh()->municipal_report_id)->toBe($municipalReport->id);
-    expect($forReview->fresh()->municipal_report_id)->toBeNull();
+    $municipalReport = MunicipalReport::query()->where('mun_id', $municipality->mun_id)->sole();
+    expect($municipalReport->mrp_total_arrivals)->toBe(150);
+    expect($municipalReport->mrp_status)->toBe(MunicipalReport::STATUS_SUBMITTED);
+    expect($verified->fresh()->mrp_id)->toBe($municipalReport->mrp_id);
+    expect($forReview->fresh()->mrp_id)->toBeNull();
 });
 
 test('LGU cannot consolidate a month with no verified reports', function () {
@@ -228,13 +236,13 @@ test('non-LGU, non-PTO users cannot reach monthly report routes', function () {
 
 test('PTO sees every municipality unrestricted', function () {
     $listing = makeEstablishmentListing('Banaybanay', 'BAN', 'Seaview Hotel');
-    $pto = User::factory()->create(['role' => UserRole::PtoAdministrator]);
+    $pto = User::factory()->create(['usr_role' => UserRole::PtoAdministrator]);
 
     MonthlyArrivalReport::query()->create([
-        'listing_id' => $listing->id, 'municipality_id' => $listing->municipality_id,
-        'period_month' => '2026-09-01', 'submission_source' => ReportSubmissionSource::Digital,
-        'status' => MonthlyReportStatus::Verified, 'total_visitors' => 5,
-        'submitted_by' => $pto->id, 'submitted_at' => now(),
+        'lst_id' => $listing->lst_id, 'mun_id' => $listing->mun_id,
+        'mar_period_month' => '2026-09-01', 'mar_submission_source' => ReportSubmissionSource::Digital,
+        'mar_status' => MonthlyReportStatus::Verified, 'mar_total_visitors' => 5,
+        'mar_submitted_by' => $pto->usr_id, 'mar_submitted_at' => now(),
     ]);
 
     expect(MonthlyArrivalReport::query()->visibleTo($pto)->count())->toBe(1);
@@ -245,28 +253,28 @@ test('PTO municipal report show page renders the consolidated-from drill-down ta
     $municipality = $listing->municipalityRecord;
     $lgu = makeLguUser($municipality);
     $establishmentUser = makeEstablishmentUser($listing);
-    $pto = User::factory()->create(['role' => UserRole::PtoAdministrator]);
+    $pto = User::factory()->create(['usr_role' => UserRole::PtoAdministrator]);
 
     $monthlyReport = MonthlyArrivalReport::query()->create([
-        'listing_id' => $listing->id, 'municipality_id' => $municipality->id,
-        'period_month' => '2026-09-01', 'submission_source' => ReportSubmissionSource::Digital,
-        'status' => MonthlyReportStatus::Verified, 'total_visitors' => 42,
-        'submitted_by' => $establishmentUser->id, 'submitted_at' => now(),
-        'verified_by' => $lgu->id, 'verified_at' => now(),
+        'lst_id' => $listing->lst_id, 'mun_id' => $municipality->mun_id,
+        'mar_period_month' => '2026-09-01', 'mar_submission_source' => ReportSubmissionSource::Digital,
+        'mar_status' => MonthlyReportStatus::Verified, 'mar_total_visitors' => 42,
+        'mar_submitted_by' => $establishmentUser->usr_id, 'mar_submitted_at' => now(),
+        'mar_verified_by' => $lgu->usr_id, 'mar_verified_at' => now(),
     ]);
 
     $municipalReport = MunicipalReport::query()->create([
-        'municipality' => $municipality->name, 'municipality_id' => $municipality->id,
-        'submitted_by' => $lgu->id, 'period_start' => '2026-09-01', 'period_end' => '2026-09-30',
-        'total_arrivals' => 42, 'status' => MunicipalReport::STATUS_SUBMITTED,
+        'mrp_municipality' => $municipality->mun_name, 'mun_id' => $municipality->mun_id,
+        'mrp_submitted_by' => $lgu->usr_id, 'mrp_period_start' => '2026-09-01', 'mrp_period_end' => '2026-09-30',
+        'mrp_total_arrivals' => 42, 'mrp_status' => MunicipalReport::STATUS_SUBMITTED,
     ]);
-    $monthlyReport->update(['municipal_report_id' => $municipalReport->id]);
+    $monthlyReport->update(['mrp_id' => $municipalReport->mrp_id]);
 
     $response = test()->actingAs($pto)->get(route('pto.municipalReports.show', $municipalReport));
 
     $response->assertOk();
     $response->assertSee('Breakdown by Establishment');
-    $response->assertSee($listing->name);
+    $response->assertSee($listing->lst_name);
     $response->assertSee('42');
 });
 
@@ -274,19 +282,19 @@ test('LGU Tourism Reports page shows the workflow steps, KPI cards, and sorts No
     $verified = makeEstablishmentListing('Boston', 'BOS2', 'ABC Resort');
     $municipality = $verified->municipalityRecord;
     $notSubmitted = Listing::query()->create([
-        'slug' => 'xyz-hotel-'.Str::random(6), 'name' => 'XYZ Hotel', 'category' => 'accommodation',
-        'municipality' => $municipality->name, 'municipality_id' => $municipality->id,
-        'barangay' => 'Poblacion', 'status' => 'PUBLISHED',
+        'lst_slug' => 'xyz-hotel-'.Str::random(6), 'lst_name' => 'XYZ Hotel', 'lst_category' => 'accommodation',
+        'lst_municipality' => $municipality->mun_name, 'mun_id' => $municipality->mun_id,
+        'lst_barangay' => 'Poblacion', 'lst_status' => 'PUBLISHED',
     ]);
     $lgu = makeLguUser($municipality);
     $establishmentUser = makeEstablishmentUser($verified);
 
     MonthlyArrivalReport::query()->create([
-        'listing_id' => $verified->id, 'municipality_id' => $municipality->id,
-        'period_month' => '2026-09-01', 'submission_source' => ReportSubmissionSource::Digital,
-        'status' => MonthlyReportStatus::Verified, 'total_visitors' => 10,
-        'submitted_by' => $establishmentUser->id, 'submitted_at' => now(),
-        'verified_by' => $lgu->id, 'verified_at' => now(),
+        'lst_id' => $verified->lst_id, 'mun_id' => $municipality->mun_id,
+        'mar_period_month' => '2026-09-01', 'mar_submission_source' => ReportSubmissionSource::Digital,
+        'mar_status' => MonthlyReportStatus::Verified, 'mar_total_visitors' => 10,
+        'mar_submitted_by' => $establishmentUser->usr_id, 'mar_submitted_at' => now(),
+        'mar_verified_by' => $lgu->usr_id, 'mar_verified_at' => now(),
     ]);
 
     $response = test()->actingAs($lgu)->get(route('lgu.monthlyReports.index', ['period' => '2026-09']));
@@ -302,8 +310,8 @@ test('LGU Tourism Reports page shows the workflow steps, KPI cards, and sorts No
     $response->assertSee('Municipal Reports');
 
     $content = $response->getContent();
-    $notSubmittedPos = strpos($content, $notSubmitted->name);
-    $verifiedPos = strpos($content, $verified->name);
+    $notSubmittedPos = strpos($content, $notSubmitted->lst_name);
+    $verifiedPos = strpos($content, $verified->lst_name);
     expect($notSubmittedPos)->not->toBeFalse();
     expect($verifiedPos)->not->toBeFalse();
     expect($notSubmittedPos)->toBeLessThan($verifiedPos);
@@ -313,15 +321,15 @@ test('PTO Provincial Reports is one workspace with Overview, Monthly Records, an
     $listing = makeEstablishmentListing('Caraga', 'CAR2', 'Riverside Resort');
     $municipality = $listing->municipalityRecord;
     $lgu = makeLguUser($municipality);
-    $pto = User::factory()->create(['role' => UserRole::PtoAdministrator]);
+    $pto = User::factory()->create(['usr_role' => UserRole::PtoAdministrator]);
 
     $monthlyReport = makeVerifiedMonthlyReport($listing, $lgu, 70);
     $municipalReport = MunicipalReport::query()->create([
-        'municipality' => $municipality->name, 'municipality_id' => $municipality->id,
-        'submitted_by' => $lgu->id, 'period_start' => '2026-09-01', 'period_end' => '2026-09-30',
-        'total_arrivals' => 70, 'status' => MunicipalReport::STATUS_SUBMITTED,
+        'mrp_municipality' => $municipality->mun_name, 'mun_id' => $municipality->mun_id,
+        'mrp_submitted_by' => $lgu->usr_id, 'mrp_period_start' => '2026-09-01', 'mrp_period_end' => '2026-09-30',
+        'mrp_total_arrivals' => 70, 'mrp_status' => MunicipalReport::STATUS_SUBMITTED,
     ]);
-    $monthlyReport->update(['municipal_report_id' => $municipalReport->id]);
+    $monthlyReport->update(['mrp_id' => $municipalReport->mrp_id]);
 
     $response = test()->actingAs($pto)->get(route('pto.monthlyReports.index', ['year' => 2026]));
 
@@ -367,9 +375,9 @@ test('provincial official totals count PTO-verified LGU reports only', function 
 
     foreach ([[$listingA, $lguA, 500, MunicipalReport::STATUS_APPROVED], [$listingB, $lguB, 900, MunicipalReport::STATUS_SUBMITTED]] as [$listing, $lgu, $total, $status]) {
         MunicipalReport::query()->create([
-            'municipality' => $listing->municipality, 'municipality_id' => $listing->municipality_id,
-            'submitted_by' => $lgu->id, 'period_start' => '2026-08-01', 'period_end' => '2026-08-31',
-            'total_arrivals' => $total, 'status' => $status,
+            'mrp_municipality' => $listing->lst_municipality, 'mun_id' => $listing->mun_id,
+            'mrp_submitted_by' => $lgu->usr_id, 'mrp_period_start' => '2026-08-01', 'mrp_period_end' => '2026-08-31',
+            'mrp_total_arrivals' => $total, 'mrp_status' => $status,
         ]);
     }
 
@@ -392,10 +400,10 @@ test('LGU can correct a For Review report and the reason is required', function 
     $lgu = makeLguUser($municipality);
 
     $report = MonthlyArrivalReport::query()->create([
-        'listing_id' => $listing->id, 'municipality_id' => $municipality->id,
-        'period_month' => '2026-09-01', 'submission_source' => ReportSubmissionSource::ManualPaper,
-        'status' => MonthlyReportStatus::ForReview, 'party_male' => 10, 'party_female' => 5, 'total_visitors' => 15,
-        'submitted_by' => $lgu->id, 'submitted_at' => now(),
+        'lst_id' => $listing->lst_id, 'mun_id' => $municipality->mun_id,
+        'mar_period_month' => '2026-09-01', 'mar_submission_source' => ReportSubmissionSource::ManualPaper,
+        'mar_status' => MonthlyReportStatus::ForReview, 'mar_party_male' => 10, 'mar_party_female' => 5, 'mar_total_visitors' => 15,
+        'mar_submitted_by' => $lgu->usr_id, 'mar_submitted_at' => now(),
     ]);
 
     test()->actingAs($lgu)->put(route('lgu.monthlyReports.update', $report), [
@@ -409,13 +417,13 @@ test('LGU can correct a For Review report and the reason is required', function 
         'reason' => 'Miscounted male visitors on the paper report.',
     ])->assertRedirect();
 
-    expect($report->fresh()->total_visitors)->toBe(25);
+    expect($report->fresh()->mar_total_visitors)->toBe(25);
 
-    $log = OperationLog::where('entity_type', 'monthly_arrival_report')->where('entity_id', $report->id)->where('action', 'update')->first();
+    $log = OperationLog::where('opl_entity_type', 'monthly_arrival_report')->where('opl_entity_id', $report->mar_id)->where('opl_action', 'update')->first();
     expect($log)->not->toBeNull();
-    expect($log->reason)->toBe('Miscounted male visitors on the paper report.');
-    expect($log->old_values['party_male'])->toBe(10);
-    expect($log->new_values['party_male'])->toBe(20);
+    expect($log->opl_reason)->toBe('Miscounted male visitors on the paper report.');
+    expect($log->opl_old_values['mar_party_male'])->toBe(10);
+    expect($log->opl_new_values['mar_party_male'])->toBe(20);
 });
 
 test('correcting a Verified report reverts it to For Review', function () {
@@ -425,11 +433,11 @@ test('correcting a Verified report reverts it to For Review', function () {
     $establishmentUser = makeEstablishmentUser($listing);
 
     $report = MonthlyArrivalReport::query()->create([
-        'listing_id' => $listing->id, 'municipality_id' => $municipality->id,
-        'period_month' => '2026-09-01', 'submission_source' => ReportSubmissionSource::Digital,
-        'status' => MonthlyReportStatus::Verified, 'total_visitors' => 15,
-        'submitted_by' => $establishmentUser->id, 'submitted_at' => now(),
-        'verified_by' => $lgu->id, 'verified_at' => now(),
+        'lst_id' => $listing->lst_id, 'mun_id' => $municipality->mun_id,
+        'mar_period_month' => '2026-09-01', 'mar_submission_source' => ReportSubmissionSource::Digital,
+        'mar_status' => MonthlyReportStatus::Verified, 'mar_total_visitors' => 15,
+        'mar_submitted_by' => $establishmentUser->usr_id, 'mar_submitted_at' => now(),
+        'mar_verified_by' => $lgu->usr_id, 'mar_verified_at' => now(),
     ]);
 
     test()->actingAs($lgu)->put(route('lgu.monthlyReports.update', $report), [
@@ -439,9 +447,9 @@ test('correcting a Verified report reverts it to For Review', function () {
     ])->assertRedirect();
 
     $fresh = $report->fresh();
-    expect($fresh->status)->toBe(MonthlyReportStatus::ForReview);
-    expect($fresh->verified_by)->toBeNull();
-    expect($fresh->verified_at)->toBeNull();
+    expect($fresh->mar_status)->toBe(MonthlyReportStatus::ForReview);
+    expect($fresh->mar_verified_by)->toBeNull();
+    expect($fresh->mar_verified_at)->toBeNull();
 });
 
 test('a report cannot be corrected while part of a still-pending or already-approved municipal report', function () {
@@ -451,26 +459,26 @@ test('a report cannot be corrected while part of a still-pending or already-appr
     $establishmentUser = makeEstablishmentUser($listing);
 
     $municipalReport = MunicipalReport::query()->create([
-        'municipality' => $municipality->name, 'municipality_id' => $municipality->id,
-        'submitted_by' => $lgu->id, 'period_start' => '2026-09-01', 'period_end' => '2026-09-30',
-        'total_arrivals' => 15, 'status' => MunicipalReport::STATUS_SUBMITTED,
+        'mrp_municipality' => $municipality->mun_name, 'mun_id' => $municipality->mun_id,
+        'mrp_submitted_by' => $lgu->usr_id, 'mrp_period_start' => '2026-09-01', 'mrp_period_end' => '2026-09-30',
+        'mrp_total_arrivals' => 15, 'mrp_status' => MunicipalReport::STATUS_SUBMITTED,
     ]);
     $report = MonthlyArrivalReport::query()->create([
-        'listing_id' => $listing->id, 'municipality_id' => $municipality->id,
-        'period_month' => '2026-09-01', 'submission_source' => ReportSubmissionSource::Digital,
-        'status' => MonthlyReportStatus::Verified, 'total_visitors' => 15,
-        'submitted_by' => $establishmentUser->id, 'submitted_at' => now(),
-        'verified_by' => $lgu->id, 'verified_at' => now(),
-        'municipal_report_id' => $municipalReport->id,
+        'lst_id' => $listing->lst_id, 'mun_id' => $municipality->mun_id,
+        'mar_period_month' => '2026-09-01', 'mar_submission_source' => ReportSubmissionSource::Digital,
+        'mar_status' => MonthlyReportStatus::Verified, 'mar_total_visitors' => 15,
+        'mar_submitted_by' => $establishmentUser->usr_id, 'mar_submitted_at' => now(),
+        'mar_verified_by' => $lgu->usr_id, 'mar_verified_at' => now(),
+        'mrp_id' => $municipalReport->mrp_id,
     ]);
 
     test()->actingAs($lgu)->get(route('lgu.monthlyReports.edit', $report))->assertForbidden();
     test()->actingAs($lgu)->put(route('lgu.monthlyReports.update', $report), ['reason' => 'x'])->assertForbidden();
 
-    $municipalReport->update(['status' => MunicipalReport::STATUS_RETURNED]);
+    $municipalReport->update(['mrp_status' => MunicipalReport::STATUS_RETURNED]);
     test()->actingAs($lgu)->get(route('lgu.monthlyReports.edit', $report->fresh()))->assertOk();
 
-    $municipalReport->update(['status' => MunicipalReport::STATUS_APPROVED]);
+    $municipalReport->update(['mrp_status' => MunicipalReport::STATUS_APPROVED]);
     test()->actingAs($lgu)->get(route('lgu.monthlyReports.edit', $report->fresh()))->assertForbidden();
 });
 
@@ -478,14 +486,14 @@ test('verification history shows on both the LGU and PTO report detail pages', f
     $listing = makeEstablishmentListing('San Isidro', 'SAN2', 'ABC Resort');
     $municipality = $listing->municipalityRecord;
     $lgu = makeLguUser($municipality);
-    $pto = User::factory()->create(['role' => UserRole::PtoAdministrator]);
+    $pto = User::factory()->create(['usr_role' => UserRole::PtoAdministrator]);
 
     test()->actingAs($lgu)->post(route('lgu.monthlyReports.manualEntry.store', $listing), [
         'period_month' => '2026-09',
         'party_male' => 5, 'party_female' => 5, 'party_adults' => 10,
         'party_children' => 0, 'party_seniors' => 0, 'party_local' => 10, 'party_foreign' => 0,
     ]);
-    $report = MonthlyArrivalReport::query()->where('listing_id', $listing->id)->sole();
+    $report = MonthlyArrivalReport::query()->where('lst_id', $listing->lst_id)->sole();
 
     test()->actingAs($lgu)->patch(route('lgu.monthlyReports.submit', $report));
     test()->actingAs($lgu)->patch(route('lgu.monthlyReports.review', $report));
@@ -504,21 +512,21 @@ test('the Logged Via column on both report detail pages correctly labels staff v
     $listing = makeEstablishmentListing('Caraga', 'CAR2', 'Underlying Arrivals Resort');
     $municipality = $listing->municipalityRecord;
     $lgu = makeLguUser($municipality);
-    $pto = User::factory()->create(['role' => UserRole::PtoAdministrator]);
+    $pto = User::factory()->create(['usr_role' => UserRole::PtoAdministrator]);
     $user = makeEstablishmentUser($listing);
 
     $listing->arrivals()->create([
-        'source' => 'staff', 'date' => '2026-09-05', 'visit_type' => 'Daytour',
-        'party_male' => 1, 'party_size' => 1, 'status' => 'Recorded',
+        'arr_source' => 'staff', 'arr_date' => '2026-09-05', 'arr_visit_type' => 'Daytour',
+        'arr_party_male' => 1, 'arr_party_size' => 1, 'arr_status' => 'Recorded',
     ]);
     $listing->arrivals()->create([
-        'source' => 'self_checkin', 'date' => '2026-09-06', 'visit_type' => 'Daytour',
-        'party_male' => 1, 'party_size' => 1, 'status' => 'Recorded',
+        'arr_source' => 'self_checkin', 'arr_date' => '2026-09-06', 'arr_visit_type' => 'Daytour',
+        'arr_party_male' => 1, 'arr_party_size' => 1, 'arr_status' => 'Recorded',
     ]);
 
     test()->actingAs($user)->post(route('establishment.arrivals.monthly.draft'), ['period_month' => '2026-09'])->assertRedirect();
     test()->actingAs($user)->post(route('establishment.arrivals.monthly.submit'), ['period_month' => '2026-09'])->assertRedirect();
-    $report = MonthlyArrivalReport::query()->where('listing_id', $listing->id)->sole();
+    $report = MonthlyArrivalReport::query()->where('lst_id', $listing->lst_id)->sole();
 
     $lguResponse = test()->actingAs($lgu)->get(route('lgu.monthlyReports.show', $report));
     $lguResponse->assertSee('Front Desk');
@@ -533,28 +541,28 @@ test('the monthly report detail pages show the within/outside-province and top-c
     $listing = makeEstablishmentListing('Boston', 'BOS3', 'Origin Breakdown Resort');
     $municipality = $listing->municipalityRecord;
     $lgu = makeLguUser($municipality);
-    $pto = User::factory()->create(['role' => UserRole::PtoAdministrator]);
+    $pto = User::factory()->create(['usr_role' => UserRole::PtoAdministrator]);
     $user = makeEstablishmentUser($listing);
 
     $listing->arrivals()->create([
-        'source' => 'staff', 'date' => '2026-09-05', 'visit_type' => 'Daytour',
-        'party_local' => 2, 'party_size' => 2, 'status' => 'Recorded',
-        'local_origin_scope' => 'within_province',
+        'arr_source' => 'staff', 'arr_date' => '2026-09-05', 'arr_visit_type' => 'Daytour',
+        'arr_party_local' => 2, 'arr_party_size' => 2, 'arr_status' => 'Recorded',
+        'arr_local_origin_scope' => 'within_province',
     ]);
     $listing->arrivals()->create([
-        'source' => 'self_checkin', 'date' => '2026-09-06', 'visit_type' => 'Daytour',
-        'party_local' => 3, 'party_size' => 3, 'status' => 'Recorded',
-        'local_origin_scope' => 'outside_province', 'local_origin_place' => 'Davao del Sur',
+        'arr_source' => 'self_checkin', 'arr_date' => '2026-09-06', 'arr_visit_type' => 'Daytour',
+        'arr_party_local' => 3, 'arr_party_size' => 3, 'arr_status' => 'Recorded',
+        'arr_local_origin_scope' => 'outside_province', 'arr_local_origin_place' => 'Davao del Sur',
     ]);
     $listing->arrivals()->create([
-        'source' => 'self_checkin', 'date' => '2026-09-07', 'visit_type' => 'Daytour',
-        'party_foreign' => 1, 'party_size' => 1, 'status' => 'Recorded',
-        'foreign_country' => 'Japan',
+        'arr_source' => 'self_checkin', 'arr_date' => '2026-09-07', 'arr_visit_type' => 'Daytour',
+        'arr_party_foreign' => 1, 'arr_party_size' => 1, 'arr_status' => 'Recorded',
+        'arr_foreign_country' => 'Japan',
     ]);
 
     test()->actingAs($user)->post(route('establishment.arrivals.monthly.draft'), ['period_month' => '2026-09'])->assertRedirect();
     test()->actingAs($user)->post(route('establishment.arrivals.monthly.submit'), ['period_month' => '2026-09'])->assertRedirect();
-    $report = MonthlyArrivalReport::query()->where('listing_id', $listing->id)->sole();
+    $report = MonthlyArrivalReport::query()->where('lst_id', $listing->lst_id)->sole();
 
     $breakdown = $report->fresh('arrivals')->originBreakdown();
     expect($breakdown['withinProvince'])->toBe(2);
@@ -584,7 +592,7 @@ test('submitting without a saved draft creates no report', function () {
         ->assertRedirect()
         ->assertSessionHas('toast_tone', 'danger');
 
-    expect(MonthlyArrivalReport::query()->where('listing_id', $listing->id)->count())->toBe(0);
+    expect(MonthlyArrivalReport::query()->where('lst_id', $listing->lst_id)->count())->toBe(0);
 });
 
 test('an establishment draft is visible only to its owner — LGU and PTO see it as Not Submitted', function () {
@@ -592,10 +600,10 @@ test('an establishment draft is visible only to its owner — LGU and PTO see it
     $municipality = $listing->municipalityRecord;
     $user = makeEstablishmentUser($listing);
     $lgu = makeLguUser($municipality);
-    $pto = User::factory()->create(['role' => UserRole::PtoAdministrator]);
+    $pto = User::factory()->create(['usr_role' => UserRole::PtoAdministrator]);
 
     test()->actingAs($user)->post(route('establishment.arrivals.monthly.draft'), ['period_month' => '2026-09']);
-    $report = MonthlyArrivalReport::query()->where('listing_id', $listing->id)->sole();
+    $report = MonthlyArrivalReport::query()->where('lst_id', $listing->lst_id)->sole();
 
     test()->actingAs($user)->get(route('establishment.arrivals.monthly.show', $report))
         ->assertOk()
@@ -619,24 +627,24 @@ test('a draft cannot be submitted when arrivals were recorded after it was saved
     $user = makeEstablishmentUser($listing);
 
     test()->actingAs($user)->post(route('establishment.arrivals.monthly.draft'), ['period_month' => '2026-09']);
-    $report = MonthlyArrivalReport::query()->where('listing_id', $listing->id)->sole();
+    $report = MonthlyArrivalReport::query()->where('lst_id', $listing->lst_id)->sole();
 
     $listing->arrivals()->create([
-        'source' => 'staff', 'date' => '2026-09-10', 'visit_type' => 'Daytour',
-        'party_male' => 1, 'party_size' => 1, 'status' => 'Recorded',
+        'arr_source' => 'staff', 'arr_date' => '2026-09-10', 'arr_visit_type' => 'Daytour',
+        'arr_party_male' => 1, 'arr_party_size' => 1, 'arr_status' => 'Recorded',
     ]);
 
     test()->actingAs($user)
         ->post(route('establishment.arrivals.monthly.submit'), ['period_month' => '2026-09'])
         ->assertRedirect(route('establishment.arrivals.monthly.show', $report))
         ->assertSessionHas('toast_tone', 'danger');
-    expect($report->fresh()->status)->toBe(MonthlyReportStatus::Draft);
+    expect($report->fresh()->mar_status)->toBe(MonthlyReportStatus::Draft);
 
     test()->actingAs($user)->post(route('establishment.arrivals.monthly.draft'), ['period_month' => '2026-09']);
-    expect($report->fresh()->total_visitors)->toBe(1);
+    expect($report->fresh()->mar_total_visitors)->toBe(1);
 
     test()->actingAs($user)->post(route('establishment.arrivals.monthly.submit'), ['period_month' => '2026-09']);
-    expect($report->fresh()->status)->toBe(MonthlyReportStatus::Submitted);
+    expect($report->fresh()->mar_status)->toBe(MonthlyReportStatus::Submitted);
 });
 
 test('LGU can return a submitted report for correction with required remarks, and the establishment resubmits it', function () {
@@ -647,7 +655,7 @@ test('LGU can return a submitted report for correction with required remarks, an
 
     test()->actingAs($user)->post(route('establishment.arrivals.monthly.draft'), ['period_month' => '2026-09']);
     test()->actingAs($user)->post(route('establishment.arrivals.monthly.submit'), ['period_month' => '2026-09']);
-    $report = MonthlyArrivalReport::query()->where('listing_id', $listing->id)->sole();
+    $report = MonthlyArrivalReport::query()->where('lst_id', $listing->lst_id)->sole();
 
     // A just-Submitted report must be opened (Review) before a decision.
     test()->actingAs($lgu)->patch(route('lgu.monthlyReports.return', $report), ['remarks' => 'x'])->assertForbidden();
@@ -655,19 +663,19 @@ test('LGU can return a submitted report for correction with required remarks, an
 
     test()->actingAs($lgu)->patch(route('lgu.monthlyReports.return', $report), ['remarks' => ''])
         ->assertSessionHasErrors('remarks');
-    expect($report->fresh()->status)->toBe(MonthlyReportStatus::ForReview);
+    expect($report->fresh()->mar_status)->toBe(MonthlyReportStatus::ForReview);
 
     test()->actingAs($lgu)->patch(route('lgu.monthlyReports.return', $report), ['remarks' => 'Missing the Sept 12 tour group.'])
         ->assertRedirect();
 
     $report->refresh();
-    expect($report->status)->toBe(MonthlyReportStatus::ForCorrection);
-    expect($report->remarks)->toBe('Missing the Sept 12 tour group.');
+    expect($report->mar_status)->toBe(MonthlyReportStatus::ForCorrection);
+    expect($report->mar_remarks)->toBe('Missing the Sept 12 tour group.');
 
-    $log = OperationLog::where('entity_type', 'monthly_arrival_report')->where('entity_id', $report->id)->where('action', 'return')->sole();
-    expect($log->user_id)->toBe($lgu->id);
-    expect($log->reason)->toBe('Missing the Sept 12 tour group.');
-    expect($log->establishment_id)->toBe($listing->id);
+    $log = OperationLog::where('opl_entity_type', 'monthly_arrival_report')->where('opl_entity_id', $report->mar_id)->where('opl_action', 'return')->sole();
+    expect($log->usr_id)->toBe($lgu->usr_id);
+    expect($log->opl_reason)->toBe('Missing the Sept 12 tour group.');
+    expect($log->lst_id)->toBe($listing->lst_id);
 
     test()->actingAs($lgu)->patch(route('lgu.monthlyReports.verify', $report))->assertForbidden();
     test()->actingAs($lgu)->get(route('lgu.monthlyReports.edit', $report))->assertForbidden();
@@ -675,20 +683,20 @@ test('LGU can return a submitted report for correction with required remarks, an
     test()->actingAs($user)->get(route('establishment.arrivals.monthly'))->assertSee('Missing the Sept 12 tour group.');
 
     $listing->arrivals()->create([
-        'source' => 'staff', 'date' => '2026-09-12', 'visit_type' => 'Daytour',
-        'party_male' => 4, 'party_female' => 4, 'party_size' => 8, 'status' => 'Recorded',
+        'arr_source' => 'staff', 'arr_date' => '2026-09-12', 'arr_visit_type' => 'Daytour',
+        'arr_party_male' => 4, 'arr_party_female' => 4, 'arr_party_size' => 8, 'arr_status' => 'Recorded',
     ]);
 
     test()->actingAs($user)->post(route('establishment.arrivals.monthly.draft'), ['period_month' => '2026-09']);
-    expect($report->fresh()->status)->toBe(MonthlyReportStatus::ForCorrection);
-    expect($report->fresh()->total_visitors)->toBe(8);
+    expect($report->fresh()->mar_status)->toBe(MonthlyReportStatus::ForCorrection);
+    expect($report->fresh()->mar_total_visitors)->toBe(8);
 
     test()->actingAs($user)->post(route('establishment.arrivals.monthly.submit'), ['period_month' => '2026-09']);
-    expect($report->fresh()->status)->toBe(MonthlyReportStatus::Submitted);
+    expect($report->fresh()->mar_status)->toBe(MonthlyReportStatus::Submitted);
 
     test()->actingAs($lgu)->patch(route('lgu.monthlyReports.review', $report));
     test()->actingAs($lgu)->patch(route('lgu.monthlyReports.verify', $report))->assertRedirect();
-    expect($report->fresh()->status)->toBe(MonthlyReportStatus::Verified);
+    expect($report->fresh()->mar_status)->toBe(MonthlyReportStatus::Verified);
 });
 
 test('a Manual/Paper report cannot be returned for correction, and another municipality cannot act on it', function () {
@@ -698,16 +706,16 @@ test('a Manual/Paper report cannot be returned for correction, and another munic
     $otherLgu = makeLguUser(makeMunicipality('Tarragona', 'TAR3'));
 
     $report = MonthlyArrivalReport::query()->create([
-        'listing_id' => $listing->id, 'municipality_id' => $municipality->id,
-        'period_month' => '2026-09-01', 'submission_source' => ReportSubmissionSource::ManualPaper,
-        'status' => MonthlyReportStatus::ForReview, 'total_visitors' => 10,
-        'submitted_by' => $lgu->id, 'submitted_at' => now(),
+        'lst_id' => $listing->lst_id, 'mun_id' => $municipality->mun_id,
+        'mar_period_month' => '2026-09-01', 'mar_submission_source' => ReportSubmissionSource::ManualPaper,
+        'mar_status' => MonthlyReportStatus::ForReview, 'mar_total_visitors' => 10,
+        'mar_submitted_by' => $lgu->usr_id, 'mar_submitted_at' => now(),
     ]);
 
     test()->actingAs($lgu)->patch(route('lgu.monthlyReports.return', $report), ['remarks' => 'x'])->assertForbidden();
     test()->actingAs($otherLgu)->patch(route('lgu.monthlyReports.verify', $report))->assertForbidden();
     test()->actingAs($otherLgu)->patch(route('lgu.monthlyReports.submit', $report))->assertForbidden();
-    expect($report->fresh()->status)->toBe(MonthlyReportStatus::ForReview);
+    expect($report->fresh()->mar_status)->toBe(MonthlyReportStatus::ForReview);
 });
 
 test('a paper report enters the same Review -> Verify path as a digital one, and is corrected directly by the LGU', function () {
@@ -720,11 +728,11 @@ test('a paper report enters the same Review -> Verify path as a digital one, and
     test()->actingAs($lgu)->post(route('lgu.monthlyReports.manualEntry.store', $listing), [
         'period_month' => '2026-09', 'party_male' => 5, 'party_female' => 5, ...$figures,
     ])->assertRedirect();
-    $report = MonthlyArrivalReport::query()->where('listing_id', $listing->id)->sole();
+    $report = MonthlyArrivalReport::query()->where('lst_id', $listing->lst_id)->sole();
 
-    expect($report->status)->toBe(MonthlyReportStatus::Draft);
+    expect($report->mar_status)->toBe(MonthlyReportStatus::Draft);
     test()->actingAs($lgu)->patch(route('lgu.monthlyReports.submit', $report))->assertRedirect();
-    expect($report->fresh()->status)->toBe(MonthlyReportStatus::Submitted);
+    expect($report->fresh()->mar_status)->toBe(MonthlyReportStatus::Submitted);
     test()->actingAs($lgu)->get(route('lgu.monthlyReports.manualEntry', ['listing' => $listing, 'period' => '2026-09']))->assertStatus(422);
     test()->actingAs($lgu)->patch(route('lgu.monthlyReports.verify', $report))->assertForbidden();
 
@@ -736,10 +744,10 @@ test('a paper report enters the same Review -> Verify path as a digital one, and
         'party_seniors' => 0, 'party_local' => 11, 'party_foreign' => 0,
         'reason' => 'Mis-encoded male count from the paper form.',
     ])->assertRedirect();
-    expect($report->fresh()->total_visitors)->toBe(11);
+    expect($report->fresh()->mar_total_visitors)->toBe(11);
 
     test()->actingAs($lgu)->patch(route('lgu.monthlyReports.verify', $report))->assertRedirect();
-    expect($report->fresh()->status)->toBe(MonthlyReportStatus::Verified);
+    expect($report->fresh()->mar_status)->toBe(MonthlyReportStatus::Verified);
 });
 
 // --- LGU Monthly Reports: Establishment Reports | Municipal Reports ---
@@ -750,12 +758,12 @@ test('a paper report enters the same Review -> Verify path as a digital one, and
 function makeVerifiedMonthlyReport(Listing $listing, User $lgu, int $total): MonthlyArrivalReport
 {
     return MonthlyArrivalReport::query()->create([
-        'listing_id' => $listing->id, 'municipality_id' => $listing->municipality_id,
-        'period_month' => '2026-09-01', 'submission_source' => ReportSubmissionSource::ManualPaper,
-        'status' => MonthlyReportStatus::Verified,
-        'party_male' => $total, 'party_female' => 0, 'party_adults' => $total, 'party_children' => 0,
-        'party_seniors' => 0, 'party_local' => $total, 'party_foreign' => 0, 'total_visitors' => $total,
-        'submitted_by' => $lgu->id, 'submitted_at' => now(), 'verified_by' => $lgu->id, 'verified_at' => now(),
+        'lst_id' => $listing->lst_id, 'mun_id' => $listing->mun_id,
+        'mar_period_month' => '2026-09-01', 'mar_submission_source' => ReportSubmissionSource::ManualPaper,
+        'mar_status' => MonthlyReportStatus::Verified,
+        'mar_party_male' => $total, 'mar_party_female' => 0, 'mar_party_adults' => $total, 'mar_party_children' => 0,
+        'mar_party_seniors' => 0, 'mar_party_local' => $total, 'mar_party_foreign' => 0, 'mar_total_visitors' => $total,
+        'mar_submitted_by' => $lgu->usr_id, 'mar_submitted_at' => now(), 'mar_verified_by' => $lgu->usr_id, 'mar_verified_at' => now(),
     ]);
 }
 
@@ -767,15 +775,15 @@ test('Review moves a Submitted report to For Review and is logged; it cannot be 
 
     test()->actingAs($user)->post(route('establishment.arrivals.monthly.draft'), ['period_month' => '2026-09']);
     test()->actingAs($user)->post(route('establishment.arrivals.monthly.submit'), ['period_month' => '2026-09']);
-    $report = MonthlyArrivalReport::query()->where('listing_id', $listing->id)->sole();
+    $report = MonthlyArrivalReport::query()->where('lst_id', $listing->lst_id)->sole();
 
     test()->actingAs($lgu)->get(route('lgu.monthlyReports.index', ['period' => '2026-09']))->assertSee('Submitted');
     test()->actingAs($lgu)->patch(route('lgu.monthlyReports.verify', $report))->assertForbidden();
     test()->actingAs($otherLgu)->patch(route('lgu.monthlyReports.review', $report))->assertForbidden();
 
     test()->actingAs($lgu)->patch(route('lgu.monthlyReports.review', $report))->assertRedirect(route('lgu.monthlyReports.show', $report));
-    expect($report->fresh()->status)->toBe(MonthlyReportStatus::ForReview);
-    expect(OperationLog::where('entity_type', 'monthly_arrival_report')->where('entity_id', $report->id)->where('action', 'update')->exists())->toBeTrue();
+    expect($report->fresh()->mar_status)->toBe(MonthlyReportStatus::ForReview);
+    expect(OperationLog::where('opl_entity_type', 'monthly_arrival_report')->where('opl_entity_id', $report->mar_id)->where('opl_action', 'update')->exists())->toBeTrue();
 
     test()->actingAs($lgu)->get(route('lgu.monthlyReports.show', $report))
         ->assertOk()
@@ -801,7 +809,7 @@ test('the establishment report A4 preview renders for its own LGU only', functio
         ->assertSee('Monthly Tourist Arrival Report')
         ->assertSee('A4 Preview Resort')
         ->assertSee('Manual / Paper')
-        ->assertSee(sprintf('MAR-%06d', $report->id));
+        ->assertSee(sprintf('MAR-%06d', $report->mar_id));
 
     test()->actingAs($otherLgu)->get(route('lgu.monthlyReports.preview', $report))->assertForbidden();
 });
@@ -843,15 +851,15 @@ test('Submit to PTO saves the municipal report, PTO receives it, and the LGU can
     $listing = makeEstablishmentListing('Tarragona', 'TAR4', 'Delta Resort');
     $municipality = $listing->municipalityRecord;
     $lgu = makeLguUser($municipality);
-    $pto = User::factory()->create(['role' => UserRole::PtoAdministrator]);
+    $pto = User::factory()->create(['usr_role' => UserRole::PtoAdministrator]);
     makeVerifiedMonthlyReport($listing, $lgu, 300);
 
     test()->actingAs($lgu)->post(route('lgu.monthlyReports.consolidate'), ['period_month' => '2026-09'])
         ->assertRedirect(route('lgu.monthlyReports.municipal.show', '2026-09'));
 
-    $municipalReport = MunicipalReport::query()->where('municipality_id', $municipality->id)->sole();
-    expect($municipalReport->status)->toBe(MunicipalReport::STATUS_SUBMITTED);
-    expect($municipalReport->total_arrivals)->toBe(300);
+    $municipalReport = MunicipalReport::query()->where('mun_id', $municipality->mun_id)->sole();
+    expect($municipalReport->mrp_status)->toBe(MunicipalReport::STATUS_SUBMITTED);
+    expect($municipalReport->mrp_total_arrivals)->toBe(300);
 
     test()->actingAs($lgu)->get(route('lgu.monthlyReports.municipal.show', '2026-09'))
         ->assertOk()
@@ -859,11 +867,11 @@ test('Submit to PTO saves the municipal report, PTO receives it, and the LGU can
         ->assertDontSee('Resubmit to PTO');
     test()->actingAs($lgu)->get(route('lgu.monthlyReports.municipal.preview', '2026-09'))
         ->assertOk()
-        ->assertSee(sprintf('MRP-%06d', $municipalReport->id));
+        ->assertSee(sprintf('MRP-%06d', $municipalReport->mrp_id));
 
     test()->actingAs($pto)->get(route('pto.municipalReports.index', ['year' => 2026, 'month' => 9]))
         ->assertOk()
-        ->assertSee($municipality->name)
+        ->assertSee($municipality->mun_name)
         ->assertSee('For Review');
 
     test()->actingAs($lgu)->post(route('lgu.monthlyReports.consolidate'), ['period_month' => '2026-09'])->assertForbidden();
@@ -873,11 +881,11 @@ test('a municipal report PTO returns shows its remarks and can be resubmitted', 
     $listing = makeEstablishmentListing('Caraga', 'CAR4', 'Echo Resort');
     $municipality = $listing->municipalityRecord;
     $lgu = makeLguUser($municipality);
-    $pto = User::factory()->create(['role' => UserRole::PtoAdministrator]);
+    $pto = User::factory()->create(['usr_role' => UserRole::PtoAdministrator]);
     makeVerifiedMonthlyReport($listing, $lgu, 50);
 
     test()->actingAs($lgu)->post(route('lgu.monthlyReports.consolidate'), ['period_month' => '2026-09']);
-    $municipalReport = MunicipalReport::query()->where('municipality_id', $municipality->id)->sole();
+    $municipalReport = MunicipalReport::query()->where('mun_id', $municipality->mun_id)->sole();
 
     test()->actingAs($pto)->patch(route('pto.municipalReports.return', $municipalReport), ['remarks' => 'Echo Resort total looks low.'])->assertRedirect();
 
@@ -888,13 +896,13 @@ test('a municipal report PTO returns shows its remarks and can be resubmitted', 
         ->assertSee('Resubmit to PTO');
 
     test()->actingAs($lgu)->post(route('lgu.monthlyReports.consolidate'), ['period_month' => '2026-09'])->assertRedirect();
-    expect($municipalReport->fresh()->status)->toBe(MunicipalReport::STATUS_SUBMITTED);
+    expect($municipalReport->fresh()->mrp_status)->toBe(MunicipalReport::STATUS_SUBMITTED);
 });
 
 test('LGU municipal report pages are LGU-only', function () {
     $listing = makeEstablishmentListing('Baganga', 'BAG4', 'Foxtrot Inn');
     $user = makeEstablishmentUser($listing);
-    $pto = User::factory()->create(['role' => UserRole::PtoAdministrator]);
+    $pto = User::factory()->create(['usr_role' => UserRole::PtoAdministrator]);
 
     test()->actingAs($user)->get(route('lgu.monthlyReports.municipal'))->assertForbidden();
     test()->actingAs($pto)->get(route('lgu.monthlyReports.municipal.show', '2026-09'))->assertForbidden();
@@ -908,12 +916,12 @@ test('LGU municipal report pages are LGU-only', function () {
 function makeVerifiedReportFor(Listing $listing, User $lgu, string $month, int $total): MonthlyArrivalReport
 {
     return MonthlyArrivalReport::query()->create([
-        'listing_id' => $listing->id, 'municipality_id' => $listing->municipality_id,
-        'period_month' => $month, 'submission_source' => ReportSubmissionSource::Digital,
-        'status' => MonthlyReportStatus::Verified,
-        'party_male' => $total, 'party_female' => 0, 'party_adults' => $total, 'party_children' => 0,
-        'party_seniors' => 0, 'party_local' => $total, 'party_foreign' => 0, 'total_visitors' => $total,
-        'submitted_by' => $lgu->id, 'submitted_at' => now(), 'verified_by' => $lgu->id, 'verified_at' => now(),
+        'lst_id' => $listing->lst_id, 'mun_id' => $listing->mun_id,
+        'mar_period_month' => $month, 'mar_submission_source' => ReportSubmissionSource::Digital,
+        'mar_status' => MonthlyReportStatus::Verified,
+        'mar_party_male' => $total, 'mar_party_female' => 0, 'mar_party_adults' => $total, 'mar_party_children' => 0,
+        'mar_party_seniors' => 0, 'mar_party_local' => $total, 'mar_party_foreign' => 0, 'mar_total_visitors' => $total,
+        'mar_submitted_by' => $lgu->usr_id, 'mar_submitted_at' => now(), 'mar_verified_by' => $lgu->usr_id, 'mar_verified_at' => now(),
     ]);
 }
 
@@ -925,14 +933,14 @@ test('monthly records count verified reports only, mark missing months, and labe
     makeVerifiedReportFor($listing, $lgu, '2026-02-01', 150);
     makeVerifiedReportFor($listing, $lgu, '2026-04-01', 150);
     MonthlyArrivalReport::query()->create([
-        'listing_id' => $listing->id, 'municipality_id' => $listing->municipality_id,
-        'period_month' => '2026-05-01', 'submission_source' => ReportSubmissionSource::Digital,
-        'status' => MonthlyReportStatus::Submitted, 'total_visitors' => 999,
-        'submitted_by' => $lgu->id, 'submitted_at' => now(),
+        'lst_id' => $listing->lst_id, 'mun_id' => $listing->mun_id,
+        'mar_period_month' => '2026-05-01', 'mar_submission_source' => ReportSubmissionSource::Digital,
+        'mar_status' => MonthlyReportStatus::Submitted, 'mar_total_visitors' => 999,
+        'mar_submitted_by' => $lgu->usr_id, 'mar_submitted_at' => now(),
     ]);
 
     $records = TourismAnalytics::monthlyRecords([
-        'year' => 2026, 'month' => null, 'municipalityId' => null, 'listingId' => $listing->id, 'classification' => null,
+        'year' => 2026, 'month' => null, 'municipalityId' => null, 'listingId' => $listing->lst_id, 'classification' => null,
     ])->keyBy('month');
 
     expect($records[1]['change'])->toBe('No Comparison Available');
@@ -957,7 +965,7 @@ test('monthly records count verified reports only, mark missing months, and labe
 test('year comparison compares the same months only, and is unavailable without previous-year data', function () {
     $listing = makeEstablishmentListing('Mati', 'MAT6', 'Compare Resort');
     $lgu = makeLguUser($listing->municipalityRecord);
-    $filters = ['month' => null, 'municipalityId' => null, 'listingId' => $listing->id, 'classification' => null];
+    $filters = ['month' => null, 'municipalityId' => null, 'listingId' => $listing->lst_id, 'classification' => null];
 
     makeVerifiedReportFor($listing, $lgu, '2026-01-01', 120);
     $current = TourismAnalytics::monthlyRecords([...$filters, 'year' => 2026]);
@@ -982,10 +990,10 @@ test('the establishment Monthly Reports workspace has one year selector and Over
     makeVerifiedReportFor($listing, $lgu, '2026-07-01', 1120);
     makeVerifiedReportFor($listing, $lgu, '2026-08-01', 980);
     MonthlyArrivalReport::query()->create([
-        'listing_id' => $listing->id, 'municipality_id' => $listing->municipality_id,
-        'period_month' => '2026-09-01', 'submission_source' => ReportSubmissionSource::Digital,
-        'status' => MonthlyReportStatus::ForCorrection, 'total_visitors' => 777, 'remarks' => 'Please recount.',
-        'submitted_by' => $user->id, 'submitted_at' => now(),
+        'lst_id' => $listing->lst_id, 'mun_id' => $listing->mun_id,
+        'mar_period_month' => '2026-09-01', 'mar_submission_source' => ReportSubmissionSource::Digital,
+        'mar_status' => MonthlyReportStatus::ForCorrection, 'mar_total_visitors' => 777, 'mar_remarks' => 'Please recount.',
+        'mar_submitted_by' => $user->usr_id, 'mar_submitted_at' => now(),
     ]);
 
     $response = test()->actingAs($user)->get(route('establishment.arrivals.monthly', ['year' => 2026]));
@@ -1029,12 +1037,12 @@ test('Prepare Report on a Not Submitted month creates its draft and opens it for
     $user = makeEstablishmentUser($listing);
 
     $listing->arrivals()->create([
-        'source' => 'staff', 'date' => '2026-03-05', 'visit_type' => 'Daytour',
-        'party_male' => 2, 'party_female' => 2, 'party_size' => 4, 'status' => 'Recorded',
+        'arr_source' => 'staff', 'arr_date' => '2026-03-05', 'arr_visit_type' => 'Daytour',
+        'arr_party_male' => 2, 'arr_party_female' => 2, 'arr_party_size' => 4, 'arr_status' => 'Recorded',
     ]);
 
     test()->actingAs($user)->post(route('establishment.arrivals.monthly.draft'), ['period_month' => '2026-03'])->assertRedirect();
-    $report = MonthlyArrivalReport::query()->where('listing_id', $listing->id)->sole();
+    $report = MonthlyArrivalReport::query()->where('lst_id', $listing->lst_id)->sole();
 
     test()->actingAs($user)->get(route('establishment.arrivals.monthly.show', $report))
         ->assertOk()
@@ -1153,17 +1161,17 @@ test('the establishment workspace opens View and View Remarks in a modal on the 
     $lgu = makeLguUser($listing->municipalityRecord);
     $verified = makeVerifiedReportFor($listing, $lgu, '2026-06-01', 432);
     $returned = MonthlyArrivalReport::query()->create([
-        'listing_id' => $listing->id, 'municipality_id' => $listing->municipality_id,
-        'period_month' => '2026-07-01', 'submission_source' => ReportSubmissionSource::Digital,
-        'status' => MonthlyReportStatus::ForCorrection, 'total_visitors' => 12, 'remarks' => 'Add the July 4 tour group.',
-        'submitted_by' => $user->id, 'submitted_at' => now(),
+        'lst_id' => $listing->lst_id, 'mun_id' => $listing->mun_id,
+        'mar_period_month' => '2026-07-01', 'mar_submission_source' => ReportSubmissionSource::Digital,
+        'mar_status' => MonthlyReportStatus::ForCorrection, 'mar_total_visitors' => 12, 'mar_remarks' => 'Add the July 4 tour group.',
+        'mar_submitted_by' => $user->usr_id, 'mar_submitted_at' => now(),
     ]);
 
     test()->actingAs($user)->get(route('establishment.arrivals.monthly', ['year' => 2026, 'tab' => 'records']))
         ->assertOk()
-        ->assertSee('data-modal-open="report-modal-'.$verified->id.'"', false)
-        ->assertSee('id="report-modal-'.$verified->id.'"', false)
-        ->assertSee('data-modal-open="report-modal-'.$returned->id.'"', false)
+        ->assertSee('data-modal-open="report-modal-'.$verified->mar_id.'"', false)
+        ->assertSee('id="report-modal-'.$verified->mar_id.'"', false)
+        ->assertSee('data-modal-open="report-modal-'.$returned->mar_id.'"', false)
         ->assertSee('What to fix: Add the July 4 tour group.')
         ->assertSee('Open Full Report')
         ->assertSee('Report Preview');
@@ -1196,15 +1204,15 @@ test('report pages show Report Preview with Print and Download PDF, for the esta
     // LGU Monthly Reports: View on a Verified report is a modal.
     test()->actingAs($lgu)->get(route('lgu.monthlyReports.index', ['period' => '2026-05']))
         ->assertOk()
-        ->assertSee('data-modal-open="lgu-report-modal-'.$report->id.'"', false)
-        ->assertSee('id="lgu-report-modal-'.$report->id.'"', false);
+        ->assertSee('data-modal-open="lgu-report-modal-'.$report->mar_id.'"', false)
+        ->assertSee('id="lgu-report-modal-'.$report->mar_id.'"', false);
 
     // LGU Municipal Reports: View on a month not ready to submit is a modal.
     MonthlyArrivalReport::query()->create([
-        'listing_id' => makeEstablishmentListing('Lupon', 'LUP7', 'Pending Lodge')->id, 'municipality_id' => $listing->municipality_id,
-        'period_month' => '2026-05-01', 'submission_source' => ReportSubmissionSource::Digital,
-        'status' => MonthlyReportStatus::Submitted, 'total_visitors' => 5,
-        'submitted_by' => $lgu->id, 'submitted_at' => now(),
+        'lst_id' => makeEstablishmentListing('Lupon', 'LUP7', 'Pending Lodge')->lst_id, 'mun_id' => $listing->mun_id,
+        'mar_period_month' => '2026-05-01', 'mar_submission_source' => ReportSubmissionSource::Digital,
+        'mar_status' => MonthlyReportStatus::Submitted, 'mar_total_visitors' => 5,
+        'mar_submitted_by' => $lgu->usr_id, 'mar_submitted_at' => now(),
     ]);
     test()->actingAs($lgu)->get(route('lgu.monthlyReports.municipal', ['year' => 2026, 'section' => 'records']))
         ->assertOk()

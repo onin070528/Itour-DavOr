@@ -11,10 +11,10 @@
 
 <x-layouts.dashboard :user="$user" :nav-sections="$navSections" :page-title="$pageTitle" account-heading="System" :settings-href="route('pto.settings')">
     <x-dashboard.page-header
-        :title="'Review '.$listing->name"
+        :title="'Review '.$listing->lst_name"
         :description="$blnIsChangeRequest
-            ? 'The '.$listing->municipality.' LGU changed this published listing. The published version stays live until you approve the changes.'
-            : 'Request to feature this establishment as a tourist destination, submitted by the '.$listing->municipality.' LGU.'"
+            ? 'The '.$listing->lst_municipality.' LGU changed this published listing. The published version stays live until you approve the changes.'
+            : 'Request to feature this establishment as a tourist destination, submitted by the '.$listing->lst_municipality.' LGU.'"
     >
         <x-slot:actions>
             <a href="{{ route('pto.destinationReviews.index') }}" class="btn-secondary">
@@ -27,7 +27,7 @@
     <div class="mt-6 flex flex-wrap items-center gap-3 rounded-md border border-sand-200 bg-sand-0 px-4 py-3 text-sm">
         <span class="font-semibold text-sand-900">{{ $listing->destinationListingLabel() }}</span>
         @if ($lastSubmission)
-            <span class="text-xs text-sand-500">Last submitted by {{ $lastSubmission->user->name ?? '—' }} · {{ $lastSubmission->created_at->format('M j, Y g:i A') }}</span>
+            <span class="text-xs text-sand-500">Last submitted by {{ $lastSubmission->user->usr_name ?? '—' }} · {{ $lastSubmission->opl_created_at->format('M j, Y g:i A') }}</span>
         @endif
     </div>
 
@@ -67,39 +67,39 @@
             <dl class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                     <dt class="detail-term">Name</dt>
-                    <dd class="detail-value">{{ $listing->name }}</dd>
+                    <dd class="detail-value">{{ $listing->lst_name }}</dd>
                 </div>
                 <div>
                     <dt class="detail-term">Category / Type</dt>
-                    <dd class="detail-value">{{ $listing->categoryName() }}{{ $listing->type ? ' · '.$listing->type : '' }}</dd>
+                    <dd class="detail-value">{{ $listing->categoryName() }}{{ $listing->lst_type ? ' · '.$listing->lst_type : '' }}</dd>
                 </div>
                 <div>
                     <dt class="detail-term">Municipality</dt>
-                    <dd class="detail-value">{{ $listing->municipality }}</dd>
+                    <dd class="detail-value">{{ $listing->lst_municipality }}</dd>
                 </div>
                 <div>
                     <dt class="detail-term">Barangay / Address</dt>
-                    <dd class="detail-value">{{ $listing->barangay ?: '—' }}</dd>
+                    <dd class="detail-value">{{ $listing->lst_barangay ?: '—' }}</dd>
                 </div>
                 <div>
                     <dt class="detail-term">Map location</dt>
-                    <dd class="detail-value">{{ $listing->lat !== null && $listing->lng !== null ? $listing->lat.', '.$listing->lng : 'Not set' }}</dd>
+                    <dd class="detail-value">{{ $listing->lst_lat !== null && $listing->lst_lng !== null ? $listing->lst_lat.', '.$listing->lst_lng : 'Not set' }}</dd>
                 </div>
                 <div>
                     <dt class="detail-term">Operating hours</dt>
-                    <dd class="detail-value">{{ $listing->hours ?: '—' }}</dd>
+                    <dd class="detail-value">{{ $listing->lst_hours ?: '—' }}</dd>
                 </div>
                 <div>
                     <dt class="detail-term">Contact</dt>
-                    <dd class="detail-value">{{ collect([$listing->contact_phone, $listing->email])->filter()->implode(' · ') ?: '—' }}</dd>
+                    <dd class="detail-value">{{ collect([$listing->lst_contact_phone, $listing->lst_email])->filter()->implode(' · ') ?: '—' }}</dd>
                 </div>
                 <div>
                     <dt class="detail-term">Website / Social media</dt>
-                    <dd class="detail-value">{{ $listing->website ?: '—' }}</dd>
+                    <dd class="detail-value">{{ $listing->lst_website ?: '—' }}</dd>
                 </div>
                 <div class="sm:col-span-2">
                     <dt class="detail-term">Description</dt>
-                    <dd class="detail-value whitespace-pre-line">{{ $listing->description ?: '—' }}</dd>
+                    <dd class="detail-value whitespace-pre-line">{{ $listing->lst_description ?: '—' }}</dd>
                 </div>
             </dl>
         </section>
@@ -115,7 +115,7 @@
                             <button
                                 type="button"
                                 data-confirm-trigger
-                                data-confirm-title="{{ $blnIsChangeRequest ? 'Approve the changes to '.$listing->name.'?' : 'Approve & publish '.$listing->name.'?' }}"
+                                data-confirm-title="{{ $blnIsChangeRequest ? 'Approve the changes to '.$listing->lst_name.'?' : 'Approve & publish '.$listing->lst_name.'?' }}"
                                 data-confirm-message="{{ $blnIsChangeRequest ? 'The proposed changes replace the live content on the public site immediately.' : 'This makes the listing publicly visible as a tourist destination immediately.' }}"
                                 data-confirm-label="Approve &amp; Publish"
                                 data-confirm-tone="success"
@@ -156,10 +156,10 @@
                     <ul class="mt-3 flex flex-col gap-2 text-xs text-sand-600">
                         @foreach ($history as $objEntry)
                             <li>
-                                <span class="font-semibold text-sand-800">{{ ucfirst($objEntry->action) }}</span>
-                                · {{ $objEntry->user->name ?? '—' }} · {{ $objEntry->created_at->format('M j, Y g:i A') }}
-                                @if ($objEntry->reason)
-                                    <span class="block text-sand-500">{{ $objEntry->reason }}</span>
+                                <span class="font-semibold text-sand-800">{{ ucfirst($objEntry->opl_action) }}</span>
+                                · {{ $objEntry->user->usr_name ?? '—' }} · {{ $objEntry->opl_created_at->format('M j, Y g:i A') }}
+                                @if ($objEntry->opl_reason)
+                                    <span class="block text-sand-500">{{ $objEntry->opl_reason }}</span>
                                 @endif
                             </li>
                         @endforeach
@@ -174,7 +174,7 @@
             <form id="return-for-correction-form" method="POST" action="{{ route('pto.directory.returnToLgu', $listing) }}" class="flex flex-col gap-3">
                 @csrf
                 @method('PATCH')
-                <p class="text-sm text-sand-700">The {{ $listing->municipality }} LGU sees these remarks, corrects the listing, and resubmits it.{{ $blnIsChangeRequest ? ' The published version stays live meanwhile.' : '' }}</p>
+                <p class="text-sm text-sand-700">The {{ $listing->lst_municipality }} LGU sees these remarks, corrects the listing, and resubmits it.{{ $blnIsChangeRequest ? ' The published version stays live meanwhile.' : '' }}</p>
                 <label for="return-remarks" class="form-label">Remarks <span class="text-danger" aria-hidden="true">*</span></label>
                 <textarea id="return-remarks" name="reason" rows="4" required maxlength="500" placeholder="What needs to be corrected?" class="form-input">{{ old('reason') }}</textarea>
                 @error('reason') <p class="form-error">{{ $message }}</p> @enderror

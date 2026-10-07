@@ -1,8 +1,10 @@
 {{--
-    System     : iTOUR - Integrated Tourism Information and Monitoring System
-    Purpose    : One establishment's photo-approval card — thumbnails, Approve all, Return all, and per-photo Return this one. Used by the LGU and PTO queues.
-    Programmer : <name(s)>
-    Copyright  : 2026 University of Mindanao. All rights reserved.
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: One establishment's photo-approval card — thumbnails, Approve all, Return all, and
+    per-photo Return this one. Used by the LGU and PTO queues.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
 --}}
 @props(['card', 'approveAllRouteName', 'returnBatchRouteName'])
 
@@ -15,10 +17,10 @@
 <div class="rounded-md border border-sand-200 bg-sand-0 p-5">
     <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-            <p class="font-display text-base font-bold text-sand-900">{{ $listing->name }}</p>
-            <p class="text-xs text-sand-500">{{ $listing->municipality }}</p>
+            <p class="font-display text-base font-bold text-sand-900">{{ $listing->lst_name }}</p>
+            <p class="text-xs text-sand-500">{{ $listing->lst_municipality }}</p>
             <p class="mt-1 text-xs text-sand-500">
-                Uploaded by {{ $card['uploader']->name ?? '—' }} · Latest {{ $card['latestUploadAt']->format('M j, Y') }}
+                Uploaded by {{ $card['uploader']->usr_name ?? '—' }} · Latest {{ $card['latestUploadAt']->format('M j, Y') }}
                 · {{ $images->count() }} {{ Str::plural('photo', $images->count()) }} waiting
             </p>
         </div>
@@ -34,7 +36,7 @@
                     Approve all
                 </button>
             </form>
-            <button type="button" data-modal-open="return-all-{{ $listing->id }}" class="rounded-sm border border-danger/30 px-3 py-2.5 text-sm font-semibold text-danger hover:bg-danger-bg">
+            <button type="button" data-modal-open="return-all-{{ $listing->lst_id }}" class="rounded-sm border border-danger/30 px-3 py-2.5 text-sm font-semibold text-danger hover:bg-danger-bg">
                 Return all
             </button>
         </div>
@@ -82,8 +84,8 @@
         @endforeach
     </div>
 
-    <x-dashboard.modal id="return-all-{{ $listing->id }}" title="Return All Photos">
-        <form id="return-all-form-{{ $listing->id }}" method="POST" action="{{ route($returnBatchRouteName, $listing) }}" class="flex flex-col gap-3">
+    <x-dashboard.modal id="return-all-{{ $listing->lst_id }}" title="Return All Photos">
+        <form id="return-all-form-{{ $listing->lst_id }}" method="POST" action="{{ route($returnBatchRouteName, $listing) }}" class="flex flex-col gap-3">
             @csrf
             @method('PATCH')
             @foreach ($allImageIds as $imageId)
@@ -95,7 +97,7 @@
         </form>
         <x-slot:footer>
             <button type="button" data-modal-close class="rounded-sm border border-sand-300 bg-sand-0 px-4 py-2.5 text-sm font-semibold text-sand-800 hover:border-primary-300">Cancel</button>
-            <button type="submit" form="return-all-form-{{ $listing->id }}" class="rounded-sm bg-danger px-4 py-2 text-sm font-semibold text-sand-0 hover:opacity-90">Return All</button>
+            <button type="submit" form="return-all-form-{{ $listing->lst_id }}" class="rounded-sm bg-danger px-4 py-2 text-sm font-semibold text-sand-0 hover:opacity-90">Return All</button>
         </x-slot:footer>
     </x-dashboard.modal>
 </div>

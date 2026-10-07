@@ -1,3 +1,10 @@
+{{--
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: Establishment dashboard.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+--}}
 @php
     $trendLabels = ['week' => 'This Week', 'month' => 'This Month', 'year' => 'This Year'];
     $totalClassified = $classificationBreakdown->sum();

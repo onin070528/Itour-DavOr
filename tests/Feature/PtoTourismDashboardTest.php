@@ -1,5 +1,13 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Tests — pto tourism dashboard.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 use App\Enums\MonthlyReportStatus;
 use App\Enums\ReportSubmissionSource;
 use App\Enums\UserRole;
@@ -20,17 +28,17 @@ test('KPIs only count Verified reports, never For Review ones', function () {
     $user = makeEstablishmentUser($listing);
 
     MonthlyArrivalReport::query()->create([
-        'listing_id' => $listing->id, 'municipality_id' => $municipality->id,
-        'period_month' => '2026-09-01', 'submission_source' => ReportSubmissionSource::Digital,
-        'status' => MonthlyReportStatus::Verified, 'total_visitors' => 100,
-        'party_local' => 80, 'party_foreign' => 20,
-        'submitted_by' => $user->id, 'submitted_at' => now(),
+        'lst_id' => $listing->lst_id, 'mun_id' => $municipality->mun_id,
+        'mar_period_month' => '2026-09-01', 'mar_submission_source' => ReportSubmissionSource::Digital,
+        'mar_status' => MonthlyReportStatus::Verified, 'mar_total_visitors' => 100,
+        'mar_party_local' => 80, 'mar_party_foreign' => 20,
+        'mar_submitted_by' => $user->usr_id, 'mar_submitted_at' => now(),
     ]);
     MonthlyArrivalReport::query()->create([
-        'listing_id' => $listing->id, 'municipality_id' => $municipality->id,
-        'period_month' => '2026-08-01', 'submission_source' => ReportSubmissionSource::Digital,
-        'status' => MonthlyReportStatus::ForReview, 'total_visitors' => 9999,
-        'submitted_by' => $user->id, 'submitted_at' => now(),
+        'lst_id' => $listing->lst_id, 'mun_id' => $municipality->mun_id,
+        'mar_period_month' => '2026-08-01', 'mar_submission_source' => ReportSubmissionSource::Digital,
+        'mar_status' => MonthlyReportStatus::ForReview, 'mar_total_visitors' => 9999,
+        'mar_submitted_by' => $user->usr_id, 'mar_submitted_at' => now(),
     ]);
 
     $filters = ['year' => 2026, 'month' => 9, 'municipalityId' => null, 'listingId' => null, 'classification' => null];
@@ -46,9 +54,9 @@ test('Reporting LGUs KPI shows submitted-over-total correctly', function () {
     $lgu = makeLguUser($submitted);
 
     MunicipalReport::query()->create([
-        'municipality' => $submitted->name, 'municipality_id' => $submitted->id,
-        'submitted_by' => $lgu->id, 'period_start' => '2026-09-01', 'period_end' => '2026-09-30',
-        'total_arrivals' => 100, 'status' => MunicipalReport::STATUS_SUBMITTED,
+        'mrp_municipality' => $submitted->mun_name, 'mun_id' => $submitted->mun_id,
+        'mrp_submitted_by' => $lgu->usr_id, 'mrp_period_start' => '2026-09-01', 'mrp_period_end' => '2026-09-30',
+        'mrp_total_arrivals' => 100, 'mrp_status' => MunicipalReport::STATUS_SUBMITTED,
     ]);
 
     $filters = ['year' => 2026, 'month' => 9, 'municipalityId' => null, 'listingId' => null, 'classification' => null];
@@ -63,7 +71,7 @@ test('Reporting LGUs KPI shows submitted-over-total correctly', function () {
 test('reporting status shows the literal label Not Submitted, never a zero', function () {
     $municipality = makeMunicipality('Lupon', 'DASH3');
 
-    $rows = TourismAnalytics::reportingStatus(['year' => 2026, 'month' => 9, 'municipalityId' => $municipality->id, 'listingId' => null, 'classification' => null]);
+    $rows = TourismAnalytics::reportingStatus(['year' => 2026, 'month' => 9, 'municipalityId' => $municipality->mun_id, 'listingId' => null, 'classification' => null]);
 
     expect($rows->first()['status'])->toBe('Not Submitted');
     expect($rows->first()['report'])->toBeNull();
@@ -74,13 +82,13 @@ test('period comparison returns "No comparison available" when the previous peri
     $user = makeEstablishmentUser($listing);
 
     MonthlyArrivalReport::query()->create([
-        'listing_id' => $listing->id, 'municipality_id' => $listing->municipality_id,
-        'period_month' => '2026-09-01', 'submission_source' => ReportSubmissionSource::Digital,
-        'status' => MonthlyReportStatus::Verified, 'total_visitors' => 100,
-        'submitted_by' => $user->id, 'submitted_at' => now(),
+        'lst_id' => $listing->lst_id, 'mun_id' => $listing->mun_id,
+        'mar_period_month' => '2026-09-01', 'mar_submission_source' => ReportSubmissionSource::Digital,
+        'mar_status' => MonthlyReportStatus::Verified, 'mar_total_visitors' => 100,
+        'mar_submitted_by' => $user->usr_id, 'mar_submitted_at' => now(),
     ]);
 
-    $filters = ['year' => 2026, 'month' => 9, 'municipalityId' => $listing->municipality_id, 'listingId' => null, 'classification' => null];
+    $filters = ['year' => 2026, 'month' => 9, 'municipalityId' => $listing->mun_id, 'listingId' => null, 'classification' => null];
     $comparison = TourismAnalytics::periodComparison($filters);
 
     expect($comparison['label'])->toBe('No comparison available');
@@ -92,19 +100,19 @@ test('period comparison computes a safe percentage when both periods have verifi
     $user = makeEstablishmentUser($listing);
 
     MonthlyArrivalReport::query()->create([
-        'listing_id' => $listing->id, 'municipality_id' => $listing->municipality_id,
-        'period_month' => '2026-08-01', 'submission_source' => ReportSubmissionSource::Digital,
-        'status' => MonthlyReportStatus::Verified, 'total_visitors' => 100,
-        'submitted_by' => $user->id, 'submitted_at' => now(),
+        'lst_id' => $listing->lst_id, 'mun_id' => $listing->mun_id,
+        'mar_period_month' => '2026-08-01', 'mar_submission_source' => ReportSubmissionSource::Digital,
+        'mar_status' => MonthlyReportStatus::Verified, 'mar_total_visitors' => 100,
+        'mar_submitted_by' => $user->usr_id, 'mar_submitted_at' => now(),
     ]);
     MonthlyArrivalReport::query()->create([
-        'listing_id' => $listing->id, 'municipality_id' => $listing->municipality_id,
-        'period_month' => '2026-09-01', 'submission_source' => ReportSubmissionSource::Digital,
-        'status' => MonthlyReportStatus::Verified, 'total_visitors' => 150,
-        'submitted_by' => $user->id, 'submitted_at' => now(),
+        'lst_id' => $listing->lst_id, 'mun_id' => $listing->mun_id,
+        'mar_period_month' => '2026-09-01', 'mar_submission_source' => ReportSubmissionSource::Digital,
+        'mar_status' => MonthlyReportStatus::Verified, 'mar_total_visitors' => 150,
+        'mar_submitted_by' => $user->usr_id, 'mar_submitted_at' => now(),
     ]);
 
-    $filters = ['year' => 2026, 'month' => 9, 'municipalityId' => $listing->municipality_id, 'listingId' => null, 'classification' => null];
+    $filters = ['year' => 2026, 'month' => 9, 'municipalityId' => $listing->mun_id, 'listingId' => null, 'classification' => null];
     $comparison = TourismAnalytics::periodComparison($filters);
 
     expect($comparison['label'])->toBe('Increased');
@@ -116,14 +124,14 @@ test('classification filter changes the arrival total to the selected classifica
     $user = makeEstablishmentUser($listing);
 
     MonthlyArrivalReport::query()->create([
-        'listing_id' => $listing->id, 'municipality_id' => $listing->municipality_id,
-        'period_month' => '2026-09-01', 'submission_source' => ReportSubmissionSource::Digital,
-        'status' => MonthlyReportStatus::Verified, 'total_visitors' => 100,
-        'party_local' => 70, 'party_foreign' => 30,
-        'submitted_by' => $user->id, 'submitted_at' => now(),
+        'lst_id' => $listing->lst_id, 'mun_id' => $listing->mun_id,
+        'mar_period_month' => '2026-09-01', 'mar_submission_source' => ReportSubmissionSource::Digital,
+        'mar_status' => MonthlyReportStatus::Verified, 'mar_total_visitors' => 100,
+        'mar_party_local' => 70, 'mar_party_foreign' => 30,
+        'mar_submitted_by' => $user->usr_id, 'mar_submitted_at' => now(),
     ]);
 
-    $baseFilters = ['year' => 2026, 'month' => 9, 'municipalityId' => $listing->municipality_id, 'listingId' => null];
+    $baseFilters = ['year' => 2026, 'month' => 9, 'municipalityId' => $listing->mun_id, 'listingId' => null];
     $comparison = TourismAnalytics::periodComparison([...$baseFilters, 'classification' => 'local']);
 
     $localKpis = collect(TourismAnalytics::kpis([...$baseFilters, 'classification' => 'local'], $comparison));
@@ -134,7 +142,7 @@ test('classification filter changes the arrival total to the selected classifica
 });
 
 test('dashboard renders the insufficient-data trend state when a filtered year has no verified reports', function () {
-    $pto = User::factory()->create(['role' => UserRole::PtoAdministrator]);
+    $pto = User::factory()->create(['usr_role' => UserRole::PtoAdministrator]);
 
     $response = test()->actingAs($pto)->get(route('pto.dashboard', ['year' => 2019]));
 
@@ -143,7 +151,7 @@ test('dashboard renders the insufficient-data trend state when a filtered year h
 });
 
 test('the dashboard page renders for PTO with real sections', function () {
-    $pto = User::factory()->create(['role' => UserRole::PtoAdministrator]);
+    $pto = User::factory()->create(['usr_role' => UserRole::PtoAdministrator]);
 
     $response = test()->actingAs($pto)->get(route('pto.dashboard'));
 

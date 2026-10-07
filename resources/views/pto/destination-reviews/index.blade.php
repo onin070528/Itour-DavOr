@@ -34,14 +34,14 @@
                 @forelse ($awaitingListings as $listing)
                     <tr class="hover:bg-sand-50">
                         <td class="px-4 py-3">
-                            <p class="font-medium text-sand-900">{{ $listing->name }}</p>
-                            <p class="text-xs text-sand-500">{{ $listing->categoryName() }}{{ $listing->type ? ' · '.$listing->type : '' }}</p>
+                            <p class="font-medium text-sand-900">{{ $listing->lst_name }}</p>
+                            <p class="text-xs text-sand-500">{{ $listing->categoryName() }}{{ $listing->lst_type ? ' · '.$listing->lst_type : '' }}</p>
                         </td>
-                        <td class="px-4 py-3 text-sand-700">{{ $listing->municipality }}</td>
+                        <td class="px-4 py-3 text-sand-700">{{ $listing->lst_municipality }}</td>
                         <td class="px-4 py-3">
                             <x-dashboard.status-badge tone="warning">{{ $listing->hasPendingChanges() ? 'Changes to a published listing' : 'New destination listing' }}</x-dashboard.status-badge>
                         </td>
-                        <td class="px-4 py-3 text-sand-700">{{ $listing->updated_at?->format('M j, Y') }}</td>
+                        <td class="px-4 py-3 text-sand-700">{{ $listing->lst_updated_at?->format('M j, Y') }}</td>
                         <td class="px-4 py-3 text-right">
                             <a href="{{ route('pto.destinationReviews.show', $listing) }}" class="btn-primary btn-small">Review</a>
                         </td>
@@ -62,8 +62,8 @@
                 @foreach ($returnedListings as $listing)
                     <li class="flex flex-wrap items-center justify-between gap-2 px-5 py-3 text-sm">
                         <span>
-                            <span class="font-medium text-sand-900">{{ $listing->name }}</span>
-                            <span class="text-xs text-sand-500">· {{ $listing->municipality }}</span>
+                            <span class="font-medium text-sand-900">{{ $listing->lst_name }}</span>
+                            <span class="text-xs text-sand-500">· {{ $listing->lst_municipality }}</span>
                             <span class="mt-0.5 block text-xs text-sand-600">Remarks: {{ $listing->lst_review_remarks }}</span>
                         </span>
                         <a href="{{ route('pto.destinationReviews.show', $listing) }}" class="text-xs font-semibold text-primary-700 hover:text-primary-900">View</a>

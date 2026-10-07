@@ -1,12 +1,20 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Tests — pto hotlines.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 use App\Enums\UserRole;
 use App\Models\Hotline;
 use App\Models\User;
 
 function makePtoForHotlines(): User
 {
-    return User::factory()->create(['role' => UserRole::PtoAdministrator]);
+    return User::factory()->create(['usr_role' => UserRole::PtoAdministrator]);
 }
 
 test('a PTO administrator can create a hotline', function () {
@@ -59,7 +67,7 @@ test('reordering swaps sort order with the adjacent hotline', function () {
 });
 
 test('a non-PTO user cannot manage hotlines', function () {
-    $lgu = User::factory()->create(['role' => UserRole::Lgu]);
+    $lgu = User::factory()->create(['usr_role' => UserRole::Lgu]);
     $hotline = Hotline::query()->create(['hot_agency_name' => 'A', 'hot_agency_type' => 'Police', 'hot_contact_number' => '1', 'hot_sort_order' => 1]);
 
     test()->actingAs($lgu)->get(route('pto.hotlines.index'))->assertForbidden();

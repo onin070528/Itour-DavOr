@@ -37,9 +37,9 @@ class ArrivalsController extends EstablishmentController
     /**
      * Record Arrival: the two-column, Alpine.js-driven form used to log a guest.
      */
-    public function record(Request $request): View
+    public function record(Request $objRequest): View
     {
-        return $this->renderEstablishment($request, 'establishment.arrivals.record', 'arrivals.record', 'Record Arrival', [
+        return $this->renderEstablishment($objRequest, 'establishment.arrivals.record', 'arrivals.record', 'Record Arrival', [
             'provinces' => config('ph_provinces'),
             'countries' => config('countries'),
             'municipalities' => app(ArrivalRecorder::class)->getProvinceMunicipalityNames(),
@@ -55,26 +55,26 @@ class ArrivalsController extends EstablishmentController
      * the public self-checkin form (see CheckinController::store) rather than
      * one visitor's own gender/classification.
      */
-    public function store(Request $request, ArrivalRecorder $arrivalRecorder): JsonResponse
+    public function store(Request $objRequest, ArrivalRecorder $arrivalRecorder): JsonResponse
     {
         // Shared visit type / headcount / origin rules (ArrivalRecorder) plus
         // the staff-only fields: an editable date and an optional lead name.
-        $data = Validator::make($request->all(), array_merge([
+        $arrData = Validator::make($objRequest->all(), array_merge([
             'date' => ['required', 'date'],
             'visitorName' => ['nullable', 'string', 'max:255'],
-        ], $arrivalRecorder->getRules($request)))
-            ->after(fn ($validator) => $arrivalRecorder->checkHeadcount($validator, $request))
+        ], $arrivalRecorder->getRules($objRequest)))
+            ->after(fn ($objValidator) => $arrivalRecorder->checkHeadcount($objValidator, $objRequest))
             ->validate();
 
-        // Resolved via establishment_id, not a Listing.name match against
+        // Resolved via lst_id, not a Listing.name match against
         // organization_name — see Establishment\ProfileController::ownListing().
-        abort_if($request->user()->establishment_id === null, 403, 'Your account is not linked to an establishment yet.');
-        $listing = $request->user()->establishment()->firstOrFail();
+        abort_if($objRequest->user()->lst_id === null, 403, 'Your account is not linked to an establishment yet.');
+        $objListing = $objRequest->user()->establishment()->firstOrFail();
 
         try {
-            $arrivalRecorder->record($listing, $data, ArrivalSource::Staff, $request->user()->id, $data['date']);
-        } catch (\Throwable $e) {
-            Log::error('Failed to record arrival.', ['exception' => $e, 'listing_id' => $listing->id]);
+            $arrivalRecorder->record($objListing, $arrData, ArrivalSource::Staff, $objRequest->user()->usr_id, $arrData['date']);
+        } catch (\Throwable $objException) {
+            Log::error('Failed to record arrival.', ['exception' => $objException, 'listing_id' => $objListing->lst_id]);
 
             return response()->json(['message' => 'Something went wrong while recording the arrival. Please try again.'], 500);
         }
@@ -85,31 +85,31 @@ class ArrivalsController extends EstablishmentController
     /**
      * Arrival Records: guest arrivals previously recorded for this
      * establishment, staff-logged and self-checkin alike. Scoped via
-     * establishment_id (not a Listing.name match against organization_name —
+     * lst_id (not a Listing.name match against usr_organization_name —
      * see ProfileController::ownListing()), so two establishments sharing a
      * display name never see each other's arrivals.
      */
-    public function index(Request $request): View
+    public function index(Request $objRequest): View
     {
-        abort_if($request->user()->establishment_id === null, 403, 'Your account is not linked to an establishment yet.');
-        $listing = $request->user()->establishment()->firstOrFail();
+        abort_if($objRequest->user()->lst_id === null, 403, 'Your account is not linked to an establishment yet.');
+        $objListing = $objRequest->user()->establishment()->firstOrFail();
 
-        $arrivals = $listing->arrivals()
-            ->orderByDesc('date')
-            ->orderByDesc('id')
+        $objArrivals = $objListing->arrivals()
+            ->orderByDesc('arr_date')
+            ->orderByDesc('arr_id')
             ->get()
-            ->map(fn (Arrival $arrival) => [
-                'id' => 'GR-'.$arrival->id,
-                'date' => $arrival->date->toDateString(),
-                'visitorName' => $arrival->visitor_name,
-                'gender' => $arrival->gender,
-                'classification' => $arrival->classification,
-                'remarks' => $arrival->remarks,
-                'status' => $arrival->status,
+            ->map(fn (Arrival $objArrival) => [
+                'id' => 'GR-'.$objArrival->arr_id,
+                'date' => $objArrival->arr_date->toDateString(),
+                'visitorName' => $objArrival->arr_visitor_name,
+                'gender' => $objArrival->arr_gender,
+                'classification' => $objArrival->arr_classification,
+                'remarks' => $objArrival->arr_remarks,
+                'status' => $objArrival->arr_status,
             ]);
 
-        return $this->renderEstablishment($request, 'establishment.arrivals.index', 'arrivals.index', 'Arrival Records', [
-            'arrivals' => $arrivals,
+        return $this->renderEstablishment($objRequest, 'establishment.arrivals.index', 'arrivals.index', 'Arrival Records', [
+            'arrivals' => $objArrivals,
         ]);
     }
 
@@ -122,24 +122,24 @@ class ArrivalsController extends EstablishmentController
      * still prepared, reviewed and submitted through the existing Save
      * Draft -> Review -> Submit to LGU flow.
      */
-    public function monthlyReports(Request $request): View
+    public function monthlyReports(Request $objRequest): View
     {
-        abort_if($request->user()->establishment_id === null, 403, 'Your account is not linked to an establishment yet.');
-        $listing = $request->user()->establishment()->firstOrFail();
+        abort_if($objRequest->user()->lst_id === null, 403, 'Your account is not linked to an establishment yet.');
+        $objListing = $objRequest->user()->establishment()->firstOrFail();
 
-        $reports = $listing->monthlyArrivalReports()
+        $objReports = $objListing->monthlyArrivalReports()
             ->with(['submitter', 'verifier'])
-            ->orderByDesc('period_month')
+            ->orderByDesc('mar_period_month')
             ->get();
 
-        $arrYearOptions = TourismAnalytics::scopedYearOptions(null, $listing->id);
-        $intYear = in_array((int) $request->query('year'), $arrYearOptions, true) ? (int) $request->query('year') : CarbonImmutable::now()->year;
-        $strTab = in_array($request->query('tab'), ['records', 'statistics'], true) ? $request->query('tab') : 'overview';
+        $arrYearOptions = TourismAnalytics::scopedYearOptions(null, $objListing->lst_id);
+        $intYear = in_array((int) $objRequest->query('year'), $arrYearOptions, true) ? (int) $objRequest->query('year') : CarbonImmutable::now()->year;
+        $strTab = in_array($objRequest->query('tab'), ['records', 'statistics'], true) ? $objRequest->query('tab') : 'overview';
 
         // Monthly Records: every month of the selected year that has
         // started (newest first). A month with no report is "Not
         // Submitted" — shown, never treated as zero.
-        $objReportsByMonth = $reports->keyBy(fn (MonthlyArrivalReport $objReport) => $objReport->period_month->format('Y-m'));
+        $objReportsByMonth = $objReports->keyBy(fn (MonthlyArrivalReport $objReport) => $objReport->mar_period_month->format('Y-m'));
         $dtCurrentMonth = CarbonImmutable::now()->startOfMonth();
 
         $objMonths = collect(range(12, 1))
@@ -152,12 +152,12 @@ class ArrivalsController extends EstablishmentController
             ])
             ->values();
 
-        return $this->renderEstablishment($request, 'establishment.arrivals.monthly', 'arrivals.monthly', 'Monthly Reports', [
+        return $this->renderEstablishment($objRequest, 'establishment.arrivals.monthly', 'arrivals.monthly', 'Monthly Reports', [
             'year' => $intYear,
             'yearOptions' => $arrYearOptions,
             'activeTab' => $strTab,
             'months' => $objMonths,
-            'overview' => $this->_reportingOverview($listing->id, $intYear, $reports, $request->boolean('compare')),
+            'overview' => $this->_reportingOverview($objListing->lst_id, $intYear, $objReports, $objRequest->boolean('compare')),
         ]);
     }
 
@@ -177,15 +177,15 @@ class ArrivalsController extends EstablishmentController
         $objPreviousRecords = TourismAnalytics::monthlyRecords([...$arrFilters, 'year' => $intYear - 1]);
         $blnHasPrevious = $objPreviousRecords->contains('hasData', true);
 
-        $objYearReports = $objReports->filter(fn (MonthlyArrivalReport $objReport) => $objReport->period_month->year === $intYear);
+        $objYearReports = $objReports->filter(fn (MonthlyArrivalReport $objReport) => $objReport->mar_period_month->year === $intYear);
 
         return [
             'year' => $intYear,
             'records' => $objRecords,
             'summary' => TourismAnalytics::yearSummary($objRecords),
-            'submittedCount' => $objYearReports->reject(fn (MonthlyArrivalReport $objReport) => $objReport->status === MonthlyReportStatus::Draft)->count(),
-            'verifiedCount' => $objYearReports->where('status', MonthlyReportStatus::Verified)->count(),
-            'forCorrectionCount' => $objYearReports->where('status', MonthlyReportStatus::ForCorrection)->count(),
+            'submittedCount' => $objYearReports->reject(fn (MonthlyArrivalReport $objReport) => $objReport->mar_status === MonthlyReportStatus::Draft)->count(),
+            'verifiedCount' => $objYearReports->where('mar_status', MonthlyReportStatus::Verified)->count(),
+            'forCorrectionCount' => $objYearReports->where('mar_status', MonthlyReportStatus::ForCorrection)->count(),
             'hasPrevious' => $blnHasPrevious,
             'compare' => $blnCompare && $blnHasPrevious,
             'previousRecords' => $objPreviousRecords,
@@ -203,44 +203,44 @@ class ArrivalsController extends EstablishmentController
      * arrivals still saves, as a zero-arrival report — a missing report is
      * never the same thing as a submitted zero one.
      */
-    public function saveMonthlyDraft(Request $request): RedirectResponse
+    public function saveMonthlyDraft(Request $objRequest): RedirectResponse
     {
-        abort_if($request->user()->establishment_id === null, 403, 'Your account is not linked to an establishment yet.');
-        $objListing = $request->user()->establishment()->firstOrFail();
+        abort_if($objRequest->user()->lst_id === null, 403, 'Your account is not linked to an establishment yet.');
+        $objListing = $objRequest->user()->establishment()->firstOrFail();
 
-        $arrData = $request->validate([
+        $arrData = $objRequest->validate([
             'period_month' => ['required', 'date_format:Y-m'],
         ]);
 
         $dtMonth = CarbonImmutable::createFromFormat('Y-m', $arrData['period_month'])->startOfMonth();
         $objExisting = $objListing->monthlyArrivalReports()->forPeriod($dtMonth)->first();
 
-        if ($objExisting && ! $request->user()->can('editDraft', $objExisting)) {
+        if ($objExisting && ! $objRequest->user()->can('editDraft', $objExisting)) {
             return back()->with('toast', "The {$dtMonth->format('F Y')} report has already been submitted and can no longer be edited.")->with('toast_tone', 'danger');
         }
 
         $objTotals = $objListing->arrivals()
-            ->whereBetween('date', [$dtMonth->toDateString(), $dtMonth->endOfMonth()->toDateString()])
+            ->whereBetween('arr_date', [$dtMonth->toDateString(), $dtMonth->endOfMonth()->toDateString()])
             ->selectRaw('
-                COALESCE(SUM(party_male), 0) as party_male,
-                COALESCE(SUM(party_female), 0) as party_female,
-                COALESCE(SUM(party_adults), 0) as party_adults,
-                COALESCE(SUM(party_children), 0) as party_children,
-                COALESCE(SUM(party_seniors), 0) as party_seniors,
-                COALESCE(SUM(party_local), 0) as party_local,
-                COALESCE(SUM(party_foreign), 0) as party_foreign
+                COALESCE(SUM(arr_party_male), 0) as party_male,
+                COALESCE(SUM(arr_party_female), 0) as party_female,
+                COALESCE(SUM(arr_party_adults), 0) as party_adults,
+                COALESCE(SUM(arr_party_children), 0) as party_children,
+                COALESCE(SUM(arr_party_seniors), 0) as party_seniors,
+                COALESCE(SUM(arr_party_local), 0) as party_local,
+                COALESCE(SUM(arr_party_foreign), 0) as party_foreign
             ')
             ->first();
 
         $arrFigures = [
-            'party_male' => (int) $objTotals->party_male,
-            'party_female' => (int) $objTotals->party_female,
-            'party_adults' => (int) $objTotals->party_adults,
-            'party_children' => (int) $objTotals->party_children,
-            'party_seniors' => (int) $objTotals->party_seniors,
-            'party_local' => (int) $objTotals->party_local,
-            'party_foreign' => (int) $objTotals->party_foreign,
-            'total_visitors' => (int) $objTotals->party_male + (int) $objTotals->party_female,
+            'mar_party_male' => (int) $objTotals->party_male,
+            'mar_party_female' => (int) $objTotals->party_female,
+            'mar_party_adults' => (int) $objTotals->party_adults,
+            'mar_party_children' => (int) $objTotals->party_children,
+            'mar_party_seniors' => (int) $objTotals->party_seniors,
+            'mar_party_local' => (int) $objTotals->party_local,
+            'mar_party_foreign' => (int) $objTotals->party_foreign,
+            'mar_total_visitors' => (int) $objTotals->party_male + (int) $objTotals->party_female,
         ];
 
         $arrBefore = $objExisting?->getOriginal();
@@ -253,47 +253,47 @@ class ArrivalsController extends EstablishmentController
                 $objReport = $objExisting
                     ? tap($objExisting)->update($arrFigures)
                     : MonthlyArrivalReport::query()->create([
-                        'listing_id' => $objListing->id,
-                        'municipality_id' => $objListing->municipality_id,
-                        'period_month' => $dtMonth->toDateString(),
-                        'submission_source' => ReportSubmissionSource::Digital,
-                        'status' => MonthlyReportStatus::Draft,
+                        'lst_id' => $objListing->lst_id,
+                        'mun_id' => $objListing->mun_id,
+                        'mar_period_month' => $dtMonth->toDateString(),
+                        'mar_submission_source' => ReportSubmissionSource::Digital,
+                        'mar_status' => MonthlyReportStatus::Draft,
                         ...$arrFigures,
                     ]);
 
                 $objListing->arrivals()
-                    ->whereBetween('date', [$dtMonth->toDateString(), $dtMonth->endOfMonth()->toDateString()])
-                    ->update(['monthly_arrival_report_id' => $objReport->id]);
+                    ->whereBetween('arr_date', [$dtMonth->toDateString(), $dtMonth->endOfMonth()->toDateString()])
+                    ->update(['mar_id' => $objReport->mar_id]);
 
                 return $objReport;
             });
-        } catch (\Throwable $e) {
-            Log::error('Failed to save monthly report draft.', ['exception' => $e, 'listing_id' => $objListing->id]);
+        } catch (\Throwable $objException) {
+            Log::error('Failed to save monthly report draft.', ['exception' => $objException, 'listing_id' => $objListing->lst_id]);
 
             return back()->with('toast', 'Something went wrong while saving the draft. Please try again.')->with('toast_tone', 'danger');
         }
 
         if ($objExisting) {
             OperationLogger::updated(
-                $request->user(),
+                $objRequest->user(),
                 'monthly_arrival_report',
-                $objReport->id,
-                $objListing->municipality_id,
-                $objListing->id,
+                $objReport->mar_id,
+                $objListing->mun_id,
+                $objListing->lst_id,
                 OperationLogger::diff($arrBefore, $objReport),
             );
         } else {
             OperationLogger::created(
-                $request->user(),
+                $objRequest->user(),
                 'monthly_arrival_report',
-                $objReport->id,
-                $objListing->municipality_id,
-                $objListing->id,
+                $objReport->mar_id,
+                $objListing->mun_id,
+                $objListing->lst_id,
                 [
                     'period_month' => $dtMonth->toDateString(),
                     'submission_source' => ReportSubmissionSource::Digital->value,
                     'status' => MonthlyReportStatus::Draft->value,
-                    'total_visitors' => $objReport->total_visitors,
+                    'total_visitors' => $objReport->mar_total_visitors,
                 ],
             );
         }
@@ -307,21 +307,21 @@ class ArrivalsController extends EstablishmentController
      * missing arrivals, then Save Draft again) and Submit to LGU. Shows the
      * LGU's remarks when the report was returned For Correction.
      */
-    public function showMonthlyReport(Request $request, MonthlyArrivalReport $monthlyArrivalReport): View
+    public function showMonthlyReport(Request $objRequest, MonthlyArrivalReport $monthlyArrivalReport): View
     {
-        abort_unless($request->user()->can('view', $monthlyArrivalReport), 403);
+        abort_unless($objRequest->user()->can('view', $monthlyArrivalReport), 403);
 
         $monthlyArrivalReport->loadMissing(['submitter', 'verifier', 'listing.categoryRecord']);
 
         // The guest arrivals this report was added up from, so the owner
         // can check them before submitting (and later, as a record).
-        $objArrivals = $monthlyArrivalReport->arrivals()->orderBy('date')->orderBy('id')->get();
+        $objArrivals = $monthlyArrivalReport->arrivals()->orderBy('arr_date')->orderBy('arr_id')->get();
 
-        return $this->renderEstablishment($request, 'establishment.arrivals.monthly-show', 'arrivals.monthly', 'Monthly Report', [
+        return $this->renderEstablishment($objRequest, 'establishment.arrivals.monthly-show', 'arrivals.monthly', 'Monthly Report', [
             'report' => $monthlyArrivalReport,
             'arrivals' => $objArrivals,
-            'canSubmit' => $request->user()->can('submit', $monthlyArrivalReport),
-            'activeView' => $request->query('view') === 'a4' ? 'a4' : 'details',
+            'canSubmit' => $objRequest->user()->can('submit', $monthlyArrivalReport),
+            'activeView' => $objRequest->query('view') === 'a4' ? 'a4' : 'details',
             'originBreakdown' => $monthlyArrivalReport->originBreakdown(),
         ]);
     } // end showMonthlyReport
@@ -330,9 +330,9 @@ class ArrivalsController extends EstablishmentController
      * A4 Preview of the establishment's own report — the same official
      * document layout the LGU and PTO use (DRAFT watermark until Verified).
      */
-    public function previewMonthlyReport(Request $request, MonthlyArrivalReport $monthlyArrivalReport): View
+    public function previewMonthlyReport(Request $objRequest, MonthlyArrivalReport $monthlyArrivalReport): View
     {
-        abort_unless($request->user()->can('view', $monthlyArrivalReport), 403);
+        abort_unless($objRequest->user()->can('view', $monthlyArrivalReport), 403);
 
         return view('pdf.official-report', [
             'report' => OfficialReportBuilder::fromMonthlyArrivalReport($monthlyArrivalReport),
@@ -345,9 +345,9 @@ class ArrivalsController extends EstablishmentController
      * Download PDF — the same A4 document as the preview, through the
      * existing DomPDF setup.
      */
-    public function downloadMonthlyReportPdf(Request $request, MonthlyArrivalReport $monthlyArrivalReport): Response
+    public function downloadMonthlyReportPdf(Request $objRequest, MonthlyArrivalReport $monthlyArrivalReport): Response
     {
-        abort_unless($request->user()->can('view', $monthlyArrivalReport), 403);
+        abort_unless($objRequest->user()->can('view', $monthlyArrivalReport), 403);
 
         $arrReport = OfficialReportBuilder::fromMonthlyArrivalReport($monthlyArrivalReport);
 
@@ -355,8 +355,8 @@ class ArrivalsController extends EstablishmentController
             return Pdf::loadView('pdf.official-report', ['report' => $arrReport, 'preview' => false])
                 ->setPaper('a4')
                 ->download("{$arrReport['reference_number']}.pdf");
-        } catch (\Throwable $e) {
-            Log::error('Failed to generate monthly report PDF.', ['exception' => $e, 'report_id' => $monthlyArrivalReport->id]);
+        } catch (\Throwable $objException) {
+            Log::error('Failed to generate monthly report PDF.', ['exception' => $objException, 'report_id' => $monthlyArrivalReport->mar_id]);
 
             abort(500, 'The PDF could not be generated. Please use Print instead.');
         }
@@ -370,29 +370,29 @@ class ArrivalsController extends EstablishmentController
      * recorded for that month after the draft was saved, the draft must be
      * saved and reviewed again first.
      */
-    public function submitMonthlyReport(Request $request): RedirectResponse
+    public function submitMonthlyReport(Request $objRequest): RedirectResponse
     {
-        abort_if($request->user()->establishment_id === null, 403, 'Your account is not linked to an establishment yet.');
-        $listing = $request->user()->establishment()->firstOrFail();
+        abort_if($objRequest->user()->lst_id === null, 403, 'Your account is not linked to an establishment yet.');
+        $objListing = $objRequest->user()->establishment()->firstOrFail();
 
-        $data = $request->validate([
+        $arrData = $objRequest->validate([
             'period_month' => ['required', 'date_format:Y-m'],
         ]);
 
-        $month = CarbonImmutable::createFromFormat('Y-m', $data['period_month'])->startOfMonth();
-        $objReport = $listing->monthlyArrivalReports()->forPeriod($month)->first();
+        $dtMonth = CarbonImmutable::createFromFormat('Y-m', $arrData['period_month'])->startOfMonth();
+        $objReport = $objListing->monthlyArrivalReports()->forPeriod($dtMonth)->first();
 
         if (! $objReport) {
-            return back()->with('toast', "Save a draft of the {$month->format('F Y')} report and review it before submitting.")->with('toast_tone', 'danger');
+            return back()->with('toast', "Save a draft of the {$dtMonth->format('F Y')} report and review it before submitting.")->with('toast_tone', 'danger');
         }
 
-        if (! $request->user()->can('submit', $objReport)) {
-            return back()->with('toast', "A report for {$month->format('F Y')} has already been submitted.")->with('toast_tone', 'danger');
+        if (! $objRequest->user()->can('submit', $objReport)) {
+            return back()->with('toast', "A report for {$dtMonth->format('F Y')} has already been submitted.")->with('toast_tone', 'danger');
         }
 
-        $blnHasUnsavedArrivals = $listing->arrivals()
-            ->whereBetween('date', [$month->toDateString(), $month->endOfMonth()->toDateString()])
-            ->whereNull('monthly_arrival_report_id')
+        $blnHasUnsavedArrivals = $objListing->arrivals()
+            ->whereBetween('arr_date', [$dtMonth->toDateString(), $dtMonth->endOfMonth()->toDateString()])
+            ->whereNull('mar_id')
             ->exists();
 
         if ($blnHasUnsavedArrivals) {
@@ -404,22 +404,22 @@ class ArrivalsController extends EstablishmentController
         $arrBefore = $objReport->getOriginal();
 
         $objReport->update([
-            'status' => MonthlyReportStatus::Submitted,
-            'submitted_by' => $request->user()->id,
-            'submitted_at' => now(),
+            'mar_status' => MonthlyReportStatus::Submitted,
+            'mar_submitted_by' => $objRequest->user()->usr_id,
+            'mar_submitted_at' => now(),
         ]);
 
         OperationLogger::submitted(
-            $request->user(),
+            $objRequest->user(),
             'monthly_arrival_report',
-            $objReport->id,
-            $listing->municipality_id,
+            $objReport->mar_id,
+            $objListing->mun_id,
             OperationLogger::diff($arrBefore, $objReport),
-            $listing->id,
+            $objListing->lst_id,
         );
 
         // Back to Monthly Records so the owner immediately sees the new status.
-        return redirect()->route('establishment.arrivals.monthly', ['year' => $month->year, 'tab' => 'records'])
-            ->with('toast', "{$month->format('F Y')} report submitted for LGU review.");
+        return redirect()->route('establishment.arrivals.monthly', ['year' => $dtMonth->year, 'tab' => 'records'])
+            ->with('toast', "{$dtMonth->format('F Y')} report submitted for LGU review.");
     }
 }

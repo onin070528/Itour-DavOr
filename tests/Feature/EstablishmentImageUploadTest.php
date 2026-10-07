@@ -1,5 +1,13 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Tests — establishment image upload.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 use App\Enums\UserRole;
 use App\Models\Category;
 use App\Models\EstablishmentImage;
@@ -22,24 +30,24 @@ function establishmentImageListingFixture(array $overrides = []): Listing
     $category = establishmentImageCategoryFixture();
 
     return Listing::query()->create(array_merge([
-        'slug' => Str::slug('image-upload-fixture-'.Str::random(6)),
-        'name' => 'Upload Test Resort',
-        'category' => 'accommodation',
+        'lst_slug' => Str::slug('image-upload-fixture-'.Str::random(6)),
+        'lst_name' => 'Upload Test Resort',
+        'lst_category' => 'accommodation',
         'cat_id' => $category->cat_id,
-        'municipality' => 'City of Mati',
-        'barangay' => 'Dahican',
+        'lst_municipality' => 'City of Mati',
+        'lst_barangay' => 'Dahican',
         // DRAFT, not PUBLISHED: an establishment's own photo management is
         // only allowed while its package is editable (see
         // App\Policies\ImagePolicy, the establishment self-review merge).
         // Tests exercising LGU/PTO-side or public-route behavior override
         // this explicitly where PUBLISHED actually matters.
-        'status' => 'DRAFT',
+        'lst_status' => 'DRAFT',
     ], $overrides));
 }
 
 function establishmentImageUserFixture(Listing $listing): User
 {
-    return User::factory()->create(['role' => UserRole::Establishment, 'establishment_id' => $listing->id]);
+    return User::factory()->create(['usr_role' => UserRole::Establishment, 'lst_id' => $listing->lst_id]);
 }
 
 /**
@@ -95,14 +103,14 @@ test('a photo is accepted, processed, and stored, and submits the establishment 
     $user = establishmentImageUserFixture($listing);
 
     $response = test()->actingAs($user)->post(route('establishment.images.store'), [
-        'listing_id' => $listing->id,
+        'listing_id' => $listing->lst_id,
         'photos' => [UploadedFile::fake()->image('beach.jpg', 1600, 1200)],
         'ownership_declared' => '1',
         'credit' => 'Photo by Test',
     ]);
 
     $response->assertSessionHasNoErrors();
-    $image = EstablishmentImage::query()->where('listing_id', $listing->id)->first();
+    $image = EstablishmentImage::query()->where('lst_id', $listing->lst_id)->first();
     expect($image)->not->toBeNull();
     expect($image->img_status->value)->toBe('PENDING');
     expect($image->img_source_role->value)->toBe('ESTABLISHMENT');
@@ -118,13 +126,13 @@ test('a script renamed to .jpg is rejected', function () {
     $objFakeScript = uploadedFixtureFile('<?php echo "not a photo"; ?>', 'malicious.jpg', 'image/jpeg');
 
     $response = test()->actingAs($user)->post(route('establishment.images.store'), [
-        'listing_id' => $listing->id,
+        'listing_id' => $listing->lst_id,
         'photos' => [$objFakeScript],
         'ownership_declared' => '1',
     ]);
 
     $response->assertSessionHasErrors();
-    expect(EstablishmentImage::query()->where('listing_id', $listing->id)->count())->toBe(0);
+    expect(EstablishmentImage::query()->where('lst_id', $listing->lst_id)->count())->toBe(0);
 });
 
 test('a 6 MB file is rejected', function () {
@@ -132,13 +140,13 @@ test('a 6 MB file is rejected', function () {
     $user = establishmentImageUserFixture($listing);
 
     $response = test()->actingAs($user)->post(route('establishment.images.store'), [
-        'listing_id' => $listing->id,
+        'listing_id' => $listing->lst_id,
         'photos' => [UploadedFile::fake()->image('big.jpg', 2000, 1500)->size(6144)],
         'ownership_declared' => '1',
     ]);
 
     $response->assertSessionHasErrors();
-    expect(EstablishmentImage::query()->where('listing_id', $listing->id)->count())->toBe(0);
+    expect(EstablishmentImage::query()->where('lst_id', $listing->lst_id)->count())->toBe(0);
 });
 
 test('a photo smaller than the minimum dimensions is rejected', function () {
@@ -146,7 +154,7 @@ test('a photo smaller than the minimum dimensions is rejected', function () {
     $user = establishmentImageUserFixture($listing);
 
     $response = test()->actingAs($user)->post(route('establishment.images.store'), [
-        'listing_id' => $listing->id,
+        'listing_id' => $listing->lst_id,
         'photos' => [UploadedFile::fake()->image('small.jpg', 400, 300)],
         'ownership_declared' => '1',
     ]);
@@ -159,7 +167,7 @@ test('uploading without the ownership checkbox is rejected', function () {
     $user = establishmentImageUserFixture($listing);
 
     $response = test()->actingAs($user)->post(route('establishment.images.store'), [
-        'listing_id' => $listing->id,
+        'listing_id' => $listing->lst_id,
         'photos' => [UploadedFile::fake()->image('beach.jpg', 1600, 1200)],
     ]);
 
@@ -172,20 +180,20 @@ test('a duplicate photo (by processed hash) is rejected within the same establis
     $photo = UploadedFile::fake()->image('beach.jpg', 1600, 1200);
 
     test()->actingAs($user)->post(route('establishment.images.store'), [
-        'listing_id' => $listing->id,
+        'listing_id' => $listing->lst_id,
         'photos' => [$photo],
         'ownership_declared' => '1',
     ])->assertSessionHasNoErrors();
 
     $samePhotoAgain = UploadedFile::fake()->image('beach-again.jpg', 1600, 1200);
     $response = test()->actingAs($user)->post(route('establishment.images.store'), [
-        'listing_id' => $listing->id,
+        'listing_id' => $listing->lst_id,
         'photos' => [$samePhotoAgain],
         'ownership_declared' => '1',
     ]);
 
     $response->assertSessionHasErrors();
-    expect(EstablishmentImage::query()->where('listing_id', $listing->id)->count())->toBe(1);
+    expect(EstablishmentImage::query()->where('lst_id', $listing->lst_id)->count())->toBe(1);
 });
 
 test('uploading beyond the maximum live image count is rejected', function () {
@@ -197,14 +205,14 @@ test('uploading beyond the maximum live image count is rejected', function () {
         // images from UploadedFile::fake() render identical pixels, which
         // would otherwise trip the duplicate-hash rule instead of this cap.
         test()->actingAs($user)->post(route('establishment.images.store'), [
-            'listing_id' => $listing->id,
+            'listing_id' => $listing->lst_id,
             'photos' => [UploadedFile::fake()->image("photo-{$i}.jpg", 1600 + $i, 1200)],
             'ownership_declared' => '1',
         ])->assertSessionHasNoErrors();
     }
 
     $response = test()->actingAs($user)->post(route('establishment.images.store'), [
-        'listing_id' => $listing->id,
+        'listing_id' => $listing->lst_id,
         'photos' => [UploadedFile::fake()->image('one-too-many.jpg', 1600, 1200)],
         'ownership_declared' => '1',
     ]);
@@ -214,11 +222,11 @@ test('uploading beyond the maximum live image count is rejected', function () {
 
 test('an establishment cannot upload for another establishment', function () {
     $listing = establishmentImageListingFixture();
-    $otherListing = establishmentImageListingFixture(['name' => 'Someone Else Resort']);
+    $otherListing = establishmentImageListingFixture(['lst_name' => 'Someone Else Resort']);
     $user = establishmentImageUserFixture($listing);
 
     $response = test()->actingAs($user)->post(route('establishment.images.store'), [
-        'listing_id' => $otherListing->id,
+        'listing_id' => $otherListing->lst_id,
         'photos' => [UploadedFile::fake()->image('beach.jpg', 1600, 1200)],
         'ownership_declared' => '1',
     ]);
@@ -228,16 +236,16 @@ test('an establishment cannot upload for another establishment', function () {
 
 test('a PTO upload publishes immediately with no approval step', function () {
     $listing = establishmentImageListingFixture();
-    $pto = User::factory()->create(['role' => UserRole::PtoAdministrator]);
+    $pto = User::factory()->create(['usr_role' => UserRole::PtoAdministrator]);
 
     $response = test()->actingAs($pto)->post(route('pto.images.store'), [
-        'listing_id' => $listing->id,
+        'listing_id' => $listing->lst_id,
         'photos' => [UploadedFile::fake()->image('beach.jpg', 1600, 1200)],
         'ownership_declared' => '1',
     ]);
 
     $response->assertSessionHasNoErrors();
-    $image = EstablishmentImage::query()->where('listing_id', $listing->id)->first();
+    $image = EstablishmentImage::query()->where('lst_id', $listing->lst_id)->first();
     expect($image->img_status->value)->toBe('PUBLISHED');
     expect($image->img_source_role->value)->toBe('PTO');
 });
@@ -251,13 +259,13 @@ test('an uploaded photo stored copy has no EXIF/GPS data, even when the original
     $objUploadedFile = uploadedFixtureFile($objFixtureBytes, 'gps-photo.jpg', 'image/jpeg');
 
     $response = test()->actingAs($user)->post(route('establishment.images.store'), [
-        'listing_id' => $listing->id,
+        'listing_id' => $listing->lst_id,
         'photos' => [$objUploadedFile],
         'ownership_declared' => '1',
     ]);
 
     $response->assertSessionHasNoErrors();
-    $image = EstablishmentImage::query()->where('listing_id', $listing->id)->first();
+    $image = EstablishmentImage::query()->where('lst_id', $listing->lst_id)->first();
     $strStoredContents = Storage::disk('local')->get($image->img_path);
 
     expect($strStoredContents)->not->toContain('Exif');

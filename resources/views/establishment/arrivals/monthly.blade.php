@@ -20,16 +20,16 @@
         'Decreased' => 'danger',
         default => 'neutral',
     };
-    $statusLabel = fn ($report) => $report?->status->label() ?? 'Not Submitted';
-    $statusTone = fn ($report) => $report?->status->badgeTone() ?? 'danger';
+    $statusLabel = fn ($report) => $report?->mar_status->label() ?? 'Not Submitted';
+    $statusTone = fn ($report) => $report?->mar_status->badgeTone() ?? 'danger';
     $percentOf = fn (int $value, int $total) => $total > 0 ? round($value / $total * 100, 1) : 0;
 
     // Months that need the establishment to do something, most urgent first:
     // returned for correction, then unfinished drafts, then past months
     // never prepared. The current month is still running, so it is not
     // flagged as overdue.
-    $needsAttention = $months->filter(fn ($row) => $row['report']?->status === MonthlyReportStatus::ForCorrection)
-        ->concat($months->filter(fn ($row) => $row['report']?->status === MonthlyReportStatus::Draft))
+    $needsAttention = $months->filter(fn ($row) => $row['report']?->mar_status === MonthlyReportStatus::ForCorrection)
+        ->concat($months->filter(fn ($row) => $row['report']?->mar_status === MonthlyReportStatus::Draft))
         ->concat($months->filter(fn ($row) => ! $row['report'] && ! $row['isCurrentMonth']));
 @endphp
 
@@ -98,9 +98,9 @@
                             <li class="flex flex-wrap items-center justify-between gap-3 py-3">
                                 <div class="text-sm">
                                     <p class="font-semibold text-sand-900">{{ $row['month']->format('F Y') }}</p>
-                                    @if ($report?->status === MonthlyReportStatus::ForCorrection)
-                                        <p class="text-danger">Returned by the LGU: {{ $report->remarks ?: 'please check the report.' }}</p>
-                                    @elseif ($report?->status === MonthlyReportStatus::Draft)
+                                    @if ($report?->mar_status === MonthlyReportStatus::ForCorrection)
+                                        <p class="text-danger">Returned by the LGU: {{ $report->mar_remarks ?: 'please check the report.' }}</p>
+                                    @elseif ($report?->mar_status === MonthlyReportStatus::Draft)
                                         <p class="text-sand-600">Saved as a draft but not sent to the LGU yet.</p>
                                     @else
                                         <p class="text-sand-600">No report has been prepared for this month yet.</p>
@@ -137,7 +137,7 @@
                             @php($report = $row['report'])
                             <tr @class([
                                 'hover:bg-sand-50',
-                                'bg-danger-bg/40' => $report?->status === MonthlyReportStatus::ForCorrection || (! $report && ! $row['isCurrentMonth']),
+                                'bg-danger-bg/40' => $report?->mar_status === MonthlyReportStatus::ForCorrection || (! $report && ! $row['isCurrentMonth']),
                             ])>
                                 <td class="px-4 py-3 font-medium text-sand-900">
                                     {{ $row['month']->format('F Y') }}
@@ -145,9 +145,9 @@
                                         <span class="ml-1 text-xs font-normal text-sand-500">(this month)</span>
                                     @endif
                                 </td>
-                                <td class="px-4 py-3 text-right font-semibold text-sand-800">{{ $report ? number_format($report->total_visitors) : '—' }}</td>
-                                <td class="px-4 py-3 text-sand-700">{{ $report?->submission_source->label() ?? '—' }}</td>
-                                <td class="px-4 py-3 text-sand-700">{{ $report?->submitted_at?->format('M j, Y') ?? '—' }}</td>
+                                <td class="px-4 py-3 text-right font-semibold text-sand-800">{{ $report ? number_format($report->mar_total_visitors) : '—' }}</td>
+                                <td class="px-4 py-3 text-sand-700">{{ $report?->mar_submission_source->label() ?? '—' }}</td>
+                                <td class="px-4 py-3 text-sand-700">{{ $report?->mar_submitted_at?->format('M j, Y') ?? '—' }}</td>
                                 <td class="px-4 py-3">
                                     <x-dashboard.status-badge :tone="$statusTone($report)">{{ $statusLabel($report) }}</x-dashboard.status-badge>
                                 </td>

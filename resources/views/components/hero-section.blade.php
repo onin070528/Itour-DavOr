@@ -1,3 +1,10 @@
+{{--
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: Landing page hero section.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+--}}
 <section class="relative h-screen min-h-screen w-full overflow-hidden flex flex-col" data-hero-carousel>
     @php
         // object-position tuned per photo after actually looking at each

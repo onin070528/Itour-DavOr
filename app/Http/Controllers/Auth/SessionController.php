@@ -20,6 +20,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
@@ -47,7 +48,7 @@ class SessionController extends Controller
      * "these credentials were rejected" (App\Listeners\LogSuccessfulLogin,
      * LogFailedLogin — see App\Support\SecurityLogger).
      */
-    public function store(Request $request): RedirectResponse
+    public function store(Request $objRequest): RedirectResponse
     {
         // Verified before credentials are even looked up — the account
         // must never be authenticated unless Turnstile succeeds. Skipped
@@ -56,22 +57,22 @@ class SessionController extends Controller
         // network-dependent third-party verification — never on localhost
         // (APP_ENV=local) or in production.
         if (! app()->environment('testing')) {
-            $request->validate([
-                'cf-turnstile-response' => ['required', 'string', new Turnstile($request->ip())],
+            $objRequest->validate([
+                'cf-turnstile-response' => ['required', 'string', new Turnstile($objRequest->ip())],
             ], [
                 'cf-turnstile-response.required' => 'Please complete the verification check.',
             ]);
         }
 
-        $credentials = $request->validate([
+        $arrCredentials = $objRequest->validate([
             'email' => ['required', 'string', 'email'],
             'password' => ['required', 'string'],
         ]);
 
-        $user = User::query()->where('email', $credentials['email'])->first();
+        $objUser = User::query()->where('usr_email', $arrCredentials['email'])->first();
 
-        if (! $user || ! Hash::check($credentials['password'], $user->password)) {
-            event(new Failed('web', $user, $credentials));
+        if (! $objUser || ! Hash::check($arrCredentials['password'], $objUser->usr_password)) {
+            event(new Failed('web', $objUser, $arrCredentials));
 
             throw ValidationException::withMessages([
                 'email' => __('These credentials do not match our records.'),
@@ -84,26 +85,32 @@ class SessionController extends Controller
         // the requester their account is disabled would let anyone probing
         // an email address learn it belongs to a real, suspended account.
         // The real reason is still recorded in security_logs, just not shown.
-        if ($user->status === 'Inactive') {
-            SecurityLogger::loginFailed($user, null, 'account_suspended');
+        if ($objUser->usr_status === 'Inactive') {
+            SecurityLogger::loginFailed($objUser, null, 'account_suspended');
 
             throw ValidationException::withMessages([
                 'email' => __('These credentials do not match our records.'),
             ]);
         }
 
-        Auth::login($user, $request->boolean('remember'));
-        $request->session()->regenerate();
-        $user->forceFill(['last_login_at' => now()])->save();
+        Auth::login($objUser, $objRequest->boolean('remember'));
+        $objRequest->session()->regenerate();
+
+        try {
+            $objUser->forceFill(['usr_last_login_at' => now()])->save();
+        } catch (\Throwable $objException) {
+            // The timestamp is informational only — never block a valid sign-in over it.
+            Log::warning('Failed to record the last sign-in time.', ['exception' => $objException, 'usr_id' => $objUser->usr_id]);
+        }
 
         // Temporary password: straight to the change-password page. The
         // intended URL stays in the session for after the change.
-        if ($user->mustChangePassword()) {
+        if ($objUser->mustChangePassword()) {
             return redirect()->route('password.change');
         }
 
         return redirect()->intended(
-            $user->role ? route($user->role->dashboardRouteName()) : route('home')
+            $objUser->usr_role ? route($objUser->usr_role->dashboardRouteName()) : route('home')
         );
     }
 
@@ -111,12 +118,12 @@ class SessionController extends Controller
      * Log the user out. Auth::guard('web')->logout() fires Illuminate\Auth\
      * Events\Logout, which App\Listeners\LogLogout turns into a security_log row.
      */
-    public function destroy(Request $request): RedirectResponse
+    public function destroy(Request $objRequest): RedirectResponse
     {
         Auth::guard('web')->logout();
 
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
+        $objRequest->session()->invalidate();
+        $objRequest->session()->regenerateToken();
 
         return redirect()->route('home');
     }

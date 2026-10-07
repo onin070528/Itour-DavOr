@@ -26,7 +26,7 @@ class SecurityLogPolicy
      */
     public function viewAny(User $user): bool
     {
-        return in_array($user->role, [UserRole::PtoAdministrator, UserRole::Lgu, UserRole::Establishment], true);
+        return in_array($user->usr_role, [UserRole::PtoAdministrator, UserRole::Lgu, UserRole::Establishment], true);
     }
 
     /**
@@ -35,6 +35,6 @@ class SecurityLogPolicy
      */
     public function export(User $user): bool
     {
-        return in_array($user->role, [UserRole::PtoAdministrator, UserRole::Lgu], true);
+        return in_array($user->usr_role, [UserRole::PtoAdministrator, UserRole::Lgu], true);
     }
 }

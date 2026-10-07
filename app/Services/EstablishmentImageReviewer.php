@@ -1,10 +1,12 @@
 <?php
 
-/*
- * System     : iTOUR - Integrated Tourism Information and Monitoring System
- * Purpose    : Approves or returns a pending establishment image, including the Replace workflow's cover/sort-order handoff.
- * Programmer : <name(s)>
- * Copyright  : 2026 University of Mindanao. All rights reserved.
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Approves or returns a pending establishment image, including the Replace workflow's
+ * cover/sort-order handoff.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
  */
 
 namespace App\Services;
@@ -38,15 +40,21 @@ class EstablishmentImageReviewer
     {
         $arrBefore = $objImage->getOriginal();
 
-        DB::transaction(function () use ($objReviewer, $objImage) {
-            $this->_applyApproval($objReviewer, $objImage);
-        });
+        try {
+            DB::transaction(function () use ($objReviewer, $objImage) {
+                $this->_applyApproval($objReviewer, $objImage);
+            });
+        } catch (\Throwable $objException) {
+            Log::error('Failed to approve establishment image.', ['exception' => $objException, 'image_id' => $objImage->img_id]);
+
+            throw ValidationException::withMessages(['image' => 'Something went wrong while saving. Please try again.']);
+        }
 
         OperationLogger::approved(
             $objReviewer,
             'establishment_image',
             $objImage->img_id,
-            $objImage->listing->municipality_id,
+            $objImage->listing->mun_id,
             OperationLogger::diff($arrBefore, $objImage),
         );
 
@@ -75,7 +83,7 @@ class EstablishmentImageReviewer
             'establishment_image',
             $objImage->img_id,
             $strReason,
-            $objImage->listing->municipality_id,
+            $objImage->listing->mun_id,
             OperationLogger::diff($arrBefore, $objImage),
         );
 
@@ -120,7 +128,7 @@ class EstablishmentImageReviewer
                         $objReviewer,
                         'establishment_image',
                         $objImage->img_id,
-                        $objImage->listing->municipality_id,
+                        $objImage->listing->mun_id,
                         OperationLogger::diff($arrBefore, $objImage),
                     );
 
@@ -128,7 +136,7 @@ class EstablishmentImageReviewer
                 }
             });
         } catch (\Throwable $objException) {
-            Log::error('Failed to approve a batch of establishment images.', ['exception' => $objException, 'listing_id' => $objListing->id]);
+            Log::error('Failed to approve a batch of establishment images.', ['exception' => $objException, 'listing_id' => $objListing->lst_id]);
 
             throw ValidationException::withMessages([
                 'photos' => 'Something went wrong while saving your decision. Please try again.',
@@ -178,7 +186,7 @@ class EstablishmentImageReviewer
                         'establishment_image',
                         $objImage->img_id,
                         $strReason,
-                        $objImage->listing->municipality_id,
+                        $objImage->listing->mun_id,
                         OperationLogger::diff($arrBefore, $objImage),
                     );
 
@@ -186,7 +194,7 @@ class EstablishmentImageReviewer
                 }
             });
         } catch (\Throwable $objException) {
-            Log::error('Failed to return a batch of establishment images.', ['exception' => $objException, 'listing_id' => $objListing->id]);
+            Log::error('Failed to return a batch of establishment images.', ['exception' => $objException, 'listing_id' => $objListing->lst_id]);
 
             throw ValidationException::withMessages([
                 'reason' => 'Something went wrong while saving your decision. Please try again.',
@@ -212,7 +220,7 @@ class EstablishmentImageReviewer
      */
     private function _isEligibleForBatchDecision(?EstablishmentImage $objImage, Listing $objListing, User $objReviewer): bool
     {
-        if ($objImage === null || $objImage->listing_id !== $objListing->id || ! $objImage->isPending()) {
+        if ($objImage === null || $objImage->lst_id !== $objListing->lst_id || ! $objImage->isPending()) {
             return false;
         }
 
@@ -247,7 +255,7 @@ class EstablishmentImageReviewer
                 'img_status' => ImageStatus::Published,
                 'img_is_cover' => $blnInheritedCover,
                 'img_sort_order' => $intInheritedSortOrder,
-                'img_reviewed_by' => $objReviewer->id,
+                'img_reviewed_by' => $objReviewer->usr_id,
                 'img_reviewed_at' => now(),
             ]);
         } else {
@@ -258,7 +266,7 @@ class EstablishmentImageReviewer
             // no lock of its own, but still inside the caller's
             // transaction, against every OTHER image on the same listing.
             $blnListingHasNoPublishedCover = ! EstablishmentImage::query()
-                ->where('listing_id', $objImage->listing_id)
+                ->where('lst_id', $objImage->lst_id)
                 ->where('img_id', '!=', $objImage->img_id)
                 ->where('img_status', ImageStatus::Published->value)
                 ->where('img_is_cover', true)
@@ -267,7 +275,7 @@ class EstablishmentImageReviewer
             $objImage->update([
                 'img_status' => ImageStatus::Published,
                 'img_is_cover' => $blnListingHasNoPublishedCover,
-                'img_reviewed_by' => $objReviewer->id,
+                'img_reviewed_by' => $objReviewer->usr_id,
                 'img_reviewed_at' => now(),
             ]);
         }
@@ -283,7 +291,7 @@ class EstablishmentImageReviewer
         $objImage->update([
             'img_status' => ImageStatus::Rejected,
             'img_review_note' => $strReason,
-            'img_reviewed_by' => $objReviewer->id,
+            'img_reviewed_by' => $objReviewer->usr_id,
             'img_reviewed_at' => now(),
         ]);
     }

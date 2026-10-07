@@ -1,3 +1,10 @@
+{{--
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: Public navigation bar.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+--}}
 @php
     $navLinks = [
         ['label' => 'Home', 'href' => url('/'), 'active' => request()->routeIs('home')],
@@ -7,8 +14,8 @@
         ['label' => 'Hotlines', 'href' => route('hotlines'), 'active' => request()->routeIs('hotlines')],
     ];
 
-    $authedDashboardRoute = auth()->check() && auth()->user()->role
-        ? route(auth()->user()->role->dashboardRouteName())
+    $authedDashboardRoute = auth()->check() && auth()->user()->usr_role
+        ? route(auth()->user()->usr_role->dashboardRouteName())
         : null;
 @endphp
 

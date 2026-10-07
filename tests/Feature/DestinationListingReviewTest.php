@@ -25,22 +25,22 @@ use Illuminate\Support\Str;
 
 function reviewMunicipality(string $strName, string $strCode): Municipality
 {
-    return Municipality::query()->firstOrCreate(['code' => $strCode], ['name' => $strName]);
+    return Municipality::query()->firstOrCreate(['mun_code' => $strCode], ['mun_name' => $strName]);
 }
 
 function reviewLgu(Municipality $objMunicipality): User
 {
     return User::factory()->create([
-        'role' => UserRole::Lgu,
-        'organization_name' => "{$objMunicipality->name} LGU",
-        'organization_subtitle' => $objMunicipality->name,
-        'municipality_id' => $objMunicipality->id,
+        'usr_role' => UserRole::Lgu,
+        'usr_organization_name' => "{$objMunicipality->mun_name} LGU",
+        'usr_organization_subtitle' => $objMunicipality->mun_name,
+        'mun_id' => $objMunicipality->mun_id,
     ]);
 }
 
 function reviewPto(): User
 {
-    return User::factory()->create(['role' => UserRole::PtoAdministrator]);
+    return User::factory()->create(['usr_role' => UserRole::PtoAdministrator]);
 }
 
 function reviewCategory(string $strCategoryName = 'Accommodation'): Category
@@ -58,17 +58,17 @@ function reviewEstablishment(Municipality $objMunicipality, array $arrOverrides 
     $objCategory = reviewCategory();
 
     return Listing::query()->create(array_merge([
-        'slug' => Str::slug('review-inn-'.Str::random(6)),
-        'name' => 'Dahican Beach Resort',
-        'category' => $objCategory->legacySlug(),
+        'lst_slug' => Str::slug('review-inn-'.Str::random(6)),
+        'lst_name' => 'Dahican Beach Resort',
+        'lst_category' => $objCategory->legacySlug(),
         'cat_id' => $objCategory->cat_id,
-        'type' => 'Resort',
-        'municipality' => $objMunicipality->name,
-        'municipality_id' => $objMunicipality->id,
-        'barangay' => 'Dahican',
-        'description' => 'Beachfront resort on Dahican.',
-        'contact_phone' => '09171234567',
-        'status' => 'DRAFT',
+        'lst_type' => 'Resort',
+        'lst_municipality' => $objMunicipality->mun_name,
+        'mun_id' => $objMunicipality->mun_id,
+        'lst_barangay' => 'Dahican',
+        'lst_description' => 'Beachfront resort on Dahican.',
+        'lst_contact_phone' => '09171234567',
+        'lst_status' => 'DRAFT',
     ], $arrOverrides));
 }
 
@@ -80,12 +80,12 @@ function reviewEstablishment(Municipality $objMunicipality, array $arrOverrides 
 function reviewEditPayload(Listing $objListing, array $arrOverrides = []): array
 {
     return array_merge([
-        'name' => $objListing->name,
+        'name' => $objListing->lst_name,
         'cat_id' => $objListing->cat_id,
-        'type' => $objListing->type,
-        'barangay' => $objListing->barangay,
-        'description' => $objListing->description,
-        'contact_phone' => $objListing->contact_phone,
+        'type' => $objListing->lst_type,
+        'barangay' => $objListing->lst_barangay,
+        'description' => $objListing->lst_description,
+        'contact_phone' => $objListing->lst_contact_phone,
     ], $arrOverrides);
 }
 
@@ -106,7 +106,7 @@ test('"Request to feature as tourist destination" moves it to Pending PTO Review
     test()->actingAs($objLgu)->patch(route('lgu.directory.establishments.submit', $objListing))->assertRedirect();
 
     $objFresh = $objListing->fresh();
-    expect($objFresh->status)->toBe('FOR_PTO_REVIEW');
+    expect($objFresh->lst_status)->toBe('FOR_PTO_REVIEW');
     expect($objFresh->destinationListingLabel())->toBe('Pending PTO Review');
     expect($objFresh->isPubliclyVisible())->toBeFalse();
 
@@ -117,9 +117,9 @@ test('"Request to feature as tourist destination" moves it to Pending PTO Review
             && $arrData['url'] === route('pto.destinationReviews.show', $objListing, false);
     });
 
-    $objLog = OperationLog::query()->where('entity_type', 'establishment')->where('entity_id', $objListing->id)->latest('id')->first();
-    expect($objLog->action)->toBe('submit');
-    expect($objLog->user_id)->toBe($objLgu->id);
+    $objLog = OperationLog::query()->where('opl_entity_type', 'establishment')->where('opl_entity_id', $objListing->lst_id)->latest('opl_id')->first();
+    expect($objLog->opl_action)->toBe('submit');
+    expect($objLog->usr_id)->toBe($objLgu->usr_id);
 
     auth()->logout();
     test()->get(route('listings.show', $objListing))->assertNotFound();
@@ -128,26 +128,26 @@ test('"Request to feature as tourist destination" moves it to Pending PTO Review
 test('the LGU can never publish — only the PTO can approve', function () {
     $objMati = reviewMunicipality('City of Mati', 'MATI');
     $objLgu = reviewLgu($objMati);
-    $objListing = reviewEstablishment($objMati, ['status' => 'FOR_PTO_REVIEW']);
+    $objListing = reviewEstablishment($objMati, ['lst_status' => 'FOR_PTO_REVIEW']);
 
     test()->actingAs($objLgu)->patch(route('pto.directory.publish', $objListing))->assertForbidden();
     test()->actingAs($objLgu)->get(route('pto.destinationReviews.show', $objListing))->assertForbidden();
 
-    expect($objListing->fresh()->status)->toBe('FOR_PTO_REVIEW');
+    expect($objListing->fresh()->lst_status)->toBe('FOR_PTO_REVIEW');
 });
 
 test('an LGU cannot request, resubmit, or return another municipality\'s listing (403 and a security log)', function () {
     $objMati = reviewMunicipality('City of Mati', 'MATI');
     $objBaganga = reviewMunicipality('Baganga', 'BAG');
     $objMatiLgu = reviewLgu($objMati);
-    $objBagangaListing = reviewEstablishment($objBaganga, ['name' => 'Baganga Inn']);
+    $objBagangaListing = reviewEstablishment($objBaganga, ['lst_name' => 'Baganga Inn']);
 
     test()->actingAs($objMatiLgu)->patch(route('lgu.directory.establishments.submit', $objBagangaListing))->assertForbidden();
     test()->actingAs($objMatiLgu)->patch(route('lgu.directory.establishments.return', $objBagangaListing), ['reason' => 'x'])->assertForbidden();
     test()->actingAs($objMatiLgu)->get(route('lgu.directory.establishments.show', $objBagangaListing))->assertForbidden();
 
-    expect($objBagangaListing->fresh()->status)->toBe('DRAFT');
-    expect(SecurityLog::query()->where('user_id', $objMatiLgu->id)->where('event_type', 'access_denied')->count())->toBeGreaterThanOrEqual(3);
+    expect($objBagangaListing->fresh()->lst_status)->toBe('DRAFT');
+    expect(SecurityLog::query()->where('usr_id', $objMatiLgu->usr_id)->where('sec_event_type', 'access_denied')->count())->toBeGreaterThanOrEqual(3);
 });
 
 // --- PTO review screen, Approve & Publish ---
@@ -157,7 +157,7 @@ test('the PTO review screen shows the listing details, and Approve & Publish mak
     $objMati = reviewMunicipality('City of Mati', 'MATI');
     $objLgu = reviewLgu($objMati);
     $objPto = reviewPto();
-    $objListing = reviewEstablishment($objMati, ['status' => 'FOR_PTO_REVIEW']);
+    $objListing = reviewEstablishment($objMati, ['lst_status' => 'FOR_PTO_REVIEW']);
 
     test()->actingAs($objPto)->get(route('pto.destinationReviews.index'))
         ->assertOk()
@@ -176,10 +176,10 @@ test('the PTO review screen shows the listing details, and Approve & Publish mak
     test()->actingAs($objPto)->patch(route('pto.directory.publish', $objListing))->assertRedirect();
 
     $objFresh = $objListing->fresh();
-    expect($objFresh->status)->toBe('PUBLISHED');
+    expect($objFresh->lst_status)->toBe('PUBLISHED');
     expect($objFresh->isPubliclyVisible())->toBeTrue();
     Notification::assertSentTo($objLgu, DestinationListingPublished::class);
-    expect(OperationLog::query()->where('entity_id', $objListing->id)->where('action', 'publish')->value('user_id'))->toBe($objPto->id);
+    expect(OperationLog::query()->where('opl_entity_id', $objListing->lst_id)->where('opl_action', 'publish')->value('usr_id'))->toBe($objPto->usr_id);
 
     auth()->logout();
     test()->get(route('listings.show', $objListing))->assertOk()->assertSee('Dahican Beach Resort');
@@ -192,21 +192,21 @@ test('Return for Correction requires remarks, notifies the LGU, and the LGU corr
     $objMati = reviewMunicipality('City of Mati', 'MATI');
     $objLgu = reviewLgu($objMati);
     $objPto = reviewPto();
-    $objListing = reviewEstablishment($objMati, ['status' => 'FOR_PTO_REVIEW']);
+    $objListing = reviewEstablishment($objMati, ['lst_status' => 'FOR_PTO_REVIEW']);
 
     // Remarks are required.
     test()->actingAs($objPto)->patch(route('pto.directory.returnToLgu', $objListing), ['reason' => ''])->assertSessionHasErrors('reason');
-    expect($objListing->fresh()->status)->toBe('FOR_PTO_REVIEW');
+    expect($objListing->fresh()->lst_status)->toBe('FOR_PTO_REVIEW');
 
     test()->actingAs($objPto)->patch(route('pto.directory.returnToLgu', $objListing), ['reason' => 'Please add a clearer description.'])->assertRedirect();
 
     $objFresh = $objListing->fresh();
-    expect($objFresh->status)->toBe(Listing::STATUS_FOR_CORRECTION);
+    expect($objFresh->lst_status)->toBe(Listing::STATUS_FOR_CORRECTION);
     expect($objFresh->destinationListingLabel())->toBe('Returned for Correction');
     expect($objFresh->lst_review_remarks)->toBe('Please add a clearer description.');
     expect($objFresh->isPubliclyVisible())->toBeFalse();
     Notification::assertSentTo($objLgu, EstablishmentListingReturnedToLgu::class);
-    expect(OperationLog::query()->where('entity_id', $objListing->id)->where('action', 'return')->value('reason'))->toBe('Please add a clearer description.');
+    expect(OperationLog::query()->where('opl_entity_id', $objListing->lst_id)->where('opl_action', 'return')->value('opl_reason'))->toBe('Please add a clearer description.');
 
     test()->actingAs($objLgu)->get(route('lgu.directory.establishments.show', $objListing))
         ->assertOk()
@@ -217,12 +217,12 @@ test('Return for Correction requires remarks, notifies the LGU, and the LGU corr
     // While returned, public content is editable again (applied directly — it is not public).
     test()->actingAs($objLgu)->put(route('lgu.directory.establishments.update', $objListing), reviewEditPayload($objFresh, ['description' => 'A clearer description.']))
         ->assertSessionHasNoErrors();
-    expect($objListing->fresh()->description)->toBe('A clearer description.');
+    expect($objListing->fresh()->lst_description)->toBe('A clearer description.');
 
     test()->actingAs($objLgu)->patch(route('lgu.directory.establishments.submit', $objListing))->assertRedirect();
 
     $objResubmitted = $objListing->fresh();
-    expect($objResubmitted->status)->toBe('FOR_PTO_REVIEW');
+    expect($objResubmitted->lst_status)->toBe('FOR_PTO_REVIEW');
     expect($objResubmitted->lst_review_remarks)->toBeNull();
     Notification::assertSentTo($objPto, DestinationListingSubmittedForReview::class);
 });
@@ -234,7 +234,7 @@ test('LGU edits to a Published listing are held for PTO review while the publish
     $objMati = reviewMunicipality('City of Mati', 'MATI');
     $objLgu = reviewLgu($objMati);
     $objPto = reviewPto();
-    $objListing = reviewEstablishment($objMati, ['status' => 'PUBLISHED']);
+    $objListing = reviewEstablishment($objMati, ['lst_status' => 'PUBLISHED']);
     $objFood = reviewCategory('Food & Dining');
 
     test()->actingAs($objLgu)->put(route('lgu.directory.establishments.update', $objListing), reviewEditPayload($objListing, [
@@ -245,10 +245,10 @@ test('LGU edits to a Published listing are held for PTO review while the publish
     ]))->assertSessionHasNoErrors();
 
     $objFresh = $objListing->fresh();
-    expect($objFresh->status)->toBe('PUBLISHED');
-    expect($objFresh->name)->toBe('Dahican Beach Resort');
-    expect($objFresh->category)->toBe('accommodation');
-    expect($objFresh->contact_phone)->toBe('09998887777');
+    expect($objFresh->lst_status)->toBe('PUBLISHED');
+    expect($objFresh->lst_name)->toBe('Dahican Beach Resort');
+    expect($objFresh->lst_category)->toBe('accommodation');
+    expect($objFresh->lst_contact_phone)->toBe('09998887777');
     expect($objFresh->hasPendingChanges())->toBeTrue();
     expect($objFresh->destinationListingLabel())->toBe('Published · Changes pending PTO review');
     Notification::assertSentTo($objPto, DestinationListingSubmittedForReview::class, fn ($objNotification) => str_starts_with($objNotification->toDatabase($objPto)['message'], 'Changes to a Published Listing for Review'));
@@ -269,7 +269,7 @@ test('LGU edits to a Published listing are held for PTO review while the publish
     // Returned: still live, the changes stay held with the PTO's remarks.
     test()->actingAs($objPto)->patch(route('pto.directory.returnToLgu', $objListing), ['reason' => 'Keep the original name.'])->assertRedirect();
     $objReturned = $objListing->fresh();
-    expect($objReturned->status)->toBe('PUBLISHED');
+    expect($objReturned->lst_status)->toBe('PUBLISHED');
     expect($objReturned->hasReturnedPendingChanges())->toBeTrue();
     expect($objReturned->destinationListingLabel())->toBe('Published · Changes returned for correction');
     Notification::assertSentTo($objLgu, EstablishmentListingReturnedToLgu::class);
@@ -280,16 +280,16 @@ test('LGU edits to a Published listing are held for PTO review while the publish
         'type' => 'Restobar',
     ]))->assertSessionHasNoErrors();
     expect($objListing->fresh()->lst_review_remarks)->toBeNull();
-    expect($objListing->fresh()->lst_pending_changes)->toEqual(['cat_id' => $objFood->cat_id, 'type' => 'Restobar']);
+    expect($objListing->fresh()->lst_pending_changes)->toEqual(['cat_id' => $objFood->cat_id, 'lst_type' => 'Restobar']);
 
     test()->actingAs($objPto)->patch(route('pto.directory.publish', $objListing))->assertRedirect();
 
     $objApproved = $objListing->fresh();
-    expect($objApproved->status)->toBe('PUBLISHED');
-    expect($objApproved->name)->toBe('Dahican Beach Resort');
+    expect($objApproved->lst_status)->toBe('PUBLISHED');
+    expect($objApproved->lst_name)->toBe('Dahican Beach Resort');
     expect($objApproved->cat_id)->toBe($objFood->cat_id);
-    expect($objApproved->category)->toBe('restaurants');
-    expect($objApproved->type)->toBe('Restobar');
+    expect($objApproved->lst_category)->toBe('restaurants');
+    expect($objApproved->lst_type)->toBe('Restobar');
     expect($objApproved->lst_pending_changes)->toBeNull();
     Notification::assertSentTo($objLgu, DestinationListingPublished::class);
 });
@@ -299,7 +299,7 @@ test('saving a Published listing with only contact changes, or with the live val
     $objMati = reviewMunicipality('City of Mati', 'MATI');
     $objLgu = reviewLgu($objMati);
     $objPto = reviewPto();
-    $objListing = reviewEstablishment($objMati, ['status' => 'PUBLISHED']);
+    $objListing = reviewEstablishment($objMati, ['lst_status' => 'PUBLISHED']);
 
     test()->actingAs($objLgu)->put(route('lgu.directory.establishments.update', $objListing), reviewEditPayload($objListing, ['contact_phone' => '09170000000']))->assertSessionHasNoErrors();
     expect($objListing->fresh()->hasPendingChanges())->toBeFalse();
@@ -310,21 +310,21 @@ test('saving a Published listing with only contact changes, or with the live val
     expect($objListing->fresh()->hasPendingChanges())->toBeTrue();
     test()->actingAs($objLgu)->put(route('lgu.directory.establishments.update', $objListing), reviewEditPayload($objListing->fresh()));
     expect($objListing->fresh()->lst_pending_changes)->toBeNull();
-    expect($objListing->fresh()->name)->toBe('Dahican Beach Resort');
+    expect($objListing->fresh()->lst_name)->toBe('Dahican Beach Resort');
 });
 
 test('unpublishing a listing with held changes folds them into the hidden listing for the next full review', function () {
     $objMati = reviewMunicipality('City of Mati', 'MATI');
     $objPto = reviewPto();
-    $objListing = reviewEstablishment($objMati, ['status' => 'PUBLISHED']);
-    $objListing->forceFill(['lst_pending_changes' => ['name' => 'New Name']])->save();
+    $objListing = reviewEstablishment($objMati, ['lst_status' => 'PUBLISHED']);
+    $objListing->forceFill(['lst_pending_changes' => ['lst_name' => 'New Name']])->save();
 
     test()->actingAs($objPto)->patch(route('pto.directory.unpublish', $objListing), ['reason' => 'Seasonal closure.'])->assertRedirect();
 
     $objFresh = $objListing->fresh();
-    expect($objFresh->status)->toBe('UNPUBLISHED');
+    expect($objFresh->lst_status)->toBe('UNPUBLISHED');
     expect($objFresh->isPubliclyVisible())->toBeFalse();
-    expect($objFresh->name)->toBe('New Name');
+    expect($objFresh->lst_name)->toBe('New Name');
     expect($objFresh->lst_pending_changes)->toBeNull();
 });
 
@@ -335,8 +335,8 @@ test('requesting, returning, and approving a destination listing leaves the repo
     $objLgu = reviewLgu($objMati);
     $objPto = reviewPto();
     $objListing = reviewEstablishment($objMati);
-    $objListing->forceFill(['reporting_mode' => ReportingMethod::OnlineItour])->save();
-    $objAccount = User::factory()->create(['role' => UserRole::Establishment, 'municipality_id' => $objMati->id, 'establishment_id' => $objListing->id]);
+    $objListing->forceFill(['lst_reporting_mode' => ReportingMethod::OnlineItour])->save();
+    $objAccount = User::factory()->create(['usr_role' => UserRole::Establishment, 'mun_id' => $objMati->mun_id, 'lst_id' => $objListing->lst_id]);
     expect($objListing->fresh()->isAcceptingRegistrations())->toBeTrue();
 
     test()->actingAs($objLgu)->patch(route('lgu.directory.establishments.submit', $objListing));
@@ -344,8 +344,8 @@ test('requesting, returning, and approving a destination listing leaves the repo
     test()->actingAs($objPto)->patch(route('pto.directory.returnToLgu', $objListing), ['reason' => 'More photos, please.']);
     expect($objListing->fresh()->isAcceptingRegistrations())->toBeTrue();
 
-    expect($objListing->fresh()->reporting_mode)->toBe(ReportingMethod::OnlineItour);
-    expect($objAccount->fresh()->status)->toBe('Active');
+    expect($objListing->fresh()->lst_reporting_mode)->toBe(ReportingMethod::OnlineItour);
+    expect($objAccount->fresh()->usr_status)->toBe('Active');
 });
 
 // --- Notification bell ---

@@ -52,17 +52,17 @@ class MonthlyReportsController extends LguController
      * period are shown as "Not Submitted" — a display-only state computed
      * here, never written to the database.
      */
-    public function index(Request $request): View
+    public function index(Request $objRequest): View
     {
-        $user = $request->user();
-        $month = $this->resolvePeriod($request);
+        $objUser = $objRequest->user();
+        $dtmMonth = $this->resolvePeriod($objRequest);
 
-        $rows = $this->_establishmentRows($user, $month);
-        $arrSummary = $this->_municipalSummary($user, $month, $rows);
+        $objRows = $this->_establishmentRows($objUser, $dtmMonth);
+        $arrSummary = $this->_municipalSummary($objUser, $dtmMonth, $objRows);
 
-        return $this->renderLgu($request, 'lgu.monthly-reports.index', 'reports.monthly', 'Monthly Reports', [
-            'rows' => $rows,
-            'month' => $month,
+        return $this->renderLgu($objRequest, 'lgu.monthly-reports.index', 'reports.monthly', 'Monthly Reports', [
+            'rows' => $objRows,
+            'month' => $dtmMonth,
             'monthOptions' => $this->recentMonthOptions(),
             'summary' => $arrSummary,
             'missingCount' => $arrSummary['notSubmittedCount'],
@@ -93,11 +93,11 @@ class MonthlyReportsController extends LguController
     public function municipalIndex(Request $request): View
     {
         $objUser = $request->user();
-        $arrYearOptions = TourismAnalytics::scopedYearOptions($objUser->municipality_id);
+        $arrYearOptions = TourismAnalytics::scopedYearOptions($objUser->mun_id);
         $intYear = in_array((int) $request->query('year'), $arrYearOptions, true) ? (int) $request->query('year') : CarbonImmutable::now()->year;
         $strSection = in_array($request->query('section'), ['records', 'statistics'], true) ? $request->query('section') : 'overview';
 
-        $arrFilters = ['year' => $intYear, 'month' => null, 'municipalityId' => $objUser->municipality_id, 'listingId' => null, 'classification' => null];
+        $arrFilters = ['year' => $intYear, 'month' => null, 'municipalityId' => $objUser->mun_id, 'listingId' => null, 'classification' => null];
         $objRecords = TourismAnalytics::monthlyRecords($arrFilters);
         $objPreviousRecords = TourismAnalytics::monthlyRecords([...$arrFilters, 'year' => $intYear - 1]);
         $blnHasPrevious = $objPreviousRecords->contains('hasData', true);
@@ -160,10 +160,10 @@ class MonthlyReportsController extends LguController
 
         $objHistory = $arrSummary['municipalReport']
             ? OperationLog::query()
-                ->where('entity_type', 'municipal_report')
-                ->where('entity_id', $arrSummary['municipalReport']->id)
+                ->where('opl_entity_type', 'municipal_report')
+                ->where('opl_entity_id', $arrSummary['municipalReport']->mrp_id)
                 ->with('user')
-                ->orderByDesc('created_at')
+                ->orderByDesc('opl_created_at')
                 ->get()
             : collect();
 
@@ -176,7 +176,7 @@ class MonthlyReportsController extends LguController
             'history' => $objHistory,
             'visitorBreakdown' => TourismAnalytics::visitorBreakdown([
                 'year' => $dtMonth->year, 'month' => $dtMonth->month,
-                'municipalityId' => $objUser->municipality_id, 'listingId' => null, 'classification' => null,
+                'municipalityId' => $objUser->mun_id, 'listingId' => null, 'classification' => null,
             ]),
         ]);
     } // end municipalShow
@@ -193,7 +193,7 @@ class MonthlyReportsController extends LguController
 
         $arrSummary = $this->_municipalSummary($objUser, $dtMonth, $this->_establishmentRows($objUser, $dtMonth));
 
-        OperationLogger::exported($objUser, 'municipal_report', $objUser->municipality_id, ['action' => 'preview', 'period' => $dtMonth->toDateString()]);
+        OperationLogger::exported($objUser, 'municipal_report', $objUser->mun_id, ['action' => 'preview', 'period' => $dtMonth->toDateString()]);
 
         return view('pdf.official-report', [
             'report' => $this->_municipalReportData($objUser, $dtMonth, $arrSummary),
@@ -215,7 +215,7 @@ class MonthlyReportsController extends LguController
         $arrSummary = $this->_municipalSummary($objUser, $dtMonth, $this->_establishmentRows($objUser, $dtMonth));
         $arrReport = $this->_municipalReportData($objUser, $dtMonth, $arrSummary);
 
-        OperationLogger::exported($objUser, 'municipal_report', $objUser->municipality_id, ['action' => 'download_pdf', 'period' => $dtMonth->toDateString()]);
+        OperationLogger::exported($objUser, 'municipal_report', $objUser->mun_id, ['action' => 'download_pdf', 'period' => $dtMonth->toDateString()]);
 
         try {
             $strFileName = $arrSummary['isSentToPto'] ? $arrReport['reference_number'] : 'Municipal-Report-'.$dtMonth->format('Y-m');
@@ -260,23 +260,23 @@ class MonthlyReportsController extends LguController
      * digital draft, is not re-encoded here; this office's paper Draft is
      * reopened for editing instead.
      */
-    public function showManualEntry(Request $request, Listing $listing): View|RedirectResponse
+    public function showManualEntry(Request $objRequest, Listing $listing): View|RedirectResponse
     {
-        $this->_authorizeManualEntryListing($request, $listing);
+        $this->_authorizeManualEntryListing($objRequest, $listing);
 
-        $month = $this->resolvePeriod($request);
+        $dtmMonth = $this->resolvePeriod($objRequest);
 
         if ($listing->reportingMethod()->isOnline()) {
-            return $this->_onlineEstablishmentRedirect($listing, $month);
+            return $this->_onlineEstablishmentRedirect($listing, $dtmMonth);
         }
 
-        $objExisting = $listing->monthlyArrivalReports()->forPeriod($month)->first();
+        $objExisting = $listing->monthlyArrivalReports()->forPeriod($dtmMonth)->first();
 
-        abort_if($objExisting && ! $request->user()->can('editDraft', $objExisting), 422, 'This establishment already has a report (or a draft in progress) for that month.');
+        abort_if($objExisting && ! $objRequest->user()->can('editDraft', $objExisting), 422, 'This establishment already has a report (or a draft in progress) for that month.');
 
-        return $this->renderLgu($request, 'lgu.monthly-reports.manual-entry', 'reports.manualEntry', 'Manual Entry', [
+        return $this->renderLgu($objRequest, 'lgu.monthly-reports.manual-entry', 'reports.manualEntry', 'Manual Entry', [
             'listing' => $listing,
-            'month' => $month,
+            'month' => $dtmMonth,
             'report' => $objExisting,
             'fieldGroups' => ManualReportForm::groups(),
             'blnIsProvisional' => ManualReportForm::IS_PROVISIONAL,
@@ -289,82 +289,82 @@ class MonthlyReportsController extends LguController
      * existing Draft. Nothing reaches the review workflow until it is
      * previewed and submitted (submit(), below), which stamps the LGU
      * encoder and submission time. One report per establishment per month
-     * is kept by the unique (listing_id, period_month) index.
+     * is kept by the unique (lst_id, mar_period_month) index.
      */
-    public function storeManualEntry(Request $request, Listing $listing): RedirectResponse
+    public function storeManualEntry(Request $objRequest, Listing $listing): RedirectResponse
     {
-        $this->_authorizeManualEntryListing($request, $listing);
+        $this->_authorizeManualEntryListing($objRequest, $listing);
 
-        $data = $request->validate([
+        $arrData = $objRequest->validate([
             'period_month' => ['required', 'date_format:Y-m'],
             'intent' => ['nullable', 'in:draft,preview'],
             ...ManualReportForm::rules(),
         ]);
 
-        $month = CarbonImmutable::createFromFormat('Y-m', $data['period_month'])->startOfMonth();
+        $dtmMonth = CarbonImmutable::createFromFormat('Y-m', $arrData['period_month'])->startOfMonth();
 
         if ($listing->reportingMethod()->isOnline()) {
-            return $this->_onlineEstablishmentRedirect($listing, $month);
+            return $this->_onlineEstablishmentRedirect($listing, $dtmMonth);
         }
 
-        $objExisting = $listing->monthlyArrivalReports()->forPeriod($month)->first();
+        $objExisting = $listing->monthlyArrivalReports()->forPeriod($dtmMonth)->first();
 
-        if ($objExisting && ! $request->user()->can('editDraft', $objExisting)) {
-            return back()->with('toast', "{$listing->name} already has a report for {$month->format('F Y')}.")->with('toast_tone', 'danger');
+        if ($objExisting && ! $objRequest->user()->can('editDraft', $objExisting)) {
+            return back()->with('toast', "{$listing->lst_name} already has a report for {$dtmMonth->format('F Y')}.")->with('toast_tone', 'danger');
         }
 
-        $arrFigures = ManualReportForm::figures($data);
+        $arrFigures = ManualReportForm::figures($arrData);
 
         try {
             if ($objExisting) {
                 $arrBefore = $objExisting->getOriginal();
                 $objExisting->update($arrFigures);
-                $report = $objExisting;
+                $objReport = $objExisting;
 
                 OperationLogger::updated(
-                    $request->user(),
+                    $objRequest->user(),
                     'monthly_arrival_report',
-                    $report->id,
-                    $listing->municipality_id,
-                    $listing->id,
-                    OperationLogger::diff($arrBefore, $report),
+                    $objReport->mar_id,
+                    $listing->mun_id,
+                    $listing->lst_id,
+                    OperationLogger::diff($arrBefore, $objReport),
                 );
             } else {
-                $report = MonthlyArrivalReport::query()->create([
-                    'listing_id' => $listing->id,
-                    'municipality_id' => $listing->municipality_id,
-                    'period_month' => $month->toDateString(),
-                    'submission_source' => ReportSubmissionSource::ManualPaper,
-                    'status' => MonthlyReportStatus::Draft,
+                $objReport = MonthlyArrivalReport::query()->create([
+                    'lst_id' => $listing->lst_id,
+                    'mun_id' => $listing->mun_id,
+                    'mar_period_month' => $dtmMonth->toDateString(),
+                    'mar_submission_source' => ReportSubmissionSource::ManualPaper,
+                    'mar_status' => MonthlyReportStatus::Draft,
                     ...$arrFigures,
                 ]);
 
                 OperationLogger::created(
-                    $request->user(),
+                    $objRequest->user(),
                     'monthly_arrival_report',
-                    $report->id,
-                    $listing->municipality_id,
-                    $listing->id,
+                    $objReport->mar_id,
+                    $listing->mun_id,
+                    $listing->lst_id,
                     [
-                        'period_month' => $month->toDateString(),
+                        'period_month' => $dtmMonth->toDateString(),
                         'submission_source' => ReportSubmissionSource::ManualPaper->value,
                         'status' => MonthlyReportStatus::Draft->value,
-                        'total_visitors' => $report->total_visitors,
+                        'total_visitors' => $objReport->mar_total_visitors,
                     ],
                 );
             }
         } catch (UniqueConstraintViolationException) {
             // Another report for this establishment and month was saved in the meantime.
-            return back()->withInput()->with('toast', "{$listing->name} already has a report for {$month->format('F Y')}.")->with('toast_tone', 'danger');
+            return back()->withInput()->with('toast', "{$listing->lst_name} already has a report for {$dtmMonth->format('F Y')}.")->with('toast_tone', 'danger');
         }
 
-        if (($data['intent'] ?? 'draft') === 'preview') {
-            return redirect()->route('lgu.monthlyReports.show', ['monthlyArrivalReport' => $report, 'view' => 'a4'])
+        if (($arrData['intent'] ?? 'draft') === 'preview') {
+            return redirect()->route('lgu.monthlyReports.show', ['monthlyArrivalReport' => $objReport, 'view' => 'a4'])
                 ->with('toast', 'Draft saved. Check the preview against the paper report, then submit.');
         }
 
-        return redirect()->route('lgu.monthlyReports.manualEntry', ['listing' => $listing, 'period' => $month->format('Y-m')])
-            ->with('toast', "Draft saved for {$listing->name}, {$month->format('F Y')}.");
+        return redirect()->route('lgu.monthlyReports.manualEntry', ['listing' => $listing, 'period' => $dtmMonth->format('Y-m')])
+            ->with('toast', "Draft saved for {$listing->lst_name}, {$dtmMonth->format('F Y')}.");
     }
 
     /**
@@ -383,25 +383,25 @@ class MonthlyReportsController extends LguController
 
         if ($monthlyArrivalReport->listing->reportingMethod()->isOnline()) {
             return back()
-                ->with('toast', "{$monthlyArrivalReport->listing->name} now reports through Online iTOUR, so this paper draft can't be submitted. Its own report for that month comes through iTOUR.")
+                ->with('toast', "{$monthlyArrivalReport->listing->lst_name} now reports through Online iTOUR, so this paper draft can't be submitted. Its own report for that month comes through iTOUR.")
                 ->with('toast_tone', 'danger');
         }
 
         $arrBefore = $monthlyArrivalReport->getOriginal();
 
         $monthlyArrivalReport->update([
-            'status' => MonthlyReportStatus::Submitted,
-            'submitted_by' => $request->user()->id,
-            'submitted_at' => now(),
+            'mar_status' => MonthlyReportStatus::Submitted,
+            'mar_submitted_by' => $request->user()->usr_id,
+            'mar_submitted_at' => now(),
         ]);
 
         OperationLogger::submitted(
             $request->user(),
             'monthly_arrival_report',
-            $monthlyArrivalReport->id,
-            $monthlyArrivalReport->municipality_id,
+            $monthlyArrivalReport->mar_id,
+            $monthlyArrivalReport->mun_id,
             OperationLogger::diff($arrBefore, $monthlyArrivalReport),
-            $monthlyArrivalReport->listing_id,
+            $monthlyArrivalReport->lst_id,
         );
 
         return redirect()->route('lgu.monthlyReports.show', $monthlyArrivalReport)
@@ -423,14 +423,14 @@ class MonthlyReportsController extends LguController
 
         $arrBefore = $monthlyArrivalReport->getOriginal();
 
-        $monthlyArrivalReport->update(['status' => MonthlyReportStatus::ForReview]);
+        $monthlyArrivalReport->update(['mar_status' => MonthlyReportStatus::ForReview]);
 
         OperationLogger::updated(
             $request->user(),
             'monthly_arrival_report',
-            $monthlyArrivalReport->id,
-            $monthlyArrivalReport->municipality_id,
-            $monthlyArrivalReport->listing_id,
+            $monthlyArrivalReport->mar_id,
+            $monthlyArrivalReport->mun_id,
+            $monthlyArrivalReport->lst_id,
             OperationLogger::diff($arrBefore, $monthlyArrivalReport),
         );
 
@@ -467,7 +467,7 @@ class MonthlyReportsController extends LguController
                 ->setPaper('a4')
                 ->download("{$arrReport['reference_number']}.pdf");
         } catch (\Throwable $e) {
-            Log::error('Failed to generate establishment report PDF.', ['exception' => $e, 'report_id' => $monthlyArrivalReport->id]);
+            Log::error('Failed to generate establishment report PDF.', ['exception' => $e, 'report_id' => $monthlyArrivalReport->mar_id]);
 
             abort(500, 'The PDF could not be generated. Please use Print instead.');
         }
@@ -495,18 +495,18 @@ class MonthlyReportsController extends LguController
         $arrBefore = $monthlyArrivalReport->getOriginal();
 
         $monthlyArrivalReport->update([
-            'status' => MonthlyReportStatus::ForCorrection,
-            'remarks' => $arrData['remarks'],
+            'mar_status' => MonthlyReportStatus::ForCorrection,
+            'mar_remarks' => $arrData['remarks'],
         ]);
 
         OperationLogger::returned(
             $request->user(),
             'monthly_arrival_report',
-            $monthlyArrivalReport->id,
+            $monthlyArrivalReport->mar_id,
             $arrData['remarks'],
-            $monthlyArrivalReport->municipality_id,
+            $monthlyArrivalReport->mun_id,
             OperationLogger::diff($arrBefore, $monthlyArrivalReport),
-            $monthlyArrivalReport->listing_id,
+            $monthlyArrivalReport->lst_id,
         );
 
         return redirect()->route('lgu.monthlyReports.show', $monthlyArrivalReport)
@@ -522,9 +522,9 @@ class MonthlyReportsController extends LguController
      * PTO — a provincial figure PTO has accepted shouldn't change
      * retroactively outside a fresh submission).
      */
-    public function show(Request $request, MonthlyArrivalReport $monthlyArrivalReport): View
+    public function show(Request $objRequest, MonthlyArrivalReport $monthlyArrivalReport): View
     {
-        abort_unless($request->user()->can('view', $monthlyArrivalReport), 403);
+        abort_unless($objRequest->user()->can('view', $monthlyArrivalReport), 403);
 
         $monthlyArrivalReport->loadMissing(['listing.categoryRecord', 'submitter', 'verifier', 'arrivals', 'municipalReport']);
 
@@ -536,12 +536,12 @@ class MonthlyReportsController extends LguController
             fn (string $strError) => ! str_starts_with($strError, 'Grand Total')
         ));
 
-        return $this->renderLgu($request, 'lgu.monthly-reports.show', 'reports.monthly', 'Monthly Report', [
+        return $this->renderLgu($objRequest, 'lgu.monthly-reports.show', 'reports.monthly', 'Monthly Report', [
             'report' => $monthlyArrivalReport,
-            'locked' => ! $request->user()->can('update', $monthlyArrivalReport),
+            'locked' => ! $objRequest->user()->can('update', $monthlyArrivalReport),
             'history' => $this->reportHistory($monthlyArrivalReport),
             'originBreakdown' => $monthlyArrivalReport->originBreakdown(),
-            'activeView' => $request->query('view') === 'a4' ? 'a4' : 'details',
+            'activeView' => $objRequest->query('view') === 'a4' ? 'a4' : 'details',
             'balanceErrors' => $arrBalanceErrors,
         ]);
     }
@@ -553,17 +553,17 @@ class MonthlyReportsController extends LguController
      * figures were wrong, the LGU is the only one who can fix them (e.g.
      * after PTO returns the consolidated report for clarification).
      */
-    public function edit(Request $request, MonthlyArrivalReport $monthlyArrivalReport): View
+    public function edit(Request $objRequest, MonthlyArrivalReport $monthlyArrivalReport): View
     {
         abort_unless(
-            $request->user()->can('update', $monthlyArrivalReport),
+            $objRequest->user()->can('update', $monthlyArrivalReport),
             403,
             'This report cannot be corrected here: it is still a draft or with the establishment for correction, or it is part of a provincial report pending or approved by PTO.'
         );
 
         $monthlyArrivalReport->loadMissing('listing');
 
-        return $this->renderLgu($request, 'lgu.monthly-reports.edit', 'reports.monthly', 'Correct Report', [
+        return $this->renderLgu($objRequest, 'lgu.monthly-reports.edit', 'reports.monthly', 'Correct Report', [
             'report' => $monthlyArrivalReport,
         ]);
     }
@@ -575,15 +575,15 @@ class MonthlyReportsController extends LguController
      * fresh verification rather than keeping a sign-off that predates the
      * correction.
      */
-    public function update(Request $request, MonthlyArrivalReport $monthlyArrivalReport): RedirectResponse
+    public function update(Request $objRequest, MonthlyArrivalReport $monthlyArrivalReport): RedirectResponse
     {
         abort_unless(
-            $request->user()->can('update', $monthlyArrivalReport),
+            $objRequest->user()->can('update', $monthlyArrivalReport),
             403,
             'This report cannot be corrected here: it is still a draft or with the establishment for correction, or it is part of a provincial report pending or approved by PTO.'
         );
 
-        $data = $request->validate([
+        $arrData = $objRequest->validate([
             'party_male' => ['required', 'integer', 'min:0'],
             'party_female' => ['required', 'integer', 'min:0'],
             'party_adults' => ['required', 'integer', 'min:0'],
@@ -594,58 +594,70 @@ class MonthlyReportsController extends LguController
             'reason' => ['required', 'string', 'max:2000'],
         ]);
 
-        $wasVerified = $monthlyArrivalReport->status === MonthlyReportStatus::Verified;
-        $before = $monthlyArrivalReport->getOriginal();
+        $blnWasVerified = $monthlyArrivalReport->mar_status === MonthlyReportStatus::Verified;
+        $arrBefore = $monthlyArrivalReport->getOriginal();
 
-        $monthlyArrivalReport->update([
-            'party_male' => $data['party_male'],
-            'party_female' => $data['party_female'],
-            'party_adults' => $data['party_adults'],
-            'party_children' => $data['party_children'],
-            'party_seniors' => $data['party_seniors'],
-            'party_local' => $data['party_local'],
-            'party_foreign' => $data['party_foreign'],
-            'total_visitors' => $data['party_male'] + $data['party_female'],
-            ...($wasVerified ? ['status' => MonthlyReportStatus::ForReview, 'verified_by' => null, 'verified_at' => null] : []),
-        ]);
+        try {
+            $monthlyArrivalReport->update([
+                'mar_party_male' => $arrData['party_male'],
+                'mar_party_female' => $arrData['party_female'],
+                'mar_party_adults' => $arrData['party_adults'],
+                'mar_party_children' => $arrData['party_children'],
+                'mar_party_seniors' => $arrData['party_seniors'],
+                'mar_party_local' => $arrData['party_local'],
+                'mar_party_foreign' => $arrData['party_foreign'],
+                'mar_total_visitors' => $arrData['party_male'] + $arrData['party_female'],
+                ...($blnWasVerified ? ['mar_status' => MonthlyReportStatus::ForReview, 'mar_verified_by' => null, 'mar_verified_at' => null] : []),
+            ]);
+        } catch (\Throwable $objException) {
+            Log::error('Failed to correct the monthly arrival report.', ['exception' => $objException, 'mar_id' => $monthlyArrivalReport->mar_id]);
+
+            return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
+        }
 
         OperationLogger::updated(
-            $request->user(),
+            $objRequest->user(),
             'monthly_arrival_report',
-            $monthlyArrivalReport->id,
-            $monthlyArrivalReport->municipality_id,
-            $monthlyArrivalReport->listing_id,
-            OperationLogger::diff($before, $monthlyArrivalReport),
-            $data['reason'],
+            $monthlyArrivalReport->mar_id,
+            $monthlyArrivalReport->mun_id,
+            $monthlyArrivalReport->lst_id,
+            OperationLogger::diff($arrBefore, $monthlyArrivalReport),
+            $arrData['reason'],
         );
 
         return redirect()->route('lgu.monthlyReports.show', $monthlyArrivalReport)
-            ->with('toast', $wasVerified ? 'Report corrected — re-verify before consolidating again.' : 'Report corrected.');
+            ->with('toast', $blnWasVerified ? 'Report corrected — re-verify before consolidating again.' : 'Report corrected.');
     }
 
-    public function verify(Request $request, MonthlyArrivalReport $monthlyArrivalReport): RedirectResponse
+    public function verify(Request $objRequest, MonthlyArrivalReport $monthlyArrivalReport): RedirectResponse
     {
         abort_unless(
-            $request->user()->can('verify', $monthlyArrivalReport),
+            $objRequest->user()->can('verify', $monthlyArrivalReport),
             403,
             'Only a submitted report awaiting review can be verified.'
         );
 
-        $before = $monthlyArrivalReport->getOriginal();
+        $arrBefore = $monthlyArrivalReport->getOriginal();
 
-        $monthlyArrivalReport->update([
-            'status' => MonthlyReportStatus::Verified,
-            'verified_by' => $request->user()->id,
-            'verified_at' => now(),
-        ]);
+        try {
+            $monthlyArrivalReport->update([
+                'mar_status' => MonthlyReportStatus::Verified,
+                'mar_verified_by' => $objRequest->user()->usr_id,
+                'mar_verified_at' => now(),
+            ]);
+        } catch (\Throwable $objException) {
+            Log::error('Failed to verify the monthly arrival report.', ['exception' => $objException, 'mar_id' => $monthlyArrivalReport->mar_id]);
+
+            return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
+        }
 
         OperationLogger::validated(
-            $request->user(),
+            $objRequest->user(),
             'monthly_arrival_report',
-            $monthlyArrivalReport->id,
-            $monthlyArrivalReport->municipality_id,
-            $monthlyArrivalReport->listing_id,
-            OperationLogger::diff($before, $monthlyArrivalReport),
+            $monthlyArrivalReport->mar_id,
+            $monthlyArrivalReport->mun_id,
+            $monthlyArrivalReport->lst_id,
+            OperationLogger::diff($arrBefore, $monthlyArrivalReport),
         );
 
         return back()->with('toast', 'Report verified.');
@@ -658,36 +670,36 @@ class MonthlyReportsController extends LguController
      * no separate handoff step. Only Verified reports ever count toward the
      * total; a month with none yet cannot be consolidated.
      */
-    public function consolidate(Request $request): RedirectResponse
+    public function consolidate(Request $objRequest): RedirectResponse
     {
-        $user = $request->user();
-        $data = $request->validate([
+        $objUser = $objRequest->user();
+        $arrData = $objRequest->validate([
             'period_month' => ['required', 'date_format:Y-m'],
         ]);
-        $month = CarbonImmutable::createFromFormat('Y-m', $data['period_month'])->startOfMonth();
+        $dtmMonth = CarbonImmutable::createFromFormat('Y-m', $arrData['period_month'])->startOfMonth();
 
-        $verifiedReports = MonthlyArrivalReport::query()
-            ->visibleTo($user)
-            ->forPeriod($month)
-            ->where('status', MonthlyReportStatus::Verified)
+        $objVerifiedReports = MonthlyArrivalReport::query()
+            ->visibleTo($objUser)
+            ->forPeriod($dtmMonth)
+            ->where('mar_status', MonthlyReportStatus::Verified)
             ->get();
 
-        if ($verifiedReports->isEmpty()) {
-            return back()->with('toast', "No verified reports for {$month->format('F Y')} yet — nothing to consolidate.")->with('toast_tone', 'danger');
+        if ($objVerifiedReports->isEmpty()) {
+            return back()->with('toast', "No verified reports for {$dtmMonth->format('F Y')} yet — nothing to consolidate.")->with('toast_tone', 'danger');
         }
 
         // Ready rule: every report the LGU has received must be decided
         // first. Establishments that never reported stay Not Submitted on
         // the municipal report (never counted as zero) and do not block it.
-        $arrSummary = $this->_municipalSummary($user, $month, $this->_establishmentRows($user, $month));
+        $arrSummary = $this->_municipalSummary($objUser, $dtmMonth, $this->_establishmentRows($objUser, $dtmMonth));
 
         if ($arrSummary['pendingCount'] > 0) {
-            return back()->with('toast', "{$arrSummary['pendingCount']} establishment report(s) for {$month->format('F Y')} still need review or correction before submitting to PTO.")->with('toast_tone', 'danger');
+            return back()->with('toast', "{$arrSummary['pendingCount']} establishment report(s) for {$dtmMonth->format('F Y')} still need review or correction before submitting to PTO.")->with('toast_tone', 'danger');
         }
 
-        $existing = MunicipalReport::query()
-            ->where('municipality_id', $user->municipality_id)
-            ->whereDate('period_start', $month->toDateString())
+        $objExisting = MunicipalReport::query()
+            ->where('mun_id', $objUser->mun_id)
+            ->whereDate('mrp_period_start', $dtmMonth->toDateString())
             ->whereDoesntHave('supersededBy')
             ->first();
 
@@ -696,70 +708,76 @@ class MonthlyReportsController extends LguController
         // resubmission — it just goes back to For Review and is logged as a
         // reopen, not an ordinary consolidation.
         abort_if(
-            $existing && in_array($existing->status, [MunicipalReport::STATUS_SUBMITTED, MunicipalReport::STATUS_REVIEWED], true),
+            $objExisting && in_array($objExisting->mrp_status, [MunicipalReport::STATUS_SUBMITTED, MunicipalReport::STATUS_REVIEWED], true),
             403,
             'This municipality already has a report pending PTO review for that month.'
         );
-        $wasVerified = $existing?->isFrozen() ?? false;
+        $blnWasVerified = $objExisting?->isFrozen() ?? false;
 
-        $total = (int) $verifiedReports->sum('total_visitors');
+        $intTotal = (int) $objVerifiedReports->sum('mar_total_visitors');
 
-        $municipalReport = DB::transaction(function () use ($existing, $wasVerified, $user, $month, $total, $verifiedReports) {
-            // A Verified report's own row is frozen forever (its
-            // frozen_snapshot, PDF, and verification code must never
-            // change) — reopening it creates a brand-new revision row
-            // instead of overwriting it. Returning a RETURNED report (or
-            // consolidating for the first time) still updates/creates in
-            // place as before, since neither of those is frozen.
-            $municipalReport = match (true) {
-                $wasVerified => MunicipalReport::query()->create([
-                    'municipality' => $existing->municipality,
-                    'municipality_id' => $existing->municipality_id,
-                    'submitted_by' => $user->id,
-                    'period_start' => $month->toDateString(),
-                    'period_end' => $month->endOfMonth()->toDateString(),
-                    'total_arrivals' => $total,
-                    'status' => MunicipalReport::STATUS_SUBMITTED,
-                    'revision_number' => $existing->revision_number + 1,
-                    'supersedes_id' => $existing->id,
-                ]),
-                $existing !== null => tap($existing)->update([
-                    'total_arrivals' => $total,
-                    'status' => MunicipalReport::STATUS_SUBMITTED,
-                    'submitted_by' => $user->id,
-                    'reviewed_by' => null,
-                    'reviewed_at' => null,
-                ]),
-                default => MunicipalReport::query()->create([
-                    'municipality' => $user->organization_subtitle,
-                    'municipality_id' => $user->municipality_id,
-                    'submitted_by' => $user->id,
-                    'period_start' => $month->toDateString(),
-                    'period_end' => $month->endOfMonth()->toDateString(),
-                    'total_arrivals' => $total,
-                    'status' => MunicipalReport::STATUS_SUBMITTED,
-                ]),
-            };
+        try {
+            $objMunicipalReport = DB::transaction(function () use ($objExisting, $blnWasVerified, $objUser, $dtmMonth, $intTotal, $objVerifiedReports) {
+                // A Verified report's own row is frozen forever (its
+                // mrp_frozen_snapshot, PDF, and verification code must never
+                // change) — reopening it creates a brand-new revision row
+                // instead of overwriting it. Returning a RETURNED report (or
+                // consolidating for the first time) still updates/creates in
+                // place as before, since neither of those is frozen.
+                $objMunicipalReport = match (true) {
+                    $blnWasVerified => MunicipalReport::query()->create([
+                        'mrp_municipality' => $objExisting->mrp_municipality,
+                        'mun_id' => $objExisting->mun_id,
+                        'mrp_submitted_by' => $objUser->usr_id,
+                        'mrp_period_start' => $dtmMonth->toDateString(),
+                        'mrp_period_end' => $dtmMonth->endOfMonth()->toDateString(),
+                        'mrp_total_arrivals' => $intTotal,
+                        'mrp_status' => MunicipalReport::STATUS_SUBMITTED,
+                        'mrp_revision_number' => $objExisting->mrp_revision_number + 1,
+                        'mrp_supersedes_id' => $objExisting->mrp_id,
+                    ]),
+                    $objExisting !== null => tap($objExisting)->update([
+                        'mrp_total_arrivals' => $intTotal,
+                        'mrp_status' => MunicipalReport::STATUS_SUBMITTED,
+                        'mrp_submitted_by' => $objUser->usr_id,
+                        'mrp_reviewed_by' => null,
+                        'mrp_reviewed_at' => null,
+                    ]),
+                    default => MunicipalReport::query()->create([
+                        'mrp_municipality' => $objUser->usr_organization_subtitle,
+                        'mun_id' => $objUser->mun_id,
+                        'mrp_submitted_by' => $objUser->usr_id,
+                        'mrp_period_start' => $dtmMonth->toDateString(),
+                        'mrp_period_end' => $dtmMonth->endOfMonth()->toDateString(),
+                        'mrp_total_arrivals' => $intTotal,
+                        'mrp_status' => MunicipalReport::STATUS_SUBMITTED,
+                    ]),
+                };
 
-            $verifiedReports->each->update(['municipal_report_id' => $municipalReport->id]);
+                $objVerifiedReports->each->update(['mrp_id' => $objMunicipalReport->mrp_id]);
 
-            return $municipalReport;
-        });
+                return $objMunicipalReport;
+            });
+        } catch (\Throwable $objException) {
+            Log::error('Failed to consolidate the municipal report.', ['exception' => $objException, 'mun_id' => $objUser->mun_id]);
 
-        $newValues = [
-            'period_month' => $month->toDateString(),
-            'total_arrivals' => $total,
-            'source_report_count' => $verifiedReports->count(),
-        ];
-
-        if ($wasVerified) {
-            OperationLogger::reopened($user, 'municipal_report', $municipalReport->id, $user->municipality_id, $newValues);
-        } else {
-            OperationLogger::consolidated($user, 'municipal_report', $municipalReport->id, $user->municipality_id, $newValues);
+            return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
 
-        return redirect()->route('lgu.monthlyReports.municipal.show', $month->format('Y-m'))
-            ->with('toast', "{$month->format('F Y')} municipal report submitted to PTO.");
+        $arrNewValues = [
+            'period_month' => $dtmMonth->toDateString(),
+            'total_arrivals' => $intTotal,
+            'source_report_count' => $objVerifiedReports->count(),
+        ];
+
+        if ($blnWasVerified) {
+            OperationLogger::reopened($objUser, 'municipal_report', $objMunicipalReport->mrp_id, $objUser->mun_id, $arrNewValues);
+        } else {
+            OperationLogger::consolidated($objUser, 'municipal_report', $objMunicipalReport->mrp_id, $objUser->mun_id, $arrNewValues);
+        }
+
+        return redirect()->route('lgu.monthlyReports.municipal.show', $dtmMonth->format('Y-m'))
+            ->with('toast', "{$dtmMonth->format('F Y')} municipal report submitted to PTO.");
     }
 
     /**
@@ -769,7 +787,7 @@ class MonthlyReportsController extends LguController
     private function _authorizeManualEntryListing(Request $request, Listing $listing): void
     {
         $this->authorizeOwnMunicipality($request, $listing);
-        abort_if($listing->category === 'destinations', 404);
+        abort_if($listing->lst_category === 'destinations', 404);
     } // end _authorizeManualEntryListing
 
     /**
@@ -779,7 +797,7 @@ class MonthlyReportsController extends LguController
     private function _onlineEstablishmentRedirect(Listing $listing, CarbonImmutable $dtMonth): RedirectResponse
     {
         return redirect()->route('lgu.monthlyReports.manualEntry.index', ['period' => $dtMonth->format('Y-m')])
-            ->with('toast', "{$listing->name} reports through Online iTOUR, so it submits its own monthly report. Manual Entry is only for Manual/Paper establishments.")
+            ->with('toast', "{$listing->lst_name} reports through Online iTOUR, so it submits its own monthly report. Manual Entry is only for Manual/Paper establishments.")
             ->with('toast_tone', 'danger');
     } // end _onlineEstablishmentRedirect
 
@@ -792,9 +810,9 @@ class MonthlyReportsController extends LguController
     {
         return Listing::query()
             ->visibleTo($objUser)
-            ->where('category', '!=', 'destinations')
+            ->where('lst_category', '!=', 'destinations')
             ->with('categoryRecord')
-            ->orderBy('name')
+            ->orderBy('lst_name')
             ->get();
     } // end _establishments
 
@@ -815,13 +833,13 @@ class MonthlyReportsController extends LguController
             ->forPeriod($dtMonth)
             ->with(['submitter', 'verifier'])
             ->get()
-            ->keyBy('listing_id');
+            ->keyBy('lst_id');
 
         // Rows needing LGU attention surface at the top of the table.
         $arrStatusPriority = ['Not Submitted' => 0, 'Draft' => 1, 'Submitted' => 2, 'For Review' => 3, 'For Correction' => 4, 'Verified' => 5];
 
         return $objEstablishments->map(function (Listing $objListing) use ($objReportsByListing, $objUser) {
-            $objReport = $objReportsByListing->get($objListing->id);
+            $objReport = $objReportsByListing->get($objListing->lst_id);
 
             // An establishment's unsubmitted Draft is owner-only (see
             // MonthlyArrivalReportPolicy::view()), so it reads as Not
@@ -832,7 +850,7 @@ class MonthlyReportsController extends LguController
             return [
                 'listing' => $objListing,
                 'report' => $blnIsHiddenDraft ? null : $objReport,
-                'status' => $blnIsHiddenDraft ? 'Not Submitted' : ($objReport?->status->label() ?? 'Not Submitted'),
+                'status' => $blnIsHiddenDraft ? 'Not Submitted' : ($objReport?->mar_status->label() ?? 'Not Submitted'),
                 'draftInProgress' => $blnIsHiddenDraft,
             ];
         })->sortBy(fn (array $arrRow) => $arrStatusPriority[$arrRow['status']])->values();
@@ -848,9 +866,9 @@ class MonthlyReportsController extends LguController
     private function _municipalSummary(User $objUser, CarbonImmutable $dtMonth, Collection $objRows): array
     {
         $objReports = $objRows->pluck('report')->filter()->values();
-        $countStatus = fn (array $arrStatuses) => $objReports->filter(fn (MonthlyArrivalReport $objReport) => in_array($objReport->status, $arrStatuses, true))->count();
+        $countStatus = fn (array $arrStatuses) => $objReports->filter(fn (MonthlyArrivalReport $objReport) => in_array($objReport->mar_status, $arrStatuses, true))->count();
 
-        $objVerifiedReports = $objReports->filter(fn (MonthlyArrivalReport $objReport) => $objReport->status === MonthlyReportStatus::Verified)->values();
+        $objVerifiedReports = $objReports->filter(fn (MonthlyArrivalReport $objReport) => $objReport->mar_status === MonthlyReportStatus::Verified)->values();
         $intAwaitingReviewCount = $countStatus(MonthlyReportStatus::awaitingReview());
         $intForCorrectionCount = $countStatus([MonthlyReportStatus::ForCorrection]);
         $intOwnDraftCount = $countStatus([MonthlyReportStatus::Draft]);
@@ -858,20 +876,20 @@ class MonthlyReportsController extends LguController
 
         $objMunicipalReport = MunicipalReport::query()
             ->with(['submitter', 'reviewer'])
-            ->where('municipality_id', $objUser->municipality_id)
-            ->whereDate('period_start', $dtMonth->toDateString())
+            ->where('mun_id', $objUser->mun_id)
+            ->whereDate('mrp_period_start', $dtMonth->toDateString())
             ->whereDoesntHave('supersededBy')
             ->first();
 
-        $blnIsSentToPto = $objMunicipalReport !== null && $objMunicipalReport->status !== MunicipalReport::STATUS_RETURNED;
+        $blnIsSentToPto = $objMunicipalReport !== null && $objMunicipalReport->mrp_status !== MunicipalReport::STATUS_RETURNED;
         $blnHasVerified = $objVerifiedReports->isNotEmpty();
         $blnCanSubmit = ! $blnIsSentToPto && $blnHasVerified && $intPendingCount === 0;
 
         [$strStatus, $strTone] = match (true) {
-            $objMunicipalReport?->status === MunicipalReport::STATUS_APPROVED => ['Verified by PTO', 'success'],
-            $objMunicipalReport?->status === MunicipalReport::STATUS_REVIEWED => ['For PTO Review', 'warning'],
-            $objMunicipalReport?->status === MunicipalReport::STATUS_SUBMITTED => ['Submitted to PTO', 'info'],
-            $objMunicipalReport?->status === MunicipalReport::STATUS_RETURNED => ['Returned by PTO', 'danger'],
+            $objMunicipalReport?->mrp_status === MunicipalReport::STATUS_APPROVED => ['Verified by PTO', 'success'],
+            $objMunicipalReport?->mrp_status === MunicipalReport::STATUS_REVIEWED => ['For PTO Review', 'warning'],
+            $objMunicipalReport?->mrp_status === MunicipalReport::STATUS_SUBMITTED => ['Submitted to PTO', 'info'],
+            $objMunicipalReport?->mrp_status === MunicipalReport::STATUS_RETURNED => ['Returned by PTO', 'danger'],
             $intPendingCount > 0 => ['Pending Establishment Reviews', 'warning'],
             $blnHasVerified => ['Ready for Submission', 'success'],
             default => ['No Verified Reports', 'neutral'],
@@ -886,7 +904,7 @@ class MonthlyReportsController extends LguController
             'submittedCount' => $intAwaitingReviewCount + $intForCorrectionCount + $objVerifiedReports->count(),
             'pendingCount' => $intPendingCount,
             'verifiedReports' => $objVerifiedReports,
-            'verifiedTotal' => (int) $objVerifiedReports->sum('total_visitors'),
+            'verifiedTotal' => (int) $objVerifiedReports->sum('mar_total_visitors'),
             'municipalReport' => $objMunicipalReport,
             'isSentToPto' => $blnIsSentToPto,
             'canSubmit' => $blnCanSubmit,
@@ -909,26 +927,26 @@ class MonthlyReportsController extends LguController
         $objMunicipalReport = $arrSummary['municipalReport'];
 
         if ($arrSummary['isSentToPto']) {
-            return $objMunicipalReport->isFrozen() && $objMunicipalReport->frozen_snapshot
-                ? $objMunicipalReport->frozen_snapshot
+            return $objMunicipalReport->isFrozen() && $objMunicipalReport->mrp_frozen_snapshot
+                ? $objMunicipalReport->mrp_frozen_snapshot
                 : OfficialReportBuilder::fromMunicipalReport($objMunicipalReport);
         }
 
         return OfficialReportBuilder::fromLiveConsolidation(
-            Municipality::query()->findOrFail($objUser->municipality_id),
+            Municipality::query()->findOrFail($objUser->mun_id),
             $dtMonth,
             $arrSummary['verifiedReports'],
-            $objUser->name,
-            $objUser->role?->title(),
+            $objUser->usr_name,
+            $objUser->usr_role?->title(),
         );
     } // end _municipalReportData
 
-    private function resolvePeriod(Request $request): CarbonImmutable
+    private function resolvePeriod(Request $objRequest): CarbonImmutable
     {
-        $period = $request->query('period');
+        $strPeriod = $objRequest->query('period');
 
-        if (is_string($period) && preg_match('/^\d{4}-\d{2}$/', $period)) {
-            return CarbonImmutable::createFromFormat('Y-m', $period)->startOfMonth();
+        if (is_string($strPeriod) && preg_match('/^\d{4}-\d{2}$/', $strPeriod)) {
+            return CarbonImmutable::createFromFormat('Y-m', $strPeriod)->startOfMonth();
         }
 
         return CarbonImmutable::now()->startOfMonth();
@@ -940,6 +958,6 @@ class MonthlyReportsController extends LguController
     private function recentMonthOptions(): Collection
     {
         return collect(range(0, 11))
-            ->map(fn (int $i) => CarbonImmutable::now()->subMonthsNoOverflow($i)->startOfMonth());
+            ->map(fn (int $intIndex) => CarbonImmutable::now()->subMonthsNoOverflow($intIndex)->startOfMonth());
     }
 }

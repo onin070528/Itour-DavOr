@@ -58,12 +58,12 @@ class QrCodeService
      */
     public function buildCheckinUrl(Listing $objListing): string
     {
-        if ($objListing->uuid === null) {
-            throw new InvalidArgumentException("Listing {$objListing->id} has no uuid; run php artisan listings:backfill-uuids.");
+        if ($objListing->lst_uuid === null) {
+            throw new InvalidArgumentException("Listing {$objListing->lst_id} has no uuid; run php artisan listings:backfill-uuids.");
         }
 
         $strBaseUrl = rtrim((string) config('app.url'), '/');
-        $strCheckinPath = route('lgu.establishmentQr', ['establishment' => $objListing->uuid], false);
+        $strCheckinPath = route('lgu.establishmentQr', ['establishment' => $objListing->lst_uuid], false);
 
         return $strBaseUrl.$strCheckinPath;
     }
@@ -90,7 +90,7 @@ class QrCodeService
                     return $this->_generateBrandedSvg($strCheckinUrl, $intClampedSize);
                 } catch (Throwable $errBranding) {
                     Log::warning('Branded QR code failed; falling back to the plain QR code.', [
-                        'listing_id' => $objListing->id,
+                        'listing_id' => $objListing->lst_id,
                         'exception' => $errBranding,
                     ]);
                 } // end try branded
@@ -99,7 +99,7 @@ class QrCodeService
             return $this->_generatePlainSvg($strCheckinUrl, $intClampedSize);
         } catch (Throwable $errGeneration) {
             Log::error('Failed to generate a check-in QR code.', [
-                'listing_id' => $objListing->id,
+                'listing_id' => $objListing->lst_id,
                 'exception' => $errGeneration,
             ]);
 

@@ -42,20 +42,20 @@ class CheckinController extends Controller
      */
     public function show(string $establishment, ArrivalRecorder $arrivalRecorder): View
     {
-        $listing = Listing::query()->where('uuid', $establishment)->first();
+        $objListing = Listing::query()->where('lst_uuid', $establishment)->first();
 
-        abort_if(! $listing, 404);
+        abort_if(! $objListing, 404);
 
-        if (! $listing->isAcceptingRegistrations()) {
+        if (! $objListing->isAcceptingRegistrations()) {
             return view('lgu.establishmentQR', [
-                'establishmentName' => $listing->name,
+                'establishmentName' => $objListing->lst_name,
                 'checkinAction' => null,
                 'refusalMessage' => self::NOT_ACCEPTING_MESSAGE,
             ]);
         }
 
         return view('lgu.establishmentQR', [
-            'establishmentName' => $listing->name,
+            'establishmentName' => $objListing->lst_name,
             'provinces' => config('ph_provinces'),
             'countries' => config('countries'),
             'municipalities' => $arrivalRecorder->getProvinceMunicipalityNames(),
@@ -75,18 +75,18 @@ class CheckinController extends Controller
      * (App\Services\ArrivalRecorder); the QR form adds the required lead
      * name/contact and the honeypot.
      */
-    public function store(Request $request, string $establishment, ArrivalRecorder $arrivalRecorder): JsonResponse
+    public function store(Request $objRequest, string $establishment, ArrivalRecorder $arrivalRecorder): JsonResponse
     {
-        $listing = Listing::query()->where('uuid', $establishment)->firstOrFail();
+        $objListing = Listing::query()->where('lst_uuid', $establishment)->firstOrFail();
 
         // Defense in depth: show() already refuses the form, but a QR switch
         // or status change could happen between the scan and the submit —
         // never save in that case.
-        if (! $listing->isAcceptingRegistrations()) {
+        if (! $objListing->isAcceptingRegistrations()) {
             return response()->json(['message' => self::NOT_ACCEPTING_MESSAGE], 422);
         }
 
-        $data = Validator::make($request->all(), array_merge([
+        $arrData = Validator::make($objRequest->all(), array_merge([
             // Honeypot: real visitors never see or fill this field (see
             // resources/views/lgu/establishmentQR.blade.php). A filled value
             // means a bot submitted the form, so the whole request fails
@@ -94,19 +94,19 @@ class CheckinController extends Controller
             'website' => ['prohibited'],
             'visitorName' => ['required', 'string', 'max:255'],
             'visitorContact' => ['required', 'string', 'max:255'],
-        ], $arrivalRecorder->getRules($request)), [
+        ], $arrivalRecorder->getRules($objRequest)), [
             'visitorName.required' => 'Please enter your full name.',
             'visitorContact.required' => 'Please enter your contact number.',
             'visitType.required' => 'Please choose Day Tour or Overnight.',
             'website.prohibited' => 'Your registration could not be submitted.',
         ])
-            ->after(fn ($validator) => $arrivalRecorder->checkHeadcount($validator, $request))
+            ->after(fn ($objValidator) => $arrivalRecorder->checkHeadcount($objValidator, $objRequest))
             ->validate();
 
         try {
-            $arrivalRecorder->record($listing, $data, ArrivalSource::SelfCheckin, null, now()->toDateString());
-        } catch (\Throwable $e) {
-            Log::error('Failed to record self check-in.', ['exception' => $e, 'listing_id' => $listing->id]);
+            $arrivalRecorder->record($objListing, $arrData, ArrivalSource::SelfCheckin, null, now()->toDateString());
+        } catch (\Throwable $objException) {
+            Log::error('Failed to record self check-in.', ['exception' => $objException, 'listing_id' => $objListing->lst_id]);
 
             return response()->json(['message' => 'Something went wrong while submitting your check-in. Please try again.'], 500);
         }

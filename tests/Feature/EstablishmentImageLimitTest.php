@@ -1,5 +1,13 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Tests — establishment image limit.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 use App\Enums\ImageSourceRole;
 use App\Enums\ImageStatus;
 use App\Enums\UserRole;
@@ -19,16 +27,16 @@ use Illuminate\Validation\ValidationException;
 function establishmentImageRowFixture(Listing $listing, User $uploader, array $overrides = []): EstablishmentImage
 {
     return EstablishmentImage::query()->create(array_merge([
-        'listing_id' => $listing->id,
-        'img_path' => 'establishment-images/'.$listing->id.'/'.uniqid().'.jpg',
-        'img_thumbnail_path' => 'establishment-images/'.$listing->id.'/'.uniqid().'_thumb.jpg',
-        'img_alt_text' => $listing->name,
+        'lst_id' => $listing->lst_id,
+        'img_path' => 'establishment-images/'.$listing->lst_id.'/'.uniqid().'.jpg',
+        'img_thumbnail_path' => 'establishment-images/'.$listing->lst_id.'/'.uniqid().'_thumb.jpg',
+        'img_alt_text' => $listing->lst_name,
         'img_source_role' => ImageSourceRole::Establishment,
         'img_status' => ImageStatus::Published,
         'img_is_cover' => false,
         'img_sort_order' => 1,
         'img_hash' => hash('sha256', 'fixture-'.uniqid()),
-        'img_uploaded_by' => $uploader->id,
+        'img_uploaded_by' => $uploader->usr_id,
         'img_has_ownership_declared' => true,
     ], $overrides));
 }
@@ -43,14 +51,14 @@ test('uploading the 5th image succeeds and a 6th is rejected with the plain mess
     expect($listing->fresh()->liveImageCount())->toBe(4);
 
     test()->actingAs($user)->post(route('establishment.images.store'), [
-        'listing_id' => $listing->id,
+        'listing_id' => $listing->lst_id,
         'photos' => [UploadedFile::fake()->image('fifth.jpg', 1600, 1200)],
         'ownership_declared' => '1',
     ])->assertSessionHasNoErrors();
     expect($listing->fresh()->liveImageCount())->toBe(5);
 
     $response = test()->actingAs($user)->post(route('establishment.images.store'), [
-        'listing_id' => $listing->id,
+        'listing_id' => $listing->lst_id,
         'photos' => [UploadedFile::fake()->image('sixth.jpg', 1601, 1200)],
         'ownership_declared' => '1',
     ]);
@@ -72,9 +80,9 @@ test('PENDING images count toward the limit; REJECTED and ARCHIVED do not', func
 });
 
 test('a pending Replace at 5 of 5 is allowed and is not counted as a 6th image', function () {
-    $mati = Municipality::query()->firstOrCreate(['code' => 'MATI'], ['name' => 'City of Mati']);
-    $listing = establishmentImageListingFixture(['municipality' => 'City of Mati']);
-    $listing->update(['municipality_id' => $mati->id]);
+    $mati = Municipality::query()->firstOrCreate(['mun_code' => 'MATI'], ['mun_name' => 'City of Mati']);
+    $listing = establishmentImageListingFixture(['lst_municipality' => 'City of Mati']);
+    $listing->update(['mun_id' => $mati->mun_id]);
     $user = establishmentImageUserFixture($listing);
 
     $cover = establishmentImageRowFixture($listing, $user, ['img_is_cover' => true, 'img_hash' => hash('sha256', 'cover')]);
@@ -93,7 +101,7 @@ test('a pending Replace at 5 of 5 is allowed and is not counted as a 6th image',
     // Uploading a brand-new (non-replace) photo is still correctly blocked —
     // the pending replace must not have freed a phantom slot.
     test()->actingAs($user)->post(route('establishment.images.store'), [
-        'listing_id' => $listing->id,
+        'listing_id' => $listing->lst_id,
         'photos' => [UploadedFile::fake()->image('extra.jpg', 1602, 1200)],
         'ownership_declared' => '1',
     ])->assertSessionHasErrors('photos');
@@ -109,7 +117,7 @@ test('selecting more files than the remaining slots is rejected entirely, and no
     expect($listing->fresh()->getRemainingSlots())->toBe(2);
 
     $response = test()->actingAs($user)->post(route('establishment.images.store'), [
-        'listing_id' => $listing->id,
+        'listing_id' => $listing->lst_id,
         'photos' => [
             UploadedFile::fake()->image('a.jpg', 1600, 1200),
             UploadedFile::fake()->image('b.jpg', 1601, 1200),
@@ -157,7 +165,7 @@ test('an establishment that already has 7 images keeps all 7, cannot add more, a
     expect($listing->fresh()->liveImageCount())->toBe(7);
 
     $response = test()->actingAs($user)->post(route('establishment.images.store'), [
-        'listing_id' => $listing->id,
+        'listing_id' => $listing->lst_id,
         'photos' => [UploadedFile::fake()->image('eighth.jpg', 1600, 1200)],
         'ownership_declared' => '1',
     ]);
@@ -183,14 +191,14 @@ test('removing an image frees a slot immediately', function () {
     expect($listing->fresh()->getRemainingSlots())->toBe(1);
 
     test()->actingAs($user)->post(route('establishment.images.store'), [
-        'listing_id' => $listing->id,
+        'listing_id' => $listing->lst_id,
         'photos' => [UploadedFile::fake()->image('new.jpg', 1600, 1200)],
         'ownership_declared' => '1',
     ])->assertSessionHasNoErrors();
 });
 
 test('the Add Photo button is disabled at the limit on the Establishment, LGU, and PTO management pages', function () {
-    $mati = Municipality::query()->firstOrCreate(['code' => 'MATI'], ['name' => 'City of Mati']);
+    $mati = Municipality::query()->firstOrCreate(['mun_code' => 'MATI'], ['mun_name' => 'City of Mati']);
 
     // Establishment view: its own linked account.
     $establishmentListing = establishmentImageListingFixture();
@@ -202,16 +210,16 @@ test('the Add Photo button is disabled at the limit on the Establishment, LGU, a
     // LGU view: only an establishment the LGU is actually eligible to
     // upload for (I1 — no linked account, or reporting_mode PAPER_LGU) is
     // worth testing here; ImagePolicy::uploadFor() is exercised elsewhere.
-    $lguListing = establishmentImageListingFixture(['name' => 'Paper Establishment', 'municipality' => 'City of Mati', 'reporting_mode' => 'PAPER_LGU']);
-    $lguListing->update(['municipality_id' => $mati->id]);
-    $lgu = User::factory()->create(['role' => UserRole::Lgu, 'municipality_id' => $mati->id]);
+    $lguListing = establishmentImageListingFixture(['lst_name' => 'Paper Establishment', 'lst_municipality' => 'City of Mati', 'lst_reporting_mode' => 'PAPER_LGU']);
+    $lguListing->update(['mun_id' => $mati->mun_id]);
+    $lgu = User::factory()->create(['usr_role' => UserRole::Lgu, 'mun_id' => $mati->mun_id]);
     foreach (range(1, 5) as $i) {
         establishmentImageRowFixture($lguListing, $establishmentUser, ['img_hash' => hash('sha256', "lgu-{$i}")]);
     }
 
     // PTO view: any establishment — PTO may always upload.
-    $ptoListing = establishmentImageListingFixture(['name' => 'PTO Managed Establishment']);
-    $pto = User::factory()->create(['role' => UserRole::PtoAdministrator]);
+    $ptoListing = establishmentImageListingFixture(['lst_name' => 'PTO Managed Establishment']);
+    $pto = User::factory()->create(['usr_role' => UserRole::PtoAdministrator]);
     foreach (range(1, 5) as $i) {
         establishmentImageRowFixture($ptoListing, $establishmentUser, ['img_hash' => hash('sha256', "pto-{$i}")]);
     }

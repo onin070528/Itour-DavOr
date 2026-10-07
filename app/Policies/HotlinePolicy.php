@@ -22,26 +22,26 @@ class HotlinePolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->role === UserRole::PtoAdministrator;
+        return $user->usr_role === UserRole::PtoAdministrator;
     }
 
     public function create(User $user): bool
     {
-        return $user->role === UserRole::PtoAdministrator;
+        return $user->usr_role === UserRole::PtoAdministrator;
     }
 
     public function update(User $user, Hotline $hotline): bool
     {
-        return $user->role === UserRole::PtoAdministrator;
+        return $user->usr_role === UserRole::PtoAdministrator;
     }
 
     public function deactivate(User $user, Hotline $hotline): bool
     {
-        return $user->role === UserRole::PtoAdministrator;
+        return $user->usr_role === UserRole::PtoAdministrator;
     }
 
     public function reorder(User $user, Hotline $hotline): bool
     {
-        return $user->role === UserRole::PtoAdministrator;
+        return $user->usr_role === UserRole::PtoAdministrator;
     }
 }

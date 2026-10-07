@@ -1,3 +1,10 @@
+{{--
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: Dashboard KPI card — label, value, delta and tone.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+--}}
 @props(['label', 'value', 'delta' => null, 'tone' => 'neutral', 'href' => null])
 
 @php

@@ -27,20 +27,20 @@ abstract class LguController extends Controller
      * sidebar chrome already wired up, plus the current user's assigned
      * municipality — every LGU page is scoped to it.
      *
-     * @param  array<string, mixed>  $data
+     * @param  array<string, mixed>  $arrData
      */
-    protected function renderLgu(Request $request, string $view, string $activeKey, string $pageTitle, array $data = []): View
+    protected function renderLgu(Request $objRequest, string $strView, string $strActiveKey, string $strPageTitle, array $arrData = []): View
     {
-        $user = $request->user();
+        $objUser = $objRequest->user();
 
-        return view($view, array_merge([
-            'user' => $user,
-            'municipality' => $user->organization_subtitle,
-            'navSections' => DashboardNavigation::sections($user, $activeKey, $this->imageApprovalCount($user)),
-            'pageTitle' => $pageTitle,
+        return view($strView, array_merge([
+            'user' => $objUser,
+            'municipality' => $objUser->usr_organization_subtitle,
+            'navSections' => DashboardNavigation::sections($objUser, $strActiveKey, $this->imageApprovalCount($objUser)),
+            'pageTitle' => $strPageTitle,
             'accountHeading' => 'System',
             'settingsHref' => route('lgu.settings'),
-        ], $data));
+        ], $arrData));
     }
 
     /**
@@ -50,17 +50,17 @@ abstract class LguController extends Controller
      * mirrored here for the badge count — one card per establishment on
      * the queue page, so the badge counts cards, not photos).
      */
-    protected function imageApprovalCount(User $user): int
+    protected function imageApprovalCount(User $objUser): int
     {
-        if ($user->municipality_id === null) {
+        if ($objUser->mun_id === null) {
             return 0;
         }
 
         return EstablishmentImage::query()
             ->where('img_status', ImageStatus::Pending->value)
             ->where('img_source_role', ImageSourceRole::Establishment->value)
-            ->whereHas('listing', fn ($query) => $query->where('municipality_id', $user->municipality_id))
+            ->whereHas('listing', fn ($objQuery) => $objQuery->where('mun_id', $objUser->mun_id))
             ->distinct()
-            ->count('listing_id');
+            ->count('lst_id');
     }
 }

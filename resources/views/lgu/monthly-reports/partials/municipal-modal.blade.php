@@ -16,10 +16,10 @@
 @endphp
 
 <x-dashboard.modal :id="'municipal-modal-'.$period" :title="'Municipal Report — '.$entry['month']->format('F Y')" max-width="max-w-2xl">
-    @if ($municipalReport?->status === \App\Models\MunicipalReport::STATUS_RETURNED)
+    @if ($municipalReport?->mrp_status === \App\Models\MunicipalReport::STATUS_RETURNED)
         <div class="mb-4 rounded-md border border-danger/30 bg-danger-bg px-4 py-3 text-sm text-danger">
             <p class="font-semibold">Returned by PTO for clarification</p>
-            <p class="mt-1">Remarks: {{ $municipalReport->remarks ?: '—' }}</p>
+            <p class="mt-1">Remarks: {{ $municipalReport->mrp_remarks ?: '—' }}</p>
         </div>
     @endif
 
@@ -46,7 +46,7 @@
         </div>
         <div>
             <dt class="text-xs font-semibold text-sand-500 uppercase">Submitted to PTO</dt>
-            <dd class="mt-1 text-sand-800">{{ $municipalReport ? ($municipalReport->submitter->name ?? '—').' · '.$municipalReport->updated_at->format('M j, Y') : 'Not yet' }}</dd>
+            <dd class="mt-1 text-sand-800">{{ $municipalReport ? ($municipalReport->submitter->usr_name ?? '—').' · '.$municipalReport->mrp_updated_at->format('M j, Y') : 'Not yet' }}</dd>
         </div>
     </dl>
 

@@ -35,13 +35,13 @@ class DirectoryController extends LguController
      * New/edited destinations are always saved under the LGU's own
      * municipality — there is no municipality selector in the form.
      */
-    public function destinations(Request $request): View
+    public function destinations(Request $objRequest): View
     {
-        $municipality = $request->user()->organization_subtitle;
+        $objMunicipality = $objRequest->user()->usr_organization_subtitle;
 
-        return $this->renderLgu($request, 'lgu.directory.destinations', 'directory.destinations', 'Destinations', [
-            'municipality' => $municipality,
-            'destinations' => LguMockData::destinations($municipality),
+        return $this->renderLgu($objRequest, 'lgu.directory.destinations', 'directory.destinations', 'Destinations', [
+            'municipality' => $objMunicipality,
+            'destinations' => LguMockData::destinations($objMunicipality),
         ]);
     }
 
@@ -50,39 +50,39 @@ class DirectoryController extends LguController
      * Add Tourist Attraction (AttractionRecordService) — a new destination
      * starts Not Requested and goes public only after PTO approval.
      */
-    public function storeDestination(Request $request, AttractionRecordService $objRecords): RedirectResponse
+    public function storeDestination(Request $objRequest, AttractionRecordService $objRecords): RedirectResponse
     {
-        $fields = $this->validatedDestinationFields($request);
+        $arrFields = $this->validatedDestinationFields($objRequest);
 
         try {
-            $listing = $objRecords->create($request->user(), $fields);
-        } catch (\Throwable $e) {
-            Log::error('Failed to create LGU destination.', ['exception' => $e]);
+            $objListing = $objRecords->create($objRequest->user(), $arrFields);
+        } catch (\Throwable $objException) {
+            Log::error('Failed to create LGU destination.', ['exception' => $objException]);
 
             return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
 
-        return redirect()->route('lgu.directory.attractions.show', $listing)
-            ->with('toast', "{$listing->name} was added. Request PTO review when it is ready to be featured.");
+        return redirect()->route('lgu.directory.attractions.show', $objListing)
+            ->with('toast', "{$objListing->lst_name} was added. Request PTO review when it is ready to be featured.");
     }
 
     /**
      * Older Destinations page "Edit": edits to public content of a live
      * destination are held for PTO review (AttractionRecordService).
      */
-    public function updateDestination(Request $request, Listing $listing, AttractionRecordService $objRecords): RedirectResponse
+    public function updateDestination(Request $objRequest, Listing $listing, AttractionRecordService $objRecords): RedirectResponse
     {
-        $this->authorizeOwnMunicipality($request, $listing);
-        abort_if($listing->category !== 'destinations', 404);
+        $this->authorizeOwnMunicipality($objRequest, $listing);
+        abort_if($listing->lst_category !== 'destinations', 404);
 
-        $fields = $this->validatedDestinationFields($request);
+        $arrFields = $this->validatedDestinationFields($objRequest);
 
         try {
-            $blnIsHeldForReview = $objRecords->update($request->user(), $listing, $fields);
-        } catch (ValidationException $e) {
-            return back()->with('toast', $e->validator->errors()->first())->with('toast_tone', 'danger');
-        } catch (\Throwable $e) {
-            Log::error('Failed to update LGU destination.', ['exception' => $e, 'listing_id' => $listing->id]);
+            $blnIsHeldForReview = $objRecords->update($objRequest->user(), $listing, $arrFields);
+        } catch (ValidationException $objException) {
+            return back()->with('toast', $objException->validator->errors()->first())->with('toast_tone', 'danger');
+        } catch (\Throwable $objException) {
+            Log::error('Failed to update LGU destination.', ['exception' => $objException, 'listing_id' => $listing->lst_id]);
 
             return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
@@ -90,24 +90,24 @@ class DirectoryController extends LguController
         return back()->with('toast', $blnIsHeldForReview ? 'Saved. Changes to the public listing were sent to the PTO for review.' : 'Destination saved.');
     }
 
-    public function archiveDestination(Request $request, Listing $listing): RedirectResponse
+    public function archiveDestination(Request $objRequest, Listing $listing): RedirectResponse
     {
-        $this->authorizeOwnMunicipality($request, $listing);
-        abort_if($listing->category !== 'destinations', 404);
+        $this->authorizeOwnMunicipality($objRequest, $listing);
+        abort_if($listing->lst_category !== 'destinations', 404);
 
-        $before = $listing->getOriginal();
+        $arrBefore = $listing->getOriginal();
 
         try {
-            $listing->update(['status' => 'Archived']);
-        } catch (\Throwable $e) {
-            Log::error('Failed to archive LGU destination.', ['exception' => $e, 'listing_id' => $listing->id]);
+            $listing->update(['lst_status' => 'Archived']);
+        } catch (\Throwable $objException) {
+            Log::error('Failed to archive LGU destination.', ['exception' => $objException, 'listing_id' => $listing->lst_id]);
 
             return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
 
-        OperationLogger::updated($request->user(), 'destination', $listing->id, $request->user()->municipality_id, null, OperationLogger::diff($before, $listing));
+        OperationLogger::updated($objRequest->user(), 'destination', $listing->lst_id, $objRequest->user()->mun_id, null, OperationLogger::diff($arrBefore, $listing));
 
-        return back()->with('toast', "{$listing->name} was archived.");
+        return back()->with('toast', "{$listing->lst_name} was archived.");
     }
 
     /**
@@ -116,37 +116,37 @@ class DirectoryController extends LguController
      * Review. Never publishes. See
      * App\Services\ListingPublishWorkflow::submitToPto().
      */
-    public function submitToPto(Request $request, Listing $listing, ListingPublishWorkflow $workflow): RedirectResponse
+    public function submitToPto(Request $objRequest, Listing $listing, ListingPublishWorkflow $objWorkflow): RedirectResponse
     {
-        abort_unless($request->user()->can('submit', $listing), 403);
+        abort_unless($objRequest->user()->can('submit', $listing), 403);
 
         try {
-            $workflow->submitToPto($request->user(), $listing);
-        } catch (ValidationException $e) {
-            return back()->with('toast', $e->validator->errors()->first())->with('toast_tone', 'danger');
+            $objWorkflow->submitToPto($objRequest->user(), $listing);
+        } catch (ValidationException $objException) {
+            return back()->with('toast', $objException->validator->errors()->first())->with('toast_tone', 'danger');
         }
 
-        return back()->with('toast', "{$listing->name} was sent to the Provincial Tourism Office for review. It is not published until the PTO approves it.");
+        return back()->with('toast', "{$listing->lst_name} was sent to the Provincial Tourism Office for review. It is not published until the PTO approves it.");
     }
 
     /**
      * DRAFT, FOR_LGU_REVIEW, FOR_PTO_REVIEW, or FOR_CORRECTION → DRAFT,
      * with a reason the establishment sees. See App\Services\ListingPublishWorkflow::returnToEstablishment().
      */
-    public function returnToEstablishment(Request $request, Listing $listing, ListingPublishWorkflow $workflow): RedirectResponse
+    public function returnToEstablishment(Request $objRequest, Listing $listing, ListingPublishWorkflow $objWorkflow): RedirectResponse
     {
-        abort_unless($request->user()->can('submit', $listing), 403);
+        abort_unless($objRequest->user()->can('submit', $listing), 403);
         // A destination-only record has no establishment to return it to.
         abort_if($listing->isDestinationOnly(), 404);
 
-        $data = $request->validate(['reason' => ['required', 'string', 'max:500']]);
+        $arrData = $objRequest->validate(['reason' => ['required', 'string', 'max:500']]);
 
         try {
-            $workflow->returnToEstablishment($request->user(), $listing, $data['reason']);
-        } catch (ValidationException $e) {
-            return back()->with('toast', $e->validator->errors()->first())->with('toast_tone', 'danger');
+            $objWorkflow->returnToEstablishment($objRequest->user(), $listing, $arrData['reason']);
+        } catch (ValidationException $objException) {
+            return back()->with('toast', $objException->validator->errors()->first())->with('toast_tone', 'danger');
         }
 
-        return back()->with('toast', "{$listing->name} was returned to the establishment.");
+        return back()->with('toast', "{$listing->lst_name} was returned to the establishment.");
     }
 }

@@ -12,7 +12,7 @@
 @php
     $period = $month->format('Y-m');
     $municipalReport = $summary['municipalReport'];
-    $isReturned = $municipalReport?->status === \App\Models\MunicipalReport::STATUS_RETURNED;
+    $isReturned = $municipalReport?->mrp_status === \App\Models\MunicipalReport::STATUS_RETURNED;
     $statusTone = fn (string $status) => match ($status) {
         'Verified' => 'success',
         'For Review' => 'warning',
@@ -66,13 +66,13 @@
     @if ($isReturned)
         <div class="mt-6 rounded-md border border-danger/30 bg-danger-bg px-4 py-3 text-sm text-danger">
             <p class="flex items-center gap-2 font-semibold"><i class="ti ti-arrow-back-up" aria-hidden="true"></i> Returned by PTO for clarification</p>
-            <p class="mt-1">Remarks: {{ $municipalReport->remarks ?: '—' }}</p>
+            <p class="mt-1">Remarks: {{ $municipalReport->mrp_remarks ?: '—' }}</p>
             <p class="mt-1 text-xs">Correct the affected establishment reports under Monthly Reports (each correction needs re-verification), then come back here and resubmit.</p>
         </div>
     @elseif ($summary['isSentToPto'])
         <div class="mt-6 flex items-center gap-2 rounded-md border border-sand-300 bg-sand-100 px-4 py-3 text-sm font-semibold text-sand-700">
             <i class="ti ti-lock" aria-hidden="true"></i>
-            {{ $summary['status'] }} — submitted {{ $municipalReport->updated_at->format('M j, Y g:i A') }} by {{ $municipalReport->submitter->name ?? '—' }}. This report can no longer be changed here.
+            {{ $summary['status'] }} — submitted {{ $municipalReport->mrp_updated_at->format('M j, Y g:i A') }} by {{ $municipalReport->submitter->usr_name ?? '—' }}. This report can no longer be changed here.
         </div>
     @elseif ($summary['pendingCount'] > 0)
         <div class="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-md border border-warning/30 bg-warning-bg px-4 py-3 text-sm text-warning">
@@ -142,26 +142,26 @@
                 </div>
                 <div>
                     <dt class="text-xs font-semibold text-sand-500 uppercase">Reference No.</dt>
-                    <dd class="mt-1 text-sand-800">{{ $municipalReport ? sprintf('MRP-%06d', $municipalReport->id) : 'Assigned when submitted' }}</dd>
+                    <dd class="mt-1 text-sand-800">{{ $municipalReport ? sprintf('MRP-%06d', $municipalReport->mrp_id) : 'Assigned when submitted' }}</dd>
                 </div>
                 <div>
                     <dt class="text-xs font-semibold text-sand-500 uppercase">Submitted to PTO</dt>
-                    <dd class="mt-1 text-sand-800">{{ $municipalReport ? ($municipalReport->submitter->name ?? '—').' · '.$municipalReport->updated_at->format('M j, Y') : 'Not yet' }}</dd>
+                    <dd class="mt-1 text-sand-800">{{ $municipalReport ? ($municipalReport->submitter->usr_name ?? '—').' · '.$municipalReport->mrp_updated_at->format('M j, Y') : 'Not yet' }}</dd>
                 </div>
                 <div>
                     <dt class="text-xs font-semibold text-sand-500 uppercase">PTO Review</dt>
-                    <dd class="mt-1 text-sand-800">{{ $municipalReport?->reviewed_at ? ($municipalReport->reviewer->name ?? 'PTO').' · '.$municipalReport->reviewed_at->format('M j, Y') : 'Not yet' }}</dd>
+                    <dd class="mt-1 text-sand-800">{{ $municipalReport?->mrp_reviewed_at ? ($municipalReport->reviewer->usr_name ?? 'PTO').' · '.$municipalReport->mrp_reviewed_at->format('M j, Y') : 'Not yet' }}</dd>
                 </div>
-                @if ($municipalReport?->verification_code)
+                @if ($municipalReport?->mrp_verification_code)
                     <div>
                         <dt class="text-xs font-semibold text-sand-500 uppercase">Verification Code</dt>
-                        <dd class="mt-1 font-mono text-sand-800">{{ $municipalReport->verification_code }}</dd>
+                        <dd class="mt-1 font-mono text-sand-800">{{ $municipalReport->mrp_verification_code }}</dd>
                     </div>
                 @endif
-                @if ($municipalReport && $municipalReport->revision_number > 1)
+                @if ($municipalReport && $municipalReport->mrp_revision_number > 1)
                     <div>
                         <dt class="text-xs font-semibold text-sand-500 uppercase">Revision</dt>
-                        <dd class="mt-1 text-sand-800">No. {{ $municipalReport->revision_number }}</dd>
+                        <dd class="mt-1 text-sand-800">No. {{ $municipalReport->mrp_revision_number }}</dd>
                     </div>
                 @endif
             </dl>
@@ -192,7 +192,7 @@
                 @foreach ($rows as $row)
                     @php
                         $report = $row['report'];
-                        $isCounted = $report && $report->status === \App\Enums\MonthlyReportStatus::Verified;
+                        $isCounted = $report && $report->mar_status === \App\Enums\MonthlyReportStatus::Verified;
                     @endphp
                     <tr @class(['text-sand-500' => ! $isCounted])>
                         <td class="px-4 py-3">
@@ -202,14 +202,14 @@
                                 <span class="font-medium text-sand-900">{{ $row['listing']->name }}</span>
                             @endif
                         </td>
-                        <td class="px-4 py-3">{{ $report?->submission_source->label() ?? '—' }}</td>
+                        <td class="px-4 py-3">{{ $report?->mar_submission_source->label() ?? '—' }}</td>
                         <td class="px-4 py-3"><x-dashboard.status-badge :tone="$statusTone($row['status'])">{{ $row['status'] }}</x-dashboard.status-badge></td>
-                        <td class="px-4 py-3 text-right">{{ $report ? number_format($report->party_male) : '—' }}</td>
-                        <td class="px-4 py-3 text-right">{{ $report ? number_format($report->party_female) : '—' }}</td>
-                        <td class="px-4 py-3 text-right">{{ $report ? number_format($report->party_local) : '—' }}</td>
-                        <td class="px-4 py-3 text-right">{{ $report ? number_format($report->party_foreign) : '—' }}</td>
-                        <td class="px-4 py-3 text-right font-semibold">{{ $report ? number_format($report->total_visitors) : '—' }}</td>
-                        <td class="px-4 py-3 text-xs">{{ $isCounted ? ($report->verifier->name ?? '—').' · '.$report->verified_at?->format('M j') : '—' }}</td>
+                        <td class="px-4 py-3 text-right">{{ $report ? number_format($report->mar_party_male) : '—' }}</td>
+                        <td class="px-4 py-3 text-right">{{ $report ? number_format($report->mar_party_female) : '—' }}</td>
+                        <td class="px-4 py-3 text-right">{{ $report ? number_format($report->mar_party_local) : '—' }}</td>
+                        <td class="px-4 py-3 text-right">{{ $report ? number_format($report->mar_party_foreign) : '—' }}</td>
+                        <td class="px-4 py-3 text-right font-semibold">{{ $report ? number_format($report->mar_total_visitors) : '—' }}</td>
+                        <td class="px-4 py-3 text-xs">{{ $isCounted ? ($report->verifier->name ?? '—').' · '.$report->mar_verified_at?->format('M j') : '—' }}</td>
                         <td class="px-4 py-3 text-xs">{{ $isCounted ? 'Yes' : ($report ? 'Not yet — awaiting verification' : 'No — Not Submitted') }}</td>
                     </tr>
                 @endforeach
@@ -243,10 +243,10 @@
                 <tbody class="divide-y divide-sand-100">
                     @foreach ($history as $entry)
                         <tr>
-                            <td class="px-4 py-3 whitespace-nowrap text-sand-700">{{ $entry->created_at->format('M j, Y g:i A') }}</td>
-                            <td class="px-4 py-3"><x-dashboard.status-badge :tone="\App\Models\OperationLog::badgeTone($entry->action)">{{ ucfirst(str_replace('_', ' ', $entry->action)) }}</x-dashboard.status-badge></td>
-                            <td class="px-4 py-3 text-sand-700">{{ $entry->user->name ?? '—' }}</td>
-                            <td class="px-4 py-3 text-sand-600">{{ $entry->reason ?? '—' }}</td>
+                            <td class="px-4 py-3 whitespace-nowrap text-sand-700">{{ $entry->opl_created_at->format('M j, Y g:i A') }}</td>
+                            <td class="px-4 py-3"><x-dashboard.status-badge :tone="\App\Models\OperationLog::badgeTone($entry->opl_action)">{{ ucfirst(str_replace('_', ' ', $entry->opl_action)) }}</x-dashboard.status-badge></td>
+                            <td class="px-4 py-3 text-sand-700">{{ $entry->user->usr_name ?? '—' }}</td>
+                            <td class="px-4 py-3 text-sand-600">{{ $entry->opl_reason ?? '—' }}</td>
                         </tr>
                     @endforeach
                 </tbody>

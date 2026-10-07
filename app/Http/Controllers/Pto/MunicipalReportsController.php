@@ -31,6 +31,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -49,45 +50,45 @@ class MunicipalReportsController extends PtoController
      * selected year/month — a municipality with no report row for that
      * period always reads "Not Submitted," never a missing row.
      */
-    public function index(Request $request): View
+    public function index(Request $objRequest): View
     {
-        $year = (int) ($request->query('year') ?: CarbonImmutable::now()->year);
-        $month = (int) ($request->query('month') ?: CarbonImmutable::now()->month);
-        $period = CarbonImmutable::create($year, $month, 1);
-        $statusFilter = $request->query('status');
+        $intYear = (int) ($objRequest->query('year') ?: CarbonImmutable::now()->year);
+        $intMonth = (int) ($objRequest->query('month') ?: CarbonImmutable::now()->month);
+        $dtmPeriod = CarbonImmutable::create($intYear, $intMonth, 1);
+        $strStatusFilter = $objRequest->query('status');
 
-        $reportsByMunicipality = MunicipalReport::query()
+        $objReportsByMunicipality = MunicipalReport::query()
             ->with('submitter')
-            ->whereYear('period_start', $year)
-            ->whereMonth('period_start', $month)
-            ->whereNotNull('municipality_id')
+            ->whereYear('mrp_period_start', $intYear)
+            ->whereMonth('mrp_period_start', $intMonth)
+            ->whereNotNull('mun_id')
             ->whereDoesntHave('supersededBy')
             ->get()
-            ->keyBy('municipality_id');
+            ->keyBy('mun_id');
 
-        $rows = Municipality::query()->orderBy('name')->get()->map(function (Municipality $municipality) use ($reportsByMunicipality) {
-            $report = $reportsByMunicipality->get($municipality->id);
+        $objRows = Municipality::query()->orderBy('mun_name')->get()->map(function (Municipality $objMunicipality) use ($objReportsByMunicipality) {
+            $objReport = $objReportsByMunicipality->get($objMunicipality->mun_id);
 
             return [
-                'municipality' => $municipality,
-                'report' => $report,
-                'status' => self::statusLabel($report?->status),
+                'municipality' => $objMunicipality,
+                'report' => $objReport,
+                'status' => self::statusLabel($objReport?->mrp_status),
             ];
         });
 
         // "Reports Requiring Attention" on the Dashboard links here with
         // status=attention, which stands for the three non-Verified statuses.
-        if ($statusFilter === 'attention') {
-            $rows = $rows->filter(fn (array $row) => in_array($row['status'], self::ATTENTION_STATUSES, true))->values();
+        if ($strStatusFilter === 'attention') {
+            $objRows = $objRows->filter(fn (array $arrRow) => in_array($arrRow['status'], self::ATTENTION_STATUSES, true))->values();
         }
 
-        return $this->renderPto($request, 'pto.municipal-reports.index', 'municipalReports', 'LGU Submissions', [
-            'rows' => $rows,
-            'year' => $year,
-            'month' => $month,
-            'period' => $period,
+        return $this->renderPto($objRequest, 'pto.municipal-reports.index', 'municipalReports', 'LGU Submissions', [
+            'rows' => $objRows,
+            'year' => $intYear,
+            'month' => $intMonth,
+            'period' => $dtmPeriod,
             'yearOptions' => TourismAnalytics::yearOptions(),
-            'statusFilter' => $statusFilter,
+            'statusFilter' => $strStatusFilter,
         ]);
     }
 
@@ -98,46 +99,46 @@ class MunicipalReportsController extends PtoController
      * the PTO's verify / return-for-clarification actions (hidden once
      * Verified).
      */
-    public function show(Request $request, MunicipalReport $municipalReport): View
+    public function show(Request $objRequest, MunicipalReport $municipalReport): View
     {
-        abort_unless($request->user()->can('view', $municipalReport), 403);
+        abort_unless($objRequest->user()->can('view', $municipalReport), 403);
 
-        [$breakdown, $missingEstablishments] = $this->loadBreakdown($municipalReport);
+        [$objBreakdown, $objMissingEstablishments] = $this->loadBreakdown($municipalReport);
 
-        $previousReport = $municipalReport->municipality_id
+        $objPreviousReport = $municipalReport->mun_id
             ? MunicipalReport::query()
-                ->where('municipality_id', $municipalReport->municipality_id)
-                ->where('period_start', '<', $municipalReport->period_start)
+                ->where('mun_id', $municipalReport->mun_id)
+                ->where('mrp_period_start', '<', $municipalReport->mrp_period_start)
                 ->whereDoesntHave('supersededBy')
-                ->orderByDesc('period_start')
+                ->orderByDesc('mrp_period_start')
                 ->first()
             : null;
 
-        $comparison = null;
-        if ($previousReport) {
-            $difference = $municipalReport->total_arrivals - $previousReport->total_arrivals;
-            $comparison = [
-                'report' => $previousReport,
-                'difference' => $difference,
-                'percentageChange' => $previousReport->total_arrivals > 0
-                    ? round(($difference / $previousReport->total_arrivals) * 100, 1)
+        $arrComparison = null;
+        if ($objPreviousReport) {
+            $intDifference = $municipalReport->mrp_total_arrivals - $objPreviousReport->mrp_total_arrivals;
+            $arrComparison = [
+                'report' => $objPreviousReport,
+                'difference' => $intDifference,
+                'percentageChange' => $objPreviousReport->mrp_total_arrivals > 0
+                    ? round(($intDifference / $objPreviousReport->mrp_total_arrivals) * 100, 1)
                     : null,
             ];
         }
 
-        $history = OperationLog::query()
-            ->where('entity_type', 'municipal_report')
-            ->where('entity_id', $municipalReport->id)
+        $objHistory = OperationLog::query()
+            ->where('opl_entity_type', 'municipal_report')
+            ->where('opl_entity_id', $municipalReport->mrp_id)
             ->with('user')
-            ->orderByDesc('created_at')
+            ->orderByDesc('opl_created_at')
             ->get();
 
-        return $this->renderPto($request, 'pto.municipal-reports.show', 'municipalReports', 'Municipal Report', [
+        return $this->renderPto($objRequest, 'pto.municipal-reports.show', 'municipalReports', 'Municipal Report', [
             'report' => $municipalReport,
-            'breakdown' => $breakdown,
-            'missingEstablishments' => $missingEstablishments,
-            'comparison' => $comparison,
-            'history' => $history,
+            'breakdown' => $objBreakdown,
+            'missingEstablishments' => $objMissingEstablishments,
+            'comparison' => $arrComparison,
+            'history' => $objHistory,
         ]);
     }
 
@@ -147,40 +148,46 @@ class MunicipalReportsController extends PtoController
      * route at all, and an already-Verified or Returned-but-unresolved
      * report must go through the LGU resubmission flow first.
      */
-    public function approve(Request $request, MunicipalReport $municipalReport): RedirectResponse
+    public function approve(Request $objRequest, MunicipalReport $municipalReport): RedirectResponse
     {
-        abort_unless($request->user()->can('approve', $municipalReport), 403);
+        abort_unless($objRequest->user()->can('approve', $municipalReport), 403);
         abort_unless(
-            in_array($municipalReport->status, [MunicipalReport::STATUS_SUBMITTED, MunicipalReport::STATUS_REVIEWED], true),
+            in_array($municipalReport->mrp_status, [MunicipalReport::STATUS_SUBMITTED, MunicipalReport::STATUS_REVIEWED], true),
             403,
             'Only a report pending review can be verified.'
         );
 
-        [$breakdown] = $this->loadBreakdown($municipalReport);
-        $errors = OfficialReportBuilder::validateColumnSums($this->breakdownToRows($breakdown));
-        abort_if($errors !== [], 422, 'This report cannot be verified until its Male/Female, Adults/Children/Seniors, and Local/Foreign columns all add up to the Total for every establishment: '.implode(' ', $errors));
+        [$objBreakdown] = $this->loadBreakdown($municipalReport);
+        $arrErrors = OfficialReportBuilder::validateColumnSums($this->breakdownToRows($objBreakdown));
+        abort_if($arrErrors !== [], 422, 'This report cannot be verified until its Male/Female, Adults/Children/Seniors, and Local/Foreign columns all add up to the Total for every establishment: '.implode(' ', $arrErrors));
 
-        $before = $municipalReport->getOriginal();
+        $arrBefore = $municipalReport->getOriginal();
 
-        $municipalReport->update([
-            'status' => MunicipalReport::STATUS_APPROVED,
-            'reviewed_by' => $request->user()->id,
-            'reviewed_at' => now(),
-            'verification_code' => OfficialReportBuilder::generateVerificationCode(),
-        ]);
+        try {
+            $municipalReport->update([
+                'mrp_status' => MunicipalReport::STATUS_APPROVED,
+                'mrp_reviewed_by' => $objRequest->user()->usr_id,
+                'mrp_reviewed_at' => now(),
+                'mrp_verification_code' => OfficialReportBuilder::generateVerificationCode(),
+            ]);
 
-        // Frozen the moment it's Verified — the Official Report PDF for a
-        // Verified report always renders from this snapshot, never from
-        // live monthlyArrivalReports (which get reassigned to a brand-new
-        // revision row the moment the LGU resubmits — see
-        // Lgu\MonthlyReportsController::consolidate()).
-        $municipalReport->update([
-            'frozen_snapshot' => $this->officialReportData($municipalReport->fresh(['submitter', 'reviewer'])),
-        ]);
+            // Frozen the moment it's Verified — the Official Report PDF for a
+            // Verified report always renders from this snapshot, never from
+            // live monthlyArrivalReports (which get reassigned to a brand-new
+            // revision row the moment the LGU resubmits — see
+            // Lgu\MonthlyReportsController::consolidate()).
+            $municipalReport->update([
+                'mrp_frozen_snapshot' => $this->officialReportData($municipalReport->fresh(['submitter', 'reviewer'])),
+            ]);
+        } catch (\Throwable $objException) {
+            Log::error('Failed to verify the municipal report.', ['exception' => $objException, 'mrp_id' => $municipalReport->mrp_id]);
 
-        OperationLogger::approved($request->user(), 'municipal_report', $municipalReport->id, $this->municipalityId($municipalReport), OperationLogger::diff($before, $municipalReport));
+            return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
+        }
 
-        return back()->with('toast', "{$municipalReport->municipality}'s report was verified.");
+        OperationLogger::approved($objRequest->user(), 'municipal_report', $municipalReport->mrp_id, $this->municipalityId($municipalReport), OperationLogger::diff($arrBefore, $municipalReport));
+
+        return back()->with('toast', "{$municipalReport->mrp_municipality}'s report was verified.");
     }
 
     /**
@@ -188,66 +195,66 @@ class MunicipalReportsController extends PtoController
      * dashboard chrome. A Verified report renders its frozen_snapshot; any
      * other status renders live (and therefore still-changeable) data.
      */
-    public function officialReport(Request $request, MunicipalReport $municipalReport): View
+    public function officialReport(Request $objRequest, MunicipalReport $municipalReport): View
     {
-        abort_unless($request->user()->can('export', $municipalReport), 403);
+        abort_unless($objRequest->user()->can('export', $municipalReport), 403);
 
-        $data = $municipalReport->isFrozen() && $municipalReport->frozen_snapshot
-            ? $municipalReport->frozen_snapshot
+        $arrData = $municipalReport->isFrozen() && $municipalReport->mrp_frozen_snapshot
+            ? $municipalReport->mrp_frozen_snapshot
             : $this->officialReportData($municipalReport);
 
-        OperationLogger::exported($request->user(), 'municipal_report', $this->municipalityId($municipalReport), ['action' => 'preview', 'report_id' => $municipalReport->id]);
+        OperationLogger::exported($objRequest->user(), 'municipal_report', $this->municipalityId($municipalReport), ['action' => 'preview', 'report_id' => $municipalReport->mrp_id]);
 
         return view('pdf.official-report', [
-            'report' => $data,
+            'report' => $arrData,
             'preview' => true,
             'pdfUrl' => route('pto.municipalReports.officialReport.pdf', $municipalReport),
             'excelUrl' => route('pto.municipalReports.officialReport.excel', $municipalReport),
         ]);
     }
 
-    public function officialReportPdf(Request $request, MunicipalReport $municipalReport): Response
+    public function officialReportPdf(Request $objRequest, MunicipalReport $municipalReport): Response
     {
-        abort_unless($request->user()->can('export', $municipalReport), 403);
+        abort_unless($objRequest->user()->can('export', $municipalReport), 403);
 
-        $data = $municipalReport->isFrozen() && $municipalReport->frozen_snapshot
-            ? $municipalReport->frozen_snapshot
+        $arrData = $municipalReport->isFrozen() && $municipalReport->mrp_frozen_snapshot
+            ? $municipalReport->mrp_frozen_snapshot
             : $this->officialReportData($municipalReport);
 
-        OperationLogger::exported($request->user(), 'municipal_report', $this->municipalityId($municipalReport), ['action' => 'download_pdf', 'report_id' => $municipalReport->id]);
+        OperationLogger::exported($objRequest->user(), 'municipal_report', $this->municipalityId($municipalReport), ['action' => 'download_pdf', 'report_id' => $municipalReport->mrp_id]);
 
-        $pdf = Pdf::loadView('pdf.official-report', ['report' => $data, 'preview' => false])->setPaper('a4');
+        $objPdf = Pdf::loadView('pdf.official-report', ['report' => $arrData, 'preview' => false])->setPaper('a4');
 
-        return $pdf->download("{$data['reference_number']}.pdf");
+        return $objPdf->download("{$arrData['reference_number']}.pdf");
     }
 
-    public function officialReportExcel(Request $request, MunicipalReport $municipalReport)
+    public function officialReportExcel(Request $objRequest, MunicipalReport $municipalReport)
     {
-        abort_unless($request->user()->can('export', $municipalReport), 403);
+        abort_unless($objRequest->user()->can('export', $municipalReport), 403);
 
-        $data = $municipalReport->isFrozen() && $municipalReport->frozen_snapshot
-            ? $municipalReport->frozen_snapshot
+        $arrData = $municipalReport->isFrozen() && $municipalReport->mrp_frozen_snapshot
+            ? $municipalReport->mrp_frozen_snapshot
             : $this->officialReportData($municipalReport);
 
-        OperationLogger::exported($request->user(), 'municipal_report', $this->municipalityId($municipalReport), ['action' => 'export_excel', 'report_id' => $municipalReport->id]);
+        OperationLogger::exported($objRequest->user(), 'municipal_report', $this->municipalityId($municipalReport), ['action' => 'export_excel', 'report_id' => $municipalReport->mrp_id]);
 
-        return Excel::download(new OfficialReportExport($data), "{$data['reference_number']}.xlsx");
+        return Excel::download(new OfficialReportExport($arrData), "{$arrData['reference_number']}.xlsx");
     }
 
     /**
      * @return array{0: Collection, 1: Collection}
      */
-    private function loadBreakdown(MunicipalReport $municipalReport): array
+    private function loadBreakdown(MunicipalReport $objMunicipalReport): array
     {
-        return OfficialReportBuilder::municipalBreakdown($municipalReport);
+        return OfficialReportBuilder::municipalBreakdown($objMunicipalReport);
     }
 
     /**
      * @return Collection<int, array<string, mixed>>
      */
-    private function breakdownToRows(Collection $breakdown): Collection
+    private function breakdownToRows(Collection $objBreakdown): Collection
     {
-        return OfficialReportBuilder::breakdownRows($breakdown);
+        return OfficialReportBuilder::breakdownRows($objBreakdown);
     }
 
     /**
@@ -257,32 +264,38 @@ class MunicipalReportsController extends PtoController
      *
      * @return array<string, mixed>
      */
-    private function officialReportData(MunicipalReport $municipalReport): array
+    private function officialReportData(MunicipalReport $objMunicipalReport): array
     {
-        return OfficialReportBuilder::fromMunicipalReport($municipalReport);
+        return OfficialReportBuilder::fromMunicipalReport($objMunicipalReport);
     }
 
-    public function return(Request $request, MunicipalReport $municipalReport): RedirectResponse
+    public function return(Request $objRequest, MunicipalReport $municipalReport): RedirectResponse
     {
-        abort_unless($request->user()->can('return', $municipalReport), 403);
-        abort_if($municipalReport->status === MunicipalReport::STATUS_APPROVED, 403, 'A verified report cannot be returned — ask the LGU to resubmit instead.');
+        abort_unless($objRequest->user()->can('return', $municipalReport), 403);
+        abort_if($municipalReport->mrp_status === MunicipalReport::STATUS_APPROVED, 403, 'A verified report cannot be returned — ask the LGU to resubmit instead.');
 
-        $data = $request->validate([
+        $arrData = $objRequest->validate([
             'remarks' => ['required', 'string', 'max:2000'],
         ]);
 
-        $before = $municipalReport->getOriginal();
+        $arrBefore = $municipalReport->getOriginal();
 
-        $municipalReport->update([
-            'status' => MunicipalReport::STATUS_RETURNED,
-            'reviewed_by' => $request->user()->id,
-            'reviewed_at' => now(),
-            'remarks' => $data['remarks'],
-        ]);
+        try {
+            $municipalReport->update([
+                'mrp_status' => MunicipalReport::STATUS_RETURNED,
+                'mrp_reviewed_by' => $objRequest->user()->usr_id,
+                'mrp_reviewed_at' => now(),
+                'mrp_remarks' => $arrData['remarks'],
+            ]);
+        } catch (\Throwable $objException) {
+            Log::error('Failed to return the municipal report for clarification.', ['exception' => $objException, 'mrp_id' => $municipalReport->mrp_id]);
 
-        OperationLogger::returned($request->user(), 'municipal_report', $municipalReport->id, $data['remarks'], $this->municipalityId($municipalReport), OperationLogger::diff($before, $municipalReport));
+            return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
+        }
 
-        return back()->with('toast', "{$municipalReport->municipality}'s report was returned for clarification.");
+        OperationLogger::returned($objRequest->user(), 'municipal_report', $municipalReport->mrp_id, $arrData['remarks'], $this->municipalityId($municipalReport), OperationLogger::diff($arrBefore, $municipalReport));
+
+        return back()->with('toast', "{$municipalReport->mrp_municipality}'s report was returned for clarification.");
     }
 
     /**
@@ -291,9 +304,9 @@ class MunicipalReportsController extends PtoController
      * the index table, the Dashboard's reporting-status table, and the
      * "Reports Requiring Attention" link never drift apart.
      */
-    public static function statusLabel(?string $status): string
+    public static function statusLabel(?string $strStatus): string
     {
-        return match ($status) {
+        return match ($strStatus) {
             MunicipalReport::STATUS_SUBMITTED, MunicipalReport::STATUS_REVIEWED => 'For Review',
             MunicipalReport::STATUS_APPROVED => 'Verified',
             MunicipalReport::STATUS_RETURNED => 'For Clarification',
@@ -302,13 +315,13 @@ class MunicipalReportsController extends PtoController
     }
 
     /**
-     * Prefers the real municipality_id FK (set directly by
+     * Prefers the real mun_id FK (set directly by
      * Lgu\MonthlyReportsController::consolidate() going forward); falls
      * back to a name lookup for any report that predates that FK or was
      * otherwise created without it.
      */
-    private function municipalityId(MunicipalReport $municipalReport): ?int
+    private function municipalityId(MunicipalReport $objMunicipalReport): ?int
     {
-        return $municipalReport->municipality_id ?? Municipality::query()->where('name', $municipalReport->municipality)->value('id');
+        return $objMunicipalReport->mun_id ?? Municipality::query()->where('mun_name', $objMunicipalReport->mrp_municipality)->value('mun_id');
     }
 }

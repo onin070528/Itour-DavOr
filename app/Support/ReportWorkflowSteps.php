@@ -18,29 +18,29 @@ class ReportWorkflowSteps
     /**
      * Consolidate and Submit to PTO happen as one action in this app
      * (Lgu\MonthlyReportsController::consolidate()), so they're always
-     * reached together — $consolidated covers both steps 3 and 4 at once.
+     * reached together — $blnConsolidated covers both steps 3 and 4 at once.
      *
      * @return array<int, array{label: string, state: 'done'|'current'|'pending'}>
      */
-    public static function compute(int $submittedCount, int $forReviewCount, int $verifiedCount, bool $consolidated): array
+    public static function compute(int $intSubmittedCount, int $intForReviewCount, int $intVerifiedCount, bool $blnConsolidated): array
     {
         return [
             ['label' => 'Collect reports', 'state' => match (true) {
-                $consolidated, $submittedCount > 0 => 'done',
+                $blnConsolidated, $intSubmittedCount > 0 => 'done',
                 default => 'current',
             }],
             ['label' => 'Review & verify', 'state' => match (true) {
-                $consolidated => 'done',
-                $forReviewCount > 0 => 'current',
-                $verifiedCount > 0 => 'done',
+                $blnConsolidated => 'done',
+                $intForReviewCount > 0 => 'current',
+                $intVerifiedCount > 0 => 'done',
                 default => 'pending',
             }],
             ['label' => 'Consolidate', 'state' => match (true) {
-                $consolidated => 'done',
-                $verifiedCount > 0 && $forReviewCount === 0 => 'current',
+                $blnConsolidated => 'done',
+                $intVerifiedCount > 0 && $intForReviewCount === 0 => 'current',
                 default => 'pending',
             }],
-            ['label' => 'Submit to PTO', 'state' => $consolidated ? 'done' : 'pending'],
+            ['label' => 'Submit to PTO', 'state' => $blnConsolidated ? 'done' : 'pending'],
         ];
     }
 }

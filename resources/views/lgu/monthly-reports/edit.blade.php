@@ -1,7 +1,14 @@
+{{--
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: LGU correction form for a monthly arrival report.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+--}}
 <x-layouts.dashboard :user="$user" :nav-sections="$navSections" :page-title="$pageTitle" account-heading="System" :settings-href="route('lgu.settings')">
     <x-dashboard.page-header
-        :title="'Correct Report — '.$report->listing->name"
-        :description="$report->period_month->format('F Y').' — adjust the encoded totals and record why.'"
+        :title="'Correct Report — '.$report->listing->lst_name"
+        :description="$report->mar_period_month->format('F Y').' — adjust the encoded totals and record why.'"
     >
         <x-slot:actions>
             <a href="{{ route('lgu.monthlyReports.show', $report) }}" class="inline-flex items-center gap-2 rounded-sm border border-sand-300 bg-sand-0 px-4 py-2.5 text-sm font-semibold text-sand-800 hover:border-primary-300">
@@ -11,7 +18,7 @@
         </x-slot:actions>
     </x-dashboard.page-header>
 
-    @if ($report->status->value === 'Verified')
+    @if ($report->mar_status->value === 'Verified')
         <div class="mt-6 flex items-center gap-2 rounded-md border border-warning/20 bg-warning-bg px-4 py-3 text-sm font-semibold text-warning">
             <i class="ti ti-alert-triangle" aria-hidden="true"></i>
             This report is already Verified — saving a correction will revert it to For Review so it can be checked again.

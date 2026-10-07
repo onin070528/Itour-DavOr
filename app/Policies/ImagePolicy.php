@@ -1,10 +1,11 @@
 <?php
 
-/*
- * System     : iTOUR - Integrated Tourism Information and Monitoring System
- * Purpose    : Single source of truth for who may upload, view, approve, and manage establishment images.
- * Programmer : <name(s)>
- * Copyright  : 2026 University of Mindanao. All rights reserved.
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Single source of truth for who may upload, view, approve, and manage establishment images.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
  */
 
 namespace App\Policies;
@@ -17,7 +18,7 @@ use App\Models\Listing;
 use App\Models\User;
 
 /**
- * Every "who can do what" check for tblestablishment_images lives here —
+ * Every "who can do what" check for tbl_establishment_images lives here —
  * controllers call these methods (via Gate::authorize()/$user->can()),
  * never re-derive the rule inline.
  */
@@ -32,14 +33,14 @@ class ImagePolicy
      */
     public function uploadFor(User $objUser, Listing $objListing): bool
     {
-        return match ($objUser->role) {
+        return match ($objUser->usr_role) {
             // Establishment self-review (see ListingPolicy::update()): no
             // uploads once the package has been submitted, until it's
             // returned — same editable window as the profile form.
-            UserRole::Establishment => $objUser->establishment_id === $objListing->id
-                && in_array($objListing->status, ['DRAFT', 'UNPUBLISHED'], true),
-            UserRole::Lgu => $objUser->municipality_id !== null
-                && $objUser->municipality_id === $objListing->municipality_id
+            UserRole::Establishment => $objUser->lst_id === $objListing->lst_id
+                && in_array($objListing->lst_status, ['DRAFT', 'UNPUBLISHED'], true),
+            UserRole::Lgu => $objUser->mun_id !== null
+                && $objUser->mun_id === $objListing->mun_id
                 && ($objListing->establishmentUser === null || $objListing->reportingMethod() === ReportingMethod::ManualPaper),
             UserRole::PtoAdministrator => true,
             default => false,
@@ -54,7 +55,7 @@ class ImagePolicy
      */
     public function view(User $objUser, EstablishmentImage $objImage): bool
     {
-        if ($objUser->id === $objImage->img_uploaded_by) {
+        if ($objUser->usr_id === $objImage->img_uploaded_by) {
             return true;
         }
 
@@ -78,10 +79,10 @@ class ImagePolicy
         }
 
         return match ($objApproverRole) {
-            ImageSourceRole::Lgu => $objUser->role === UserRole::Lgu
-                && $objUser->municipality_id !== null
-                && $objUser->municipality_id === $objImage->listing->municipality_id,
-            ImageSourceRole::Pto => $objUser->role === UserRole::PtoAdministrator,
+            ImageSourceRole::Lgu => $objUser->usr_role === UserRole::Lgu
+                && $objUser->mun_id !== null
+                && $objUser->mun_id === $objImage->listing->mun_id,
+            ImageSourceRole::Pto => $objUser->usr_role === UserRole::PtoAdministrator,
             ImageSourceRole::Establishment => false,
         };
     }
@@ -103,14 +104,14 @@ class ImagePolicy
      */
     public function manageListing(User $objUser, Listing $objListing): bool
     {
-        return match ($objUser->role) {
+        return match ($objUser->usr_role) {
             // Same editable window as uploadFor() above — LGU/PTO keep
             // managing photos regardless of status, their own review work
             // is unaffected.
-            UserRole::Establishment => $objUser->establishment_id === $objListing->id
-                && in_array($objListing->status, ['DRAFT', 'UNPUBLISHED'], true),
-            UserRole::Lgu => $objUser->municipality_id !== null
-                && $objUser->municipality_id === $objListing->municipality_id,
+            UserRole::Establishment => $objUser->lst_id === $objListing->lst_id
+                && in_array($objListing->lst_status, ['DRAFT', 'UNPUBLISHED'], true),
+            UserRole::Lgu => $objUser->mun_id !== null
+                && $objUser->mun_id === $objListing->mun_id,
             UserRole::PtoAdministrator => true,
             default => false,
         };

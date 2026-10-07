@@ -1,10 +1,12 @@
 <?php
 
-/*
- * System     : iTOUR - Integrated Tourism Information and Monitoring System
- * Purpose    : Remove, cover, order, and credit actions — all apply immediately, no approval, each audit-logged.
- * Programmer : <name(s)>
- * Copyright  : 2026 University of Mindanao. All rights reserved.
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Remove, cover, order, and credit actions — all apply immediately, no approval, each
+ * audit-logged.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
  */
 
 namespace App\Services;
@@ -48,7 +50,7 @@ class EstablishmentImageManager
             }
         });
 
-        OperationLogger::updated($objActor, 'establishment_image', $objImage->img_id, $objListing->municipality_id, $objListing->id, OperationLogger::diff($arrBefore, $objImage), $strReason);
+        OperationLogger::updated($objActor, 'establishment_image', $objImage->img_id, $objListing->mun_id, $objListing->lst_id, OperationLogger::diff($arrBefore, $objImage), $strReason);
     }
 
     /**
@@ -75,7 +77,7 @@ class EstablishmentImageManager
             $objImage->update(['img_is_cover' => true]);
         });
 
-        OperationLogger::updated($objActor, 'establishment_image', $objImage->img_id, $objListing->municipality_id, $objListing->id, OperationLogger::diff($arrBefore, $objImage));
+        OperationLogger::updated($objActor, 'establishment_image', $objImage->img_id, $objListing->mun_id, $objListing->lst_id, OperationLogger::diff($arrBefore, $objImage));
     }
 
     /**
@@ -99,7 +101,7 @@ class EstablishmentImageManager
                 $objImage->update(['img_sort_order' => $intSortOrder]);
 
                 if ($arrBefore['img_sort_order'] !== $intSortOrder) {
-                    OperationLogger::updated($objActor, 'establishment_image', $objImage->img_id, $objListing->municipality_id, $objListing->id, OperationLogger::diff($arrBefore, $objImage));
+                    OperationLogger::updated($objActor, 'establishment_image', $objImage->img_id, $objListing->mun_id, $objListing->lst_id, OperationLogger::diff($arrBefore, $objImage));
                 }
 
                 $intSortOrder++;
@@ -113,6 +115,6 @@ class EstablishmentImageManager
 
         $objImage->update(['img_credit' => $strCredit]);
 
-        OperationLogger::updated($objActor, 'establishment_image', $objImage->img_id, $objImage->listing->municipality_id, $objImage->listing_id, OperationLogger::diff($arrBefore, $objImage));
+        OperationLogger::updated($objActor, 'establishment_image', $objImage->img_id, $objImage->listing->mun_id, $objImage->lst_id, OperationLogger::diff($arrBefore, $objImage));
     }
 }

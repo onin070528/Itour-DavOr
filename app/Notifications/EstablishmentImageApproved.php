@@ -1,10 +1,11 @@
 <?php
 
-/*
- * System     : iTOUR - Integrated Tourism Information and Monitoring System
- * Purpose    : In-app notification telling an uploader their photo is now Live.
- * Programmer : <name(s)>
- * Copyright  : 2026 University of Mindanao. All rights reserved.
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: In-app notification telling an uploader their photo is now Live.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
  */
 
 namespace App\Notifications;
@@ -34,8 +35,8 @@ class EstablishmentImageApproved extends Notification
     {
         return [
             'image_id' => $this->objImage->img_id,
-            'listing_name' => $this->objImage->listing->name,
-            'message' => "Your photo for {$this->objImage->listing->name} is now live.",
+            'listing_name' => $this->objImage->listing->lst_name,
+            'message' => "Your photo for {$this->objImage->listing->lst_name} is now live.",
         ];
     }
 }

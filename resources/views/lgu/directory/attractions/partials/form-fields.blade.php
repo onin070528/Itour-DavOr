@@ -35,13 +35,13 @@
     <div class="mt-4 grid grid-cols-1 gap-4">
         <div>
             <label for="attraction-name" class="form-label">Attraction name <span class="text-danger" aria-hidden="true">*</span></label>
-            <input id="attraction-name" name="name" type="text" maxlength="255" required placeholder="e.g. Aliwagwag Falls" value="{{ old('name', $listing?->name) }}" @disabled($fnIsLocked('name')) class="form-input">
+            <input id="attraction-name" name="name" type="text" maxlength="255" required placeholder="e.g. Aliwagwag Falls" value="{{ old('name', $listing?->lst_name) }}" @disabled($fnIsLocked('name')) class="form-input">
             @error('name') <p class="form-error">{{ $message }}</p> @enderror
         </div>
 
         <div>
             <label for="attraction-description" class="form-label">Description</label>
-            <textarea id="attraction-description" name="description" rows="5" maxlength="5000" placeholder="What visitors can see and do here." @disabled($fnIsLocked('description')) class="form-input">{{ old('description', $listing?->description) }}</textarea>
+            <textarea id="attraction-description" name="description" rows="5" maxlength="5000" placeholder="What visitors can see and do here." @disabled($fnIsLocked('description')) class="form-input">{{ old('description', $listing?->lst_description) }}</textarea>
             @error('description') <p class="form-error">{{ $message }}</p> @enderror
         </div>
     </div>
@@ -60,19 +60,19 @@
 
         <div>
             <label for="attraction-barangay" class="form-label">Barangay / Address <span class="text-danger" aria-hidden="true">*</span></label>
-            <input id="attraction-barangay" name="barangay" type="text" maxlength="255" required value="{{ old('barangay', $listing?->barangay) }}" @disabled($fnIsLocked('barangay')) class="form-input">
+            <input id="attraction-barangay" name="barangay" type="text" maxlength="255" required value="{{ old('barangay', $listing?->lst_barangay) }}" @disabled($fnIsLocked('barangay')) class="form-input">
             @error('barangay') <p class="form-error">{{ $message }}</p> @enderror
         </div>
 
         <div>
             <label for="attraction-lat" class="form-label">Latitude</label>
-            <input id="attraction-lat" name="lat" type="number" step="any" min="-90" max="90" value="{{ old('lat', $listing?->lat) }}" @disabled($fnIsLocked('lat')) class="form-input">
+            <input id="attraction-lat" name="lat" type="number" step="any" min="-90" max="90" value="{{ old('lat', $listing?->lst_lat) }}" @disabled($fnIsLocked('lat')) class="form-input">
             @error('lat') <p class="form-error">{{ $message }}</p> @enderror
         </div>
 
         <div>
             <label for="attraction-lng" class="form-label">Longitude</label>
-            <input id="attraction-lng" name="lng" type="number" step="any" min="-180" max="180" value="{{ old('lng', $listing?->lng) }}" @disabled($fnIsLocked('lng')) class="form-input">
+            <input id="attraction-lng" name="lng" type="number" step="any" min="-180" max="180" value="{{ old('lng', $listing?->lst_lng) }}" @disabled($fnIsLocked('lng')) class="form-input">
             @error('lng') <p class="form-error">{{ $message }}</p> @enderror
         </div>
     </div>
@@ -85,25 +85,25 @@
     <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
             <label for="attraction-contact-office" class="form-label">Contact office</label>
-            <input id="attraction-contact-office" name="contact_office" type="text" maxlength="255" placeholder="e.g. Cateel Municipal Tourism Office" value="{{ old('contact_office', $listing?->contact_office) }}" class="form-input">
+            <input id="attraction-contact-office" name="contact_office" type="text" maxlength="255" placeholder="e.g. Cateel Municipal Tourism Office" value="{{ old('contact_office', $listing?->lst_contact_office) }}" class="form-input">
             @error('contact_office') <p class="form-error">{{ $message }}</p> @enderror
         </div>
 
         <div>
             <label for="attraction-contact-phone" class="form-label">Contact number</label>
-            <input id="attraction-contact-phone" name="contact_phone" type="text" maxlength="255" value="{{ old('contact_phone', $listing?->contact_phone) }}" class="form-input">
+            <input id="attraction-contact-phone" name="contact_phone" type="text" maxlength="255" value="{{ old('contact_phone', $listing?->lst_contact_phone) }}" class="form-input">
             @error('contact_phone') <p class="form-error">{{ $message }}</p> @enderror
         </div>
 
         <div>
             <label for="attraction-hours" class="form-label">Visiting hours</label>
-            <input id="attraction-hours" name="hours" type="text" maxlength="255" placeholder="e.g. 7:00 AM – 5:00 PM daily" value="{{ old('hours', $listing?->hours) }}" class="form-input">
+            <input id="attraction-hours" name="hours" type="text" maxlength="255" placeholder="e.g. 7:00 AM – 5:00 PM daily" value="{{ old('hours', $listing?->lst_hours) }}" class="form-input">
             @error('hours') <p class="form-error">{{ $message }}</p> @enderror
         </div>
 
         <div>
             <label for="attraction-website" class="form-label">Website or social page</label>
-            <input id="attraction-website" name="website" type="text" maxlength="255" value="{{ old('website', $listing?->website) }}" class="form-input">
+            <input id="attraction-website" name="website" type="text" maxlength="255" value="{{ old('website', $listing?->lst_website) }}" class="form-input">
             @error('website') <p class="form-error">{{ $message }}</p> @enderror
         </div>
     </div>

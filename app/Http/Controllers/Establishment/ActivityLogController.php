@@ -20,18 +20,18 @@ use Illuminate\View\View;
 
 class ActivityLogController extends EstablishmentController
 {
-    public function index(Request $request): View
+    public function index(Request $objRequest): View
     {
-        abort_unless($request->user()->can('viewAny', SecurityLog::class), 403);
-        $request->validate(['tab' => ['nullable', Rule::in(['security', 'operation'])]]);
-        $tab = $request->query('tab', 'security');
-        $filters = AuditLogQuery::validatedFilters($request);
-        $user = $request->user();
+        abort_unless($objRequest->user()->can('viewAny', SecurityLog::class), 403);
+        $objRequest->validate(['tab' => ['nullable', Rule::in(['security', 'operation'])]]);
+        $strTab = $objRequest->query('tab', 'security');
+        $arrFilters = AuditLogQuery::validatedFilters($objRequest);
+        $objUser = $objRequest->user();
 
-        return $this->renderEstablishment($request, 'establishment.audit-logs.index', 'activityLog', 'Activity', [
-            'tab' => $tab,
-            'filters' => $filters,
-            'rows' => $tab === 'security' ? AuditLogQuery::securityLogs($user, $filters) : AuditLogQuery::operationLogs($user, $filters),
+        return $this->renderEstablishment($objRequest, 'establishment.audit-logs.index', 'activityLog', 'Activity', [
+            'tab' => $strTab,
+            'filters' => $arrFilters,
+            'rows' => $strTab === 'security' ? AuditLogQuery::securityLogs($objUser, $arrFilters) : AuditLogQuery::operationLogs($objUser, $arrFilters),
             'securitySummary' => null,
             'operationSummary' => null,
             'municipalities' => null,

@@ -30,9 +30,9 @@ class WelcomeAccountCreated extends Mailable
         return $this
             ->subject('Your iTOUR account is ready')
             ->text('emails.welcome_account', [
-                'strName' => $this->objUser->name,
-                'strRoleLabel' => $this->objUser->role->title(),
-                'strMunicipality' => $this->objUser->organization_subtitle,
+                'strName' => $this->objUser->usr_name,
+                'strRoleLabel' => $this->objUser->usr_role->title(),
+                'strMunicipality' => $this->objUser->usr_organization_subtitle,
                 'strPassphrase' => $this->strPassphrase,
                 'strLoginUrl' => route('login'),
             ]);

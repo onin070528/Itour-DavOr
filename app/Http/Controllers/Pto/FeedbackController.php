@@ -21,9 +21,9 @@ class FeedbackController extends PtoController
     /**
      * All Feedback: every tourist feedback entry, searchable and filterable.
      */
-    public function index(Request $request): View
+    public function index(Request $objRequest): View
     {
-        return $this->renderFeedback($request, 'index');
+        return $this->renderFeedback($objRequest, 'index');
     }
 
     /**
@@ -33,9 +33,9 @@ class FeedbackController extends PtoController
      * directly (no redirect) — it renders the same merged Tourist Feedback
      * page with the Experience Analytics tab pre-selected.
      */
-    public function analytics(Request $request): View
+    public function analytics(Request $objRequest): View
     {
-        return $this->renderFeedback($request, 'analytics');
+        return $this->renderFeedback($objRequest, 'analytics');
     }
 
     /**
@@ -47,46 +47,46 @@ class FeedbackController extends PtoController
      * offered; that needs a real tblfeedbacks table with a rating column
      * before it can be built without fabricating data.
      */
-    private function renderFeedback(Request $request, string $activeTab): View
+    private function renderFeedback(Request $objRequest, string $strActiveTab): View
     {
-        $listingsBySubject = collect(TourismCatalog::listings())->keyBy('name');
+        $objListingsBySubject = collect(TourismCatalog::listings())->keyBy('name');
 
-        $feedback = collect(PtoMockData::feedback())->map(function (array $entry) use ($listingsBySubject) {
-            $listing = $listingsBySubject->get($entry['subject']);
+        $objFeedback = collect(PtoMockData::feedback())->map(function (array $arrEntry) use ($objListingsBySubject) {
+            $objListing = $objListingsBySubject->get($arrEntry['subject']);
 
             return [
-                ...$entry,
-                'municipality' => $listing['municipality'] ?? null,
-                'category' => $listing ? TourismCatalog::categoryLabel($listing['category']) : null,
+                ...$arrEntry,
+                'municipality' => $objListing['municipality'] ?? null,
+                'category' => $objListing ? TourismCatalog::categoryLabel($objListing['category']) : null,
             ];
         });
 
-        $sentimentByDestination = $feedback->groupBy('subject')->map(fn ($rows) => [
-            'positive' => $rows->where('sentiment', 'Positive')->count(),
-            'neutral' => $rows->where('sentiment', 'Neutral')->count(),
-            'negative' => $rows->where('sentiment', 'Negative')->count(),
-        ])->filter(fn ($row) => array_sum($row) > 0);
+        $objSentimentByDestination = $objFeedback->groupBy('subject')->map(fn ($objRows) => [
+            'positive' => $objRows->where('sentiment', 'Positive')->count(),
+            'neutral' => $objRows->where('sentiment', 'Neutral')->count(),
+            'negative' => $objRows->where('sentiment', 'Negative')->count(),
+        ])->filter(fn ($arrRow) => array_sum($arrRow) > 0);
 
         // "Common concerns" / "suggested improvements": the text of every
         // Negative/Neutral entry, since that's exactly where a concern or a
         // room-for-improvement remark lives in this lexicon-scored feedback.
-        $concerns = $feedback->whereIn('sentiment', ['Negative', 'Neutral'])
+        $objConcerns = $objFeedback->whereIn('sentiment', ['Negative', 'Neutral'])
             ->sortBy('polarity')
             ->take(5)
             ->values();
 
-        return $this->renderPto($request, 'pto.feedback.index', 'feedback', 'Tourist Feedback', [
-            'activeTab' => $activeTab,
-            'feedback' => $feedback->all(),
-            'municipalities' => $feedback->pluck('municipality')->filter()->unique()->sort()->values(),
-            'categories' => $feedback->pluck('category')->filter()->unique()->sort()->values(),
+        return $this->renderPto($objRequest, 'pto.feedback.index', 'feedback', 'Tourist Feedback', [
+            'activeTab' => $strActiveTab,
+            'feedback' => $objFeedback->all(),
+            'municipalities' => $objFeedback->pluck('municipality')->filter()->unique()->sort()->values(),
+            'categories' => $objFeedback->pluck('category')->filter()->unique()->sort()->values(),
             'sentiment' => PtoMockData::sentimentBreakdown(),
             'sentimentTrend' => PtoMockData::sentimentTrend(),
-            'sentimentByDestination' => $sentimentByDestination,
-            'concerns' => $concerns,
-            'byDestination' => $feedback->whereIn('subject', collect(TourismCatalog::featuredDestinations())->pluck('name'))
+            'sentimentByDestination' => $objSentimentByDestination,
+            'concerns' => $objConcerns,
+            'byDestination' => $objFeedback->whereIn('subject', collect(TourismCatalog::featuredDestinations())->pluck('name'))
                 ->groupBy('subject')->map->count()->sortDesc()->take(5),
-            'byEstablishment' => $feedback->whereNotIn('subject', collect(TourismCatalog::featuredDestinations())->pluck('name'))
+            'byEstablishment' => $objFeedback->whereNotIn('subject', collect(TourismCatalog::featuredDestinations())->pluck('name'))
                 ->groupBy('subject')->map->count()->sortDesc()->take(5),
         ]);
     }

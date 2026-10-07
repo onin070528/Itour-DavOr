@@ -142,24 +142,24 @@ class ArrivalRecorder
         } // end foreach headcount field
 
         return $objListing->arrivals()->create([
-            'source' => $objSource,
+            'arr_source' => $objSource,
             'recorded_by' => $intRecordedBy,
-            'date' => $strDate,
-            'visitor_name' => $arrData['visitorName'] ?? null,
-            'visitor_contact' => $arrData['visitorContact'] ?? null,
-            'visit_type' => $arrData['visitType'],
-            'party_male' => $arrCounts['male'],
-            'party_female' => $arrCounts['female'],
-            'party_adults' => $arrCounts['adults'],
-            'party_children' => $arrCounts['children'],
-            'party_seniors' => $arrCounts['seniors'],
-            'party_local' => $arrCounts['local'],
-            'party_foreign' => $arrCounts['foreign'],
-            'party_size' => $arrCounts['male'] + $arrCounts['female'],
-            'local_origin_scope' => $arrData['localOriginScope'] ?? null,
-            'local_origin_place' => $arrData['localOriginPlace'] ?? null,
-            'foreign_country' => $arrData['foreignCountry'] ?? null,
-            'status' => 'Recorded',
+            'arr_date' => $strDate,
+            'arr_visitor_name' => $arrData['visitorName'] ?? null,
+            'arr_visitor_contact' => $arrData['visitorContact'] ?? null,
+            'arr_visit_type' => $arrData['visitType'],
+            'arr_party_male' => $arrCounts['male'],
+            'arr_party_female' => $arrCounts['female'],
+            'arr_party_adults' => $arrCounts['adults'],
+            'arr_party_children' => $arrCounts['children'],
+            'arr_party_seniors' => $arrCounts['seniors'],
+            'arr_party_local' => $arrCounts['local'],
+            'arr_party_foreign' => $arrCounts['foreign'],
+            'arr_party_size' => $arrCounts['male'] + $arrCounts['female'],
+            'arr_local_origin_scope' => $arrData['localOriginScope'] ?? null,
+            'arr_local_origin_place' => $arrData['localOriginPlace'] ?? null,
+            'arr_foreign_country' => $arrData['foreignCountry'] ?? null,
+            'arr_status' => 'Recorded',
         ]);
     }
 
@@ -171,6 +171,6 @@ class ArrivalRecorder
      */
     public function getProvinceMunicipalityNames(): Collection
     {
-        return Municipality::query()->orderBy('name')->pluck('name');
+        return Municipality::query()->orderBy('mun_name')->pluck('mun_name');
     }
 }

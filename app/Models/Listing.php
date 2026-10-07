@@ -17,6 +17,7 @@ use App\Support\SecurityLogger;
 use App\Support\TourismCatalog;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -30,30 +31,35 @@ use Illuminate\Support\Str;
 
 /**
  * A tourism destination or establishment — the real, DB-backed replacement
- * for App\Support\TourismCatalog::listings(). `category` is 'destinations'
- * for destinations, or one of the non-destination category slugs
- * (TourismCatalog::categories()) for establishments. There is no separate
- * Establishment/Destination model or table — RBAC (see ListingPolicy)
- * branches on `category` instead.
+ * for App\Support\TourismCatalog::listings(). `lst_category` is
+ * 'destinations' for destinations, or one of the non-destination category
+ * slugs (TourismCatalog::categories()) for establishments. There is no
+ * separate Establishment/Destination model or table — RBAC (see
+ * ListingPolicy) branches on `lst_category` instead.
  *
- * `municipality`/`municipality_id` stay in #[Fillable] for the same reason
+ * `lst_municipality`/`mun_id` stay in #[Fillable] for the same reason
  * as on App\Models\User: legitimate create/update calls (seeders, the PTO
  * directory, the LGU's own-municipality create paths) set them explicitly,
  * and no controller ever passes raw request input for them. Once assigned,
  * only a signed-in PTO Administrator may move a listing to another
  * municipality — enforced in booted() below, whichever code path tries.
- * `reporting_mode` is deliberately NOT fillable: switching it has side
+ * `lst_reporting_mode` is deliberately NOT fillable: switching it has side
  * effects (QR, account), so it is only ever set explicitly.
  */
+#[Table('tbl_listings', key: 'lst_id')]
 #[Fillable([
-    'slug', 'name', 'owner_name', 'category', 'cat_id', 'type', 'license_number', 'accreditation_status',
-    'category_note', 'municipality', 'municipality_id', 'barangay', 'lat', 'lng', 'description',
-    'rating', 'tags', 'image', 'contact_office', 'contact_phone', 'hours',
-    'email', 'website', 'status',
+    'lst_slug', 'lst_name', 'lst_owner_name', 'lst_category', 'cat_id', 'lst_type', 'lst_license_number', 'lst_accreditation_status',
+    'lst_category_note', 'lst_municipality', 'mun_id', 'lst_barangay', 'lst_lat', 'lst_lng', 'lst_description',
+    'lst_rating', 'lst_tags', 'lst_image', 'lst_contact_office', 'lst_contact_phone', 'lst_hours',
+    'lst_email', 'lst_website', 'lst_status',
 ])]
 class Listing extends Model
 {
     use HasFactory;
+
+    public const CREATED_AT = 'lst_created_at';
+
+    public const UPDATED_AT = 'lst_updated_at';
 
     /** getQrStatus(): QR works — scans open the check-in form. */
     public const QR_STATUS_ACTIVE = 'active';
@@ -99,12 +105,12 @@ class Listing extends Model
      *
      * @var array<int, string>
      */
-    public const PUBLIC_CONTENT_FIELDS = ['name', 'cat_id', 'type', 'category_note', 'barangay', 'lat', 'lng', 'description'];
+    public const PUBLIC_CONTENT_FIELDS = ['lst_name', 'cat_id', 'lst_type', 'lst_category_note', 'lst_barangay', 'lst_lat', 'lst_lng', 'lst_description'];
 
     protected static function booted(): void
     {
-        static::creating(function (Listing $listing) {
-            $listing->uuid ??= (string) Str::uuid();
+        static::creating(function (Listing $objListing) {
+            $objListing->lst_uuid ??= (string) Str::uuid();
         });
 
         // Summary comment: a listing's municipality is fixed once assigned.
@@ -114,7 +120,7 @@ class Listing extends Model
         // alone so structural backfills such as RbacScopeBackfillSeeder keep
         // working — same rule as App\Models\User's LGU reassignment guard.
         static::updating(function (Listing $objListing) {
-            $blnIsReassigning = $objListing->isDirty('municipality_id') && $objListing->getOriginal('municipality_id') !== null;
+            $blnIsReassigning = $objListing->isDirty('mun_id') && $objListing->getOriginal('mun_id') !== null;
 
             if (! $blnIsReassigning) {
                 return;
@@ -124,7 +130,7 @@ class Listing extends Model
             $blnIsBlockedActor = $objActor !== null && ! $objActor->isPto();
 
             if ($blnIsBlockedActor) {
-                SecurityLogger::accessDenied($objActor, 'listing_municipality_reassign', Listing::class, $objListing->municipality_id);
+                SecurityLogger::accessDenied($objActor, 'listing_municipality_reassign', Listing::class, $objListing->mun_id);
 
                 throw new AuthorizationException('Only the Provincial Tourism Office can move a listing to another municipality.');
             }
@@ -134,13 +140,13 @@ class Listing extends Model
     protected function casts(): array
     {
         return [
-            'tags' => 'array',
-            'rating' => 'decimal:1',
-            'lat' => 'float',
-            'lng' => 'float',
+            'lst_tags' => 'array',
+            'lst_rating' => 'decimal:1',
+            'lst_lat' => 'float',
+            'lst_lng' => 'float',
             'lst_is_qr_enabled' => 'boolean',
             'lst_pending_changes' => 'array',
-            'reporting_mode' => ReportingMethod::class,
+            'lst_reporting_mode' => ReportingMethod::class,
         ];
     }
 
@@ -156,8 +162,8 @@ class Listing extends Model
 
         // Summary comment: one quiet save per row — no events, no timestamps
         // bump beyond the uuid itself.
-        static::query()->whereNull('uuid')->orderBy('id')->each(function (Listing $objListing) use (&$intFilledCount) {
-            $objListing->forceFill(['uuid' => (string) Str::uuid()])->saveQuietly();
+        static::query()->whereNull('lst_uuid')->orderBy('lst_id')->each(function (Listing $objListing) use (&$intFilledCount) {
+            $objListing->forceFill(['lst_uuid' => (string) Str::uuid()])->saveQuietly();
             $intFilledCount++;
         }); // end each listing without uuid
 
@@ -188,12 +194,12 @@ class Listing extends Model
      */
     public function getRouteKeyName(): string
     {
-        return 'slug';
+        return 'lst_slug';
     }
 
     public function images(): HasMany
     {
-        return $this->hasMany(ListingImage::class)->orderBy('sort_order');
+        return $this->hasMany(ListingImage::class, 'lst_id', 'lst_id')->orderBy('lsi_sort_order');
     }
 
     /**
@@ -204,7 +210,7 @@ class Listing extends Model
      */
     public function establishmentImages(): HasMany
     {
-        return $this->hasMany(EstablishmentImage::class, 'listing_id')
+        return $this->hasMany(EstablishmentImage::class, 'lst_id', 'lst_id')
             ->orderByDesc('img_is_cover')
             ->orderBy('img_sort_order');
     }
@@ -299,11 +305,11 @@ class Listing extends Model
      */
     public function publishedPhotoLastUpdatedAt(): ?Carbon
     {
-        $images = $this->relationLoaded('establishmentImages')
+        $objImages = $this->relationLoaded('establishmentImages')
             ? $this->establishmentImages
             : $this->establishmentImages()->where('img_status', 'PUBLISHED')->get();
 
-        return $images->where('img_status', 'PUBLISHED')->max('img_updated_at');
+        return $objImages->where('img_status', 'PUBLISHED')->max('img_updated_at');
     }
 
     /**
@@ -312,11 +318,11 @@ class Listing extends Model
      */
     public function publishedGalleryImages(): Collection
     {
-        $images = $this->relationLoaded('establishmentImages')
+        $objImages = $this->relationLoaded('establishmentImages')
             ? $this->establishmentImages
             : $this->establishmentImages()->where('img_status', 'PUBLISHED')->get();
 
-        return $images->where('img_status', 'PUBLISHED')->values();
+        return $objImages->where('img_status', 'PUBLISHED')->values();
     }
 
     /**
@@ -328,33 +334,33 @@ class Listing extends Model
      */
     public function publicCoverImageUrl(): ?string
     {
-        $cover = $this->publishedGalleryImages()->firstWhere('img_is_cover', true);
+        $objCover = $this->publishedGalleryImages()->firstWhere('img_is_cover', true);
 
-        if ($cover !== null) {
-            return route('establishmentImages.file', [$cover, 'full']);
+        if ($objCover !== null) {
+            return route('establishmentImages.file', [$objCover, 'full']);
         }
 
-        return $this->image !== null ? asset('storage/itour-images/'.$this->image) : null;
+        return $this->lst_image !== null ? asset('storage/itour-images/'.$this->lst_image) : null;
     }
 
     public function arrivals(): HasMany
     {
-        return $this->hasMany(Arrival::class);
+        return $this->hasMany(Arrival::class, 'lst_id', 'lst_id');
     }
 
     public function monthlyArrivalReports(): HasMany
     {
-        return $this->hasMany(MonthlyArrivalReport::class);
+        return $this->hasMany(MonthlyArrivalReport::class, 'lst_id', 'lst_id');
     }
 
     public function municipalityRecord(): BelongsTo
     {
-        return $this->belongsTo(Municipality::class, 'municipality_id');
+        return $this->belongsTo(Municipality::class, 'mun_id', 'mun_id');
     }
 
     /**
-     * The fixed-lookup category (tblcategories) — being cut over to from the
-     * legacy free-text `category` string column, which is kept untouched
+     * The fixed-lookup category (tbl_categories) — being cut over to from the
+     * legacy free-text `lst_category` string column, which is kept untouched
      * until every reader has moved onto this relation.
      */
     public function categoryRecord(): BelongsTo
@@ -370,7 +376,7 @@ class Listing extends Model
      */
     public function isTourGuide(): bool
     {
-        return self::isTourGuideType($this->type);
+        return self::isTourGuideType($this->lst_type);
     }
 
     /**
@@ -391,8 +397,8 @@ class Listing extends Model
      */
     public function reportingMethod(): ReportingMethod
     {
-        return $this->reporting_mode instanceof ReportingMethod
-            ? $this->reporting_mode
+        return $this->lst_reporting_mode instanceof ReportingMethod
+            ? $this->lst_reporting_mode
             : ReportingMethod::default();
     }
 
@@ -408,34 +414,34 @@ class Listing extends Model
      */
     public function isPubliclyVisible(): bool
     {
-        return $this->category === 'destinations'
-            ? $this->status === 'Active'
-            : $this->status === 'PUBLISHED';
+        return $this->lst_category === 'destinations'
+            ? $this->lst_status === 'Active'
+            : $this->lst_status === 'PUBLISHED';
     }
 
     public function isDraft(): bool
     {
-        return $this->status === 'DRAFT';
+        return $this->lst_status === 'DRAFT';
     }
 
     public function isForPtoReview(): bool
     {
-        return $this->status === 'FOR_PTO_REVIEW';
+        return $this->lst_status === 'FOR_PTO_REVIEW';
     }
 
     public function isForLguReview(): bool
     {
-        return $this->status === 'FOR_LGU_REVIEW';
+        return $this->lst_status === 'FOR_LGU_REVIEW';
     }
 
     public function isPublished(): bool
     {
-        return $this->status === 'PUBLISHED';
+        return $this->lst_status === 'PUBLISHED';
     }
 
     public function isUnpublished(): bool
     {
-        return $this->status === 'UNPUBLISHED';
+        return $this->lst_status === 'UNPUBLISHED';
     }
 
     /**
@@ -444,7 +450,7 @@ class Listing extends Model
      */
     public function isForCorrection(): bool
     {
-        return $this->status === self::STATUS_FOR_CORRECTION;
+        return $this->lst_status === self::STATUS_FOR_CORRECTION;
     }
 
     /**
@@ -453,7 +459,7 @@ class Listing extends Model
      */
     public function isDestinationOnly(): bool
     {
-        return $this->category === 'destinations';
+        return $this->lst_category === 'destinations';
     }
 
     /**
@@ -547,9 +553,9 @@ class Listing extends Model
     public function scopeAwaitingPtoDecision(Builder $query): Builder
     {
         return $query->where(fn (Builder $objQuery) => $objQuery
-            ->where('status', 'FOR_PTO_REVIEW')
+            ->where('lst_status', 'FOR_PTO_REVIEW')
             ->orWhere(fn (Builder $objLive) => $objLive
-                ->whereIn('status', self::LIVE_STATUSES)
+                ->whereIn('lst_status', self::LIVE_STATUSES)
                 ->whereNotNull('lst_pending_changes')
                 ->whereNull('lst_review_remarks')));
     }
@@ -561,9 +567,9 @@ class Listing extends Model
     public function scopeReturnedForCorrection(Builder $query): Builder
     {
         return $query->where(fn (Builder $objQuery) => $objQuery
-            ->where('status', self::STATUS_FOR_CORRECTION)
+            ->where('lst_status', self::STATUS_FOR_CORRECTION)
             ->orWhere(fn (Builder $objLive) => $objLive
-                ->whereIn('status', self::LIVE_STATUSES)
+                ->whereIn('lst_status', self::LIVE_STATUSES)
                 ->whereNotNull('lst_pending_changes')
                 ->whereNotNull('lst_review_remarks')));
     }
@@ -609,7 +615,7 @@ class Listing extends Model
             return 'Published · Changes pending PTO review';
         }
 
-        return match ($this->status) {
+        return match ($this->lst_status) {
             'DRAFT' => 'Not Requested',
             'FOR_LGU_REVIEW' => 'Waiting for your review',
             'FOR_PTO_REVIEW' => 'Pending PTO Review',
@@ -617,7 +623,7 @@ class Listing extends Model
             // A destination-only record is live as Active (liveStatus()).
             'PUBLISHED', 'Active' => 'Published',
             'UNPUBLISHED' => 'Unpublished',
-            default => (string) $this->status,
+            default => (string) $this->lst_status,
         };
     }
 
@@ -640,7 +646,7 @@ class Listing extends Model
      */
     public function categoryName(): string
     {
-        return $this->categoryRecord?->cat_name ?? TourismCatalog::categoryLabel((string) $this->category);
+        return $this->categoryRecord?->cat_name ?? TourismCatalog::categoryLabel((string) $this->lst_category);
     }
 
     /**
@@ -659,9 +665,9 @@ class Listing extends Model
      */
     public function isQrEnabled(): bool
     {
-        return $this->uuid !== null
-            && $this->category !== 'destinations'
-            && ! in_array($this->status, self::INACTIVE_ESTABLISHMENT_STATUSES, true)
+        return $this->lst_uuid !== null
+            && $this->lst_category !== 'destinations'
+            && ! in_array($this->lst_status, self::INACTIVE_ESTABLISHMENT_STATUSES, true)
             && ! $this->isTourGuide()
             && (bool) $this->categoryRecord?->cat_is_qr_enabled;
     }
@@ -671,7 +677,7 @@ class Listing extends Model
      */
     public function hasActiveAccount(): bool
     {
-        return $this->establishmentUser?->status === self::ACCOUNT_STATUS_ACTIVE;
+        return $this->establishmentUser?->usr_status === self::ACCOUNT_STATUS_ACTIVE;
     }
 
     /**
@@ -690,7 +696,7 @@ class Listing extends Model
      */
     public function isAcceptingRegistrations(): bool
     {
-        if ($this->category === 'destinations') {
+        if ($this->lst_category === 'destinations') {
             return false;
         }
 
@@ -729,13 +735,13 @@ class Listing extends Model
     }
 
     /**
-     * The single User account linked to this listing via establishment_id
+     * The single User account linked to this listing via tbl_users.lst_id
      * (only ever set when this listing is an establishment, not a
-     * destination — see users.establishment_id's unique constraint).
+     * destination — see that column's unique constraint).
      */
     public function establishmentUser(): HasOne
     {
-        return $this->hasOne(User::class, 'establishment_id');
+        return $this->hasOne(User::class, 'lst_id', 'lst_id');
     }
 
     /**
@@ -745,18 +751,18 @@ class Listing extends Model
      * municipality (per the permission matrix — establishments never see
      * other establishments).
      */
-    public function scopeVisibleTo(Builder $query, User $user): Builder
+    public function scopeVisibleTo(Builder $objQuery, User $objUser): Builder
     {
-        return match ($user->role) {
-            UserRole::PtoAdministrator => $query,
-            UserRole::Lgu => $query->where('municipality_id', $user->municipality_id),
-            UserRole::Establishment => $query->where(function (Builder $q) use ($user) {
-                $q->where('id', $user->establishment_id)
-                    ->orWhere(function (Builder $q2) use ($user) {
-                        $q2->where('category', 'destinations')->where('municipality_id', $user->municipality_id);
+        return match ($objUser->usr_role) {
+            UserRole::PtoAdministrator => $objQuery,
+            UserRole::Lgu => $objQuery->where('mun_id', $objUser->mun_id),
+            UserRole::Establishment => $objQuery->where(function (Builder $objQuery) use ($objUser) {
+                $objQuery->where('lst_id', $objUser->lst_id)
+                    ->orWhere(function (Builder $objQuery2) use ($objUser) {
+                        $objQuery2->where('lst_category', 'destinations')->where('mun_id', $objUser->mun_id);
                     });
             }),
-            default => $query->whereRaw('1 = 0'),
+            default => $objQuery->whereRaw('1 = 0'),
         };
     }
 }

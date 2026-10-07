@@ -13,6 +13,7 @@ namespace App\Models;
 use App\Enums\ArrivalOriginScope;
 use App\Enums\ArrivalSource;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -23,27 +24,32 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * the create_arrivals_table migration for the legacy single-visitor columns
  * still on this table but no longer written by either form.
  */
+#[Table('tbl_arrivals', key: 'arr_id')]
 #[Fillable([
-    'listing_id', 'monthly_arrival_report_id', 'source', 'recorded_by', 'date', 'visitor_name', 'visitor_contact',
-    'gender', 'classification', 'visit_type', 'remarks', 'party_male',
-    'party_female', 'party_adults', 'party_children', 'party_seniors',
-    'party_local', 'party_foreign', 'party_size', 'status',
-    'local_origin_scope', 'local_origin_place', 'foreign_country',
+    'lst_id', 'mar_id', 'arr_source', 'recorded_by', 'arr_date', 'arr_visitor_name', 'arr_visitor_contact',
+    'arr_gender', 'arr_classification', 'arr_visit_type', 'arr_remarks', 'arr_party_male',
+    'arr_party_female', 'arr_party_adults', 'arr_party_children', 'arr_party_seniors',
+    'arr_party_local', 'arr_party_foreign', 'arr_party_size', 'arr_status',
+    'arr_local_origin_scope', 'arr_local_origin_place', 'arr_foreign_country',
 ])]
 class Arrival extends Model
 {
+    public const CREATED_AT = 'arr_created_at';
+
+    public const UPDATED_AT = 'arr_updated_at';
+
     protected function casts(): array
     {
         return [
-            'date' => 'date',
-            'source' => ArrivalSource::class,
-            'local_origin_scope' => ArrivalOriginScope::class,
+            'arr_date' => 'date',
+            'arr_source' => ArrivalSource::class,
+            'arr_local_origin_scope' => ArrivalOriginScope::class,
         ];
     }
 
     public function listing(): BelongsTo
     {
-        return $this->belongsTo(Listing::class);
+        return $this->belongsTo(Listing::class, 'lst_id', 'lst_id');
     }
 
     /**
@@ -52,7 +58,7 @@ class Arrival extends Model
      */
     public function recorder(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'recorded_by');
+        return $this->belongsTo(User::class, 'recorded_by', 'usr_id');
     } // end recorder
 
     /**
@@ -61,6 +67,6 @@ class Arrival extends Model
      */
     public function monthlyArrivalReport(): BelongsTo
     {
-        return $this->belongsTo(MonthlyArrivalReport::class);
+        return $this->belongsTo(MonthlyArrivalReport::class, 'mar_id', 'mar_id');
     }
 }

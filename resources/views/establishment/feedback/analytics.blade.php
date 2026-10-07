@@ -1,3 +1,10 @@
+{{--
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: Establishment feedback analytics page.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+--}}
 @php
     $total = array_sum($sentiment);
     $positivePct = $total ? round(($sentiment['positive'] / $total) * 100) : 0;

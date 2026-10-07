@@ -1,5 +1,13 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Tests — lgu pages.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 use App\Enums\UserRole;
 use App\Models\Municipality;
 use App\Models\User;
@@ -7,15 +15,15 @@ use App\Models\User;
 function actingAsLgu(string $municipality): User
 {
     $record = Municipality::query()->firstOrCreate(
-        ['code' => strtoupper(substr(preg_replace('/[^A-Za-z]/', '', $municipality), 0, 4))],
-        ['name' => $municipality]
+        ['mun_code' => strtoupper(substr(preg_replace('/[^A-Za-z]/', '', $municipality), 0, 4))],
+        ['mun_name' => $municipality]
     );
 
     return User::factory()->create([
-        'role' => UserRole::Lgu,
-        'organization_name' => "{$municipality} Tourism Office",
-        'organization_subtitle' => $municipality,
-        'municipality_id' => $record->id,
+        'usr_role' => UserRole::Lgu,
+        'usr_organization_name' => "{$municipality} Tourism Office",
+        'usr_organization_subtitle' => $municipality,
+        'mun_id' => $record->mun_id,
     ]);
 }
 
@@ -91,9 +99,9 @@ test('the dashboard only shows data scoped to the LGU\'s own municipality', func
 
 test('an LGU account with no assigned municipality is blocked, not crashed', function () {
     $user = User::factory()->create([
-        'role' => UserRole::Lgu,
-        'organization_name' => 'Unassigned LGU Office',
-        'organization_subtitle' => null,
+        'usr_role' => UserRole::Lgu,
+        'usr_organization_name' => 'Unassigned LGU Office',
+        'usr_organization_subtitle' => null,
     ]);
 
     test()->actingAs($user)->get(route('lgu.dashboard'))->assertForbidden();

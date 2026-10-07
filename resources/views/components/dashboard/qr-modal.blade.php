@@ -11,17 +11,17 @@
 @php($strQrStatus = $listing->getQrStatus())
 
 @if (in_array($strQrStatus, [\App\Models\Listing::QR_STATUS_ACTIVE, \App\Models\Listing::QR_STATUS_SWITCHED_OFF], true))
-    <x-dashboard.modal id="qr-view-{{ $listing->id }}" title="{{ $listing->name }} QR Code">
+    <x-dashboard.modal id="qr-view-{{ $listing->lst_id }}" title="{{ $listing->lst_name }} QR Code">
         @if ($strQrStatus === \App\Models\Listing::QR_STATUS_ACTIVE)
             <div class="mx-auto flex h-56 w-56 items-center justify-center rounded-md border border-sand-200 bg-sand-0 p-2">
-                <img src="{{ route('qrCodes.show', $listing) }}" loading="lazy" alt="Check-in QR code for {{ $listing->name }}" class="h-full w-full">
+                <img src="{{ route('qrCodes.show', $listing) }}" loading="lazy" alt="Check-in QR code for {{ $listing->lst_name }}" class="h-full w-full">
             </div>
-            <p class="mt-3 text-center text-xs text-sand-500">Tourists scan this to register their arrival at {{ $listing->name }}.</p>
+            <p class="mt-3 text-center text-xs text-sand-500">Tourists scan this to register their arrival at {{ $listing->lst_name }}.</p>
         @else
             <div class="flex flex-col items-center gap-2 rounded-md bg-warning-bg px-4 py-6 text-center">
                 <i class="ti ti-player-pause text-2xl text-warning" aria-hidden="true"></i>
                 <p class="text-sm font-semibold text-sand-900">QR check-in is turned off</p>
-                <p class="text-xs text-sand-600">Guests who scan the QR code for {{ $listing->name }} see that it is not accepting registrations. The same printed QR code works again once it is turned back on.</p>
+                <p class="text-xs text-sand-600">Guests who scan the QR code for {{ $listing->lst_name }} see that it is not accepting registrations. The same printed QR code works again once it is turned back on.</p>
             </div>
         @endif
 
@@ -35,7 +35,7 @@
                     <button
                         type="button"
                         data-confirm-trigger
-                        data-confirm-title="Turn off QR check-in for {{ $listing->name }}?"
+                        data-confirm-title="Turn off QR check-in for {{ $listing->lst_name }}?"
                         data-confirm-message="Guests who scan its QR code will see that it is not accepting registrations until it is turned back on. Existing arrivals are untouched."
                         data-confirm-label="Turn off"
                         data-confirm-tone="danger"

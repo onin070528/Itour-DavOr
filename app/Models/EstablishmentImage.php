@@ -1,10 +1,12 @@
 <?php
 
-/*
- * System     : iTOUR - Integrated Tourism Information and Monitoring System
- * Purpose    : Eloquent model for tblestablishment_images, the establishment photo upload/approval workflow.
- * Programmer : <name(s)>
- * Copyright  : 2026 University of Mindanao. All rights reserved.
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Eloquent model for tbl_establishment_images, the establishment photo upload/approval
+ * workflow.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
  */
 
 namespace App\Models;
@@ -12,20 +14,21 @@ namespace App\Models;
 use App\Enums\ImageSourceRole;
 use App\Enums\ImageStatus;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
- * One establishment photo and its approval history. `listing_id` is the
- * real FK — it references the existing `listings` table (App\Models\
- * Listing), not a renamed `tblestablishments`; only this table itself is
- * ITD-prefixed. `img_replaces_id` chains Replace requests (the new row
+ * One establishment photo and its approval history. `lst_id` is the
+ * real FK — it references the `tbl_listings` table (App\Models\
+ * Listing). `img_replaces_id` chains Replace requests (the new row
  * stays Pending while the row it targets stays Published until approval —
  * see Establishment\ImagesController::replace() in a later sub-stage).
  */
+#[Table('tbl_establishment_images', key: 'img_id')]
 #[Fillable([
-    'listing_id', 'img_path', 'img_thumbnail_path', 'img_alt_text', 'img_credit',
+    'lst_id', 'img_path', 'img_thumbnail_path', 'img_alt_text', 'img_credit',
     'img_source_role', 'img_status', 'img_is_cover', 'img_sort_order', 'img_hash',
     'img_review_note', 'img_uploaded_by', 'img_reviewed_by', 'img_reviewed_at',
     'img_replaces_id', 'img_has_ownership_declared', 'img_archived_at',
@@ -35,10 +38,6 @@ class EstablishmentImage extends Model
     public const CREATED_AT = 'img_created_at';
 
     public const UPDATED_AT = 'img_updated_at';
-
-    protected $table = 'tblestablishment_images';
-
-    protected $primaryKey = 'img_id';
 
     protected function casts(): array
     {
@@ -54,17 +53,17 @@ class EstablishmentImage extends Model
 
     public function listing(): BelongsTo
     {
-        return $this->belongsTo(Listing::class, 'listing_id');
+        return $this->belongsTo(Listing::class, 'lst_id', 'lst_id');
     }
 
     public function uploadedBy(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'img_uploaded_by');
+        return $this->belongsTo(User::class, 'img_uploaded_by', 'usr_id');
     }
 
     public function reviewedBy(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'img_reviewed_by');
+        return $this->belongsTo(User::class, 'img_reviewed_by', 'usr_id');
     }
 
     /**

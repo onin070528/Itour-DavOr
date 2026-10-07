@@ -22,10 +22,10 @@ class HotlinesController extends Controller
      */
     public function index(): View
     {
-        $hotlines = Hotline::query()->active()->get()->groupBy('hot_agency_type');
+        $objHotlines = Hotline::query()->active()->get()->groupBy('hot_agency_type');
 
         return view('hotlines', [
-            'hotlines' => $hotlines,
+            'hotlines' => $objHotlines,
         ]);
     }
 }

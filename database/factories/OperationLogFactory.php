@@ -1,5 +1,13 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Model factory for generating operation log test records.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 namespace Database\Factories;
 
 use App\Enums\UserRole;
@@ -20,18 +28,18 @@ class OperationLogFactory extends Factory
     public function definition(): array
     {
         return [
-            'user_id' => User::factory(),
-            'user_role' => UserRole::PtoAdministrator->value,
-            'action' => 'update',
-            'entity_type' => 'establishment',
-            'entity_id' => fake()->numberBetween(1, 1000),
-            'municipality_id' => null,
-            'establishment_id' => null,
-            'old_values' => null,
-            'new_values' => null,
-            'reason' => null,
-            'ip_address' => fake()->ipv4(),
-            'created_at' => now(),
+            'usr_id' => User::factory(),
+            'opl_user_role' => UserRole::PtoAdministrator->value,
+            'opl_action' => 'update',
+            'opl_entity_type' => 'establishment',
+            'opl_entity_id' => fake()->numberBetween(1, 1000),
+            'mun_id' => null,
+            'lst_id' => null,
+            'opl_old_values' => null,
+            'opl_new_values' => null,
+            'opl_reason' => null,
+            'opl_ip_address' => fake()->ipv4(),
+            'opl_created_at' => now(),
         ];
     }
 }

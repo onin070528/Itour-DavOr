@@ -16,21 +16,25 @@ use App\Enums\UserRole;
 use App\Models\Concerns\AppendOnly;
 use Database\Factories\SecurityLogFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['event_type', 'user_id', 'attempted_email', 'target_user_id', 'municipality_id', 'ip_address', 'user_agent', 'details'])]
+#[Table('tbl_security_logs', key: 'sec_id')]
+#[Fillable(['sec_event_type', 'usr_id', 'sec_attempted_email', 'sec_target_user_id', 'mun_id', 'sec_ip_address', 'sec_user_agent', 'sec_details'])]
 class SecurityLog extends Model
 {
     /** @use HasFactory<SecurityLogFactory> */
     use AppendOnly, HasFactory;
 
+    public const CREATED_AT = 'sec_created_at';
+
     public const UPDATED_AT = null;
 
     /**
-     * The closed event_type vocabulary — the single source of truth for
+     * The closed sec_event_type vocabulary — the single source of truth for
      * filter-input validation and the Audit Logs page's badge colors.
      */
     public const EVENT_TYPES = [
@@ -44,17 +48,17 @@ class SecurityLog extends Model
     protected function casts(): array
     {
         return [
-            'details' => 'array',
+            'sec_details' => 'array',
         ];
     }
 
     /**
      * The account that performed the action (null for a failed login on an
-     * unknown email — see $attempted_email).
+     * unknown email — see sec_attempted_email).
      */
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class, 'usr_id', 'usr_id');
     }
 
     /**
@@ -64,21 +68,21 @@ class SecurityLog extends Model
      */
     public function targetUser(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'target_user_id');
+        return $this->belongsTo(User::class, 'sec_target_user_id', 'usr_id');
     }
 
     public function municipality(): BelongsTo
     {
-        return $this->belongsTo(Municipality::class);
+        return $this->belongsTo(Municipality::class, 'mun_id', 'mun_id');
     }
 
     /**
      * Badge tone for the Audit Logs page — see resources/views/components/
      * dashboard/status-badge.blade.php for the tone => classes mapping.
      */
-    public static function badgeTone(string $eventType): string
+    public static function badgeTone(string $strEventType): string
     {
-        return match ($eventType) {
+        return match ($strEventType) {
             'login_success', 'otp_verified' => 'success',
             'return', 'unlock', 'password_reset_requested', 'account_suspended' => 'warning',
             'login_failed', 'otp_failed', 'access_denied' => 'danger',
@@ -95,18 +99,18 @@ class SecurityLog extends Model
      * would appear on. Establishment sees only its own login history.
      * Default deny for any other role.
      */
-    public function scopeVisibleTo(Builder $query, User $viewer): Builder
+    public function scopeVisibleTo(Builder $objQuery, User $objViewer): Builder
     {
-        return match ($viewer->role) {
-            UserRole::PtoAdministrator => $query,
-            UserRole::Lgu => $query->where(function (Builder $q) use ($viewer) {
-                $q->where('user_id', $viewer->id)
-                    ->orWhere('target_user_id', $viewer->id)
-                    ->orWhereHas('user', fn (Builder $q2) => $q2->where('role', UserRole::Establishment)->where('municipality_id', $viewer->municipality_id))
-                    ->orWhereHas('targetUser', fn (Builder $q2) => $q2->where('role', UserRole::Establishment)->where('municipality_id', $viewer->municipality_id));
+        return match ($objViewer->usr_role) {
+            UserRole::PtoAdministrator => $objQuery,
+            UserRole::Lgu => $objQuery->where(function (Builder $objQuery) use ($objViewer) {
+                $objQuery->where('usr_id', $objViewer->usr_id)
+                    ->orWhere('sec_target_user_id', $objViewer->usr_id)
+                    ->orWhereHas('user', fn (Builder $objQuery2) => $objQuery2->where('usr_role', UserRole::Establishment)->where('mun_id', $objViewer->mun_id))
+                    ->orWhereHas('targetUser', fn (Builder $objQuery2) => $objQuery2->where('usr_role', UserRole::Establishment)->where('mun_id', $objViewer->mun_id));
             }),
-            UserRole::Establishment => $query->where('user_id', $viewer->id),
-            default => $query->whereRaw('1 = 0'),
+            UserRole::Establishment => $objQuery->where('usr_id', $objViewer->usr_id),
+            default => $objQuery->whereRaw('1 = 0'),
         };
     }
 }

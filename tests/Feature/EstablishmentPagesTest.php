@@ -1,5 +1,13 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Tests — establishment pages.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 use App\Enums\ReportingMethod;
 use App\Enums\UserRole;
 use App\Models\Category;
@@ -61,62 +69,62 @@ test('feedback and arrival records are limited to the account\'s own establishme
 
     // Establishment 1: Botanika (create listing and seed arrivals/feedback)
     $botanikaListing = Listing::query()->create([
-        'slug' => 'botanika-nature-resort',
-        'name' => 'Botanika Nature Resort',
-        'category' => 'accommodation',
+        'lst_slug' => 'botanika-nature-resort',
+        'lst_name' => 'Botanika Nature Resort',
+        'lst_category' => 'accommodation',
         'cat_id' => $category->cat_id,
-        'municipality' => 'City of Mati',
-        'barangay' => 'Dahican',
-        'status' => 'PUBLISHED',
+        'lst_municipality' => 'City of Mati',
+        'lst_barangay' => 'Dahican',
+        'lst_status' => 'PUBLISHED',
     ]);
 
     // Seed arrivals for Botanika (matching ArrivalSeeder data)
     $botanikaListing->arrivals()->createMany([
         [
-            'source' => 'staff',
-            'date' => '2026-08-22',
-            'visitor_name' => 'Kim Soo-jin',
-            'gender' => 'Female',
-            'classification' => 'Foreign',
-            'remarks' => 'Celebrating a birthday',
-            'status' => 'Recorded',
-            'party_size' => 1,
+            'arr_source' => 'staff',
+            'arr_date' => '2026-08-22',
+            'arr_visitor_name' => 'Kim Soo-jin',
+            'arr_gender' => 'Female',
+            'arr_classification' => 'Foreign',
+            'arr_remarks' => 'Celebrating a birthday',
+            'arr_status' => 'Recorded',
+            'arr_party_size' => 1,
         ],
         [
-            'source' => 'staff',
-            'date' => '2026-08-22',
-            'visitor_name' => null,
-            'gender' => 'Male',
-            'classification' => 'Domestic (Other Province)',
-            'remarks' => null,
-            'status' => 'Recorded',
-            'party_size' => 1,
+            'arr_source' => 'staff',
+            'arr_date' => '2026-08-22',
+            'arr_visitor_name' => null,
+            'arr_gender' => 'Male',
+            'arr_classification' => 'Domestic (Other Province)',
+            'arr_remarks' => null,
+            'arr_status' => 'Recorded',
+            'arr_party_size' => 1,
         ],
     ]);
 
     $botanikaUser = User::factory()->create([
-        'role' => UserRole::Establishment,
-        'organization_name' => 'Botanika Nature Resort',
-        'organization_subtitle' => 'Brgy. Dahican, City of Mati',
-        'establishment_id' => $botanikaListing->id,
+        'usr_role' => UserRole::Establishment,
+        'usr_organization_name' => 'Botanika Nature Resort',
+        'usr_organization_subtitle' => 'Brgy. Dahican, City of Mati',
+        'lst_id' => $botanikaListing->lst_id,
     ]);
 
     // Establishment 2: Badjao (no seeded data)
     $badjaoListing = Listing::query()->create([
-        'slug' => 'badjao-seafront',
-        'name' => 'Badjao Seafront Restaurant',
-        'category' => 'restaurants',
+        'lst_slug' => 'badjao-seafront',
+        'lst_name' => 'Badjao Seafront Restaurant',
+        'lst_category' => 'restaurants',
         'cat_id' => $category->cat_id,
-        'municipality' => 'City of Mati',
-        'barangay' => 'Dahican',
-        'status' => 'PUBLISHED',
+        'lst_municipality' => 'City of Mati',
+        'lst_barangay' => 'Dahican',
+        'lst_status' => 'PUBLISHED',
     ]);
 
     $badjaoUser = User::factory()->create([
-        'role' => UserRole::Establishment,
-        'organization_name' => 'Badjao Seafront Restaurant',
-        'organization_subtitle' => 'Brgy. Dahican, City of Mati',
-        'establishment_id' => $badjaoListing->id,
+        'usr_role' => UserRole::Establishment,
+        'usr_organization_name' => 'Badjao Seafront Restaurant',
+        'usr_organization_subtitle' => 'Brgy. Dahican, City of Mati',
+        'lst_id' => $badjaoListing->lst_id,
     ]);
 
     // Botanika user should see their own feedback and arrivals
@@ -150,46 +158,46 @@ test('two establishments with the same display name do not see each other\'s arr
     $sharedName = 'Paradise Resort';
 
     $listingA = Listing::query()->create([
-        'slug' => 'paradise-resort-a',
-        'name' => $sharedName,
-        'category' => 'accommodation',
+        'lst_slug' => 'paradise-resort-a',
+        'lst_name' => $sharedName,
+        'lst_category' => 'accommodation',
         'cat_id' => $category->cat_id,
-        'municipality' => 'City of Mati',
-        'barangay' => 'Dahican',
-        'status' => 'PUBLISHED',
+        'lst_municipality' => 'City of Mati',
+        'lst_barangay' => 'Dahican',
+        'lst_status' => 'PUBLISHED',
     ]);
     $listingB = Listing::query()->create([
-        'slug' => 'paradise-resort-b',
-        'name' => $sharedName,
-        'category' => 'accommodation',
+        'lst_slug' => 'paradise-resort-b',
+        'lst_name' => $sharedName,
+        'lst_category' => 'accommodation',
         'cat_id' => $category->cat_id,
-        'municipality' => 'Baganga',
-        'barangay' => 'Poblacion',
-        'status' => 'PUBLISHED',
+        'lst_municipality' => 'Baganga',
+        'lst_barangay' => 'Poblacion',
+        'lst_status' => 'PUBLISHED',
     ]);
 
-    $listingA->forceFill(['reporting_mode' => ReportingMethod::OnlineItour])->save();
+    $listingA->forceFill(['lst_reporting_mode' => ReportingMethod::OnlineItour])->save();
 
     $listingA->arrivals()->create([
-        'source' => 'staff', 'date' => '2026-08-22', 'visitor_name' => 'Guest At A',
-        'party_male' => 1, 'party_size' => 1, 'status' => 'Recorded',
+        'arr_source' => 'staff', 'arr_date' => '2026-08-22', 'arr_visitor_name' => 'Guest At A',
+        'arr_party_male' => 1, 'arr_party_size' => 1, 'arr_status' => 'Recorded',
     ]);
     $listingB->arrivals()->create([
-        'source' => 'staff', 'date' => '2026-08-22', 'visitor_name' => 'Guest At B',
-        'party_male' => 1, 'party_size' => 1, 'status' => 'Recorded',
+        'arr_source' => 'staff', 'arr_date' => '2026-08-22', 'arr_visitor_name' => 'Guest At B',
+        'arr_party_male' => 1, 'arr_party_size' => 1, 'arr_status' => 'Recorded',
     ]);
 
     $userA = User::factory()->create([
-        'role' => UserRole::Establishment,
-        'organization_name' => $sharedName,
-        'organization_subtitle' => 'Brgy. Dahican, City of Mati',
-        'establishment_id' => $listingA->id,
+        'usr_role' => UserRole::Establishment,
+        'usr_organization_name' => $sharedName,
+        'usr_organization_subtitle' => 'Brgy. Dahican, City of Mati',
+        'lst_id' => $listingA->lst_id,
     ]);
     $userB = User::factory()->create([
-        'role' => UserRole::Establishment,
-        'organization_name' => $sharedName,
-        'organization_subtitle' => 'Brgy. Poblacion, Baganga',
-        'establishment_id' => $listingB->id,
+        'usr_role' => UserRole::Establishment,
+        'usr_organization_name' => $sharedName,
+        'usr_organization_subtitle' => 'Brgy. Poblacion, Baganga',
+        'lst_id' => $listingB->lst_id,
     ]);
 
     $arrivalsA = test()->actingAs($userA)->get(route('establishment.arrivals.index'));
@@ -204,8 +212,8 @@ test('two establishments with the same display name do not see each other\'s arr
 
     $qrA = test()->actingAs($userA)->get(route('establishment.qr'));
     $qrA->assertOk();
-    $qrA->assertSee(route('lgu.establishmentQr', ['establishment' => $listingA->uuid]), false);
-    $qrA->assertDontSee($listingB->uuid);
+    $qrA->assertSee(route('lgu.establishmentQr', ['establishment' => $listingA->lst_uuid]), false);
+    $qrA->assertDontSee($listingB->lst_uuid);
 });
 
 test('an establishment user cannot access PTO or LGU routes', function () {

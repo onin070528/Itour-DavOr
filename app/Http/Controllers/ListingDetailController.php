@@ -33,8 +33,8 @@ class ListingDetailController extends Controller
 
         return view('listing-detail', [
             'listing' => $listing,
-            'categoryLabel' => TourismCatalog::categoryLabel($listing->category),
-            'categoryIcon' => TourismCatalog::categoryIcon($listing->category),
+            'categoryLabel' => TourismCatalog::categoryLabel($listing->lst_category),
+            'categoryIcon' => TourismCatalog::categoryIcon($listing->lst_category),
             'coverImageUrl' => $listing->publicCoverImageUrl(),
             'galleryImages' => $listing->publishedGalleryImages(),
         ]);

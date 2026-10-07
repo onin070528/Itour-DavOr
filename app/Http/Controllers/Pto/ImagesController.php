@@ -1,10 +1,12 @@
 <?php
 
-/*
- * System     : iTOUR - Integrated Tourism Information and Monitoring System
- * Purpose    : PTO photo upload for any establishment (publishes immediately), and the PTO's approval queue.
- * Programmer : <name(s)>
- * Copyright  : 2026 University of Mindanao. All rights reserved.
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: PTO photo upload for any establishment (publishes immediately), and the PTO's approval
+ * queue.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
  */
 
 namespace App\Http\Controllers\Pto;
@@ -42,9 +44,9 @@ class ImagesController extends PtoController
         $intSelectedMunicipalityId = $objRequest->filled('municipality') ? $objRequest->integer('municipality') : null;
 
         return $this->renderPto($objRequest, 'pto.images.index', 'images.index', 'Photos', [
-            'listings' => Listing::query()->orderBy('name')->get(),
+            'listings' => Listing::query()->orderBy('lst_name')->get(),
             'cards' => $this->_queueCards($this->_pendingLguSourcedImages($intSelectedMunicipalityId)),
-            'municipalities' => Municipality::query()->orderBy('name')->get(),
+            'municipalities' => Municipality::query()->orderBy('mun_name')->get(),
             'selectedMunicipalityId' => $intSelectedMunicipalityId,
         ]);
     }
@@ -158,7 +160,7 @@ class ImagesController extends PtoController
             ->with(['listing', 'uploadedBy', 'replaces'])
             ->where('img_status', ImageStatus::Pending->value)
             ->where('img_source_role', ImageSourceRole::Lgu->value)
-            ->when($intMunicipalityId !== null, fn ($query) => $query->whereHas('listing', fn ($listingQuery) => $listingQuery->where('municipality_id', $intMunicipalityId)))
+            ->when($intMunicipalityId !== null, fn ($objQuery) => $objQuery->whereHas('listing', fn ($objListingQuery) => $objListingQuery->where('mun_id', $intMunicipalityId)))
             ->orderBy('img_created_at')
             ->get();
     }

@@ -14,8 +14,8 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\QueryException;
 
 beforeEach(function () {
-    $this->mati = Municipality::query()->create(['name' => 'City of Mati', 'code' => 'MATI']);
-    $this->baganga = Municipality::query()->create(['name' => 'Baganga', 'code' => 'BAG']);
+    $this->mati = Municipality::query()->create(['mun_name' => 'City of Mati', 'mun_code' => 'MATI']);
+    $this->baganga = Municipality::query()->create(['mun_name' => 'Baganga', 'mun_code' => 'BAG']);
 });
 
 /**
@@ -24,11 +24,11 @@ beforeEach(function () {
 function createLguAccountFor(Municipality $objMunicipality, array $arrOverrides = []): User
 {
     return User::factory()->create(array_merge([
-        'role' => UserRole::Lgu,
-        'organization_name' => "{$objMunicipality->name} Tourism Office",
-        'organization_subtitle' => $objMunicipality->name,
-        'municipality_id' => $objMunicipality->id,
-        'status' => 'Active',
+        'usr_role' => UserRole::Lgu,
+        'usr_organization_name' => "{$objMunicipality->mun_name} Tourism Office",
+        'usr_organization_subtitle' => $objMunicipality->mun_name,
+        'mun_id' => $objMunicipality->mun_id,
+        'usr_status' => 'Active',
     ], $arrOverrides));
 }
 
@@ -39,35 +39,35 @@ test('a second active LGU account for the same municipality is rejected by the d
 });
 
 test('an inactive LGU account may share a municipality with the active one', function () {
-    createLguAccountFor($this->mati, ['status' => 'Inactive']);
+    createLguAccountFor($this->mati, ['usr_status' => 'Inactive']);
     createLguAccountFor($this->mati);
 
-    expect(User::query()->where('role', UserRole::Lgu)->where('municipality_id', $this->mati->id)->count())->toBe(2);
+    expect(User::query()->where('usr_role', UserRole::Lgu)->where('mun_id', $this->mati->mun_id)->count())->toBe(2);
 });
 
 test('reactivating a second LGU account for the same municipality is rejected', function () {
     createLguAccountFor($this->mati);
-    $objOldAccount = createLguAccountFor($this->mati, ['status' => 'Inactive']);
+    $objOldAccount = createLguAccountFor($this->mati, ['usr_status' => 'Inactive']);
 
-    expect(fn () => $objOldAccount->update(['status' => 'Active']))->toThrow(QueryException::class);
+    expect(fn () => $objOldAccount->update(['usr_status' => 'Active']))->toThrow(QueryException::class);
 });
 
 test('establishment accounts may share a municipality with its LGU account', function () {
     createLguAccountFor($this->mati);
 
     User::factory()->count(2)->create([
-        'role' => UserRole::Establishment,
-        'municipality_id' => $this->mati->id,
+        'usr_role' => UserRole::Establishment,
+        'mun_id' => $this->mati->mun_id,
     ]);
 
-    expect(User::query()->where('municipality_id', $this->mati->id)->count())->toBe(3);
+    expect(User::query()->where('mun_id', $this->mati->mun_id)->count())->toBe(3);
 });
 
 test('each municipality may have its own active LGU account', function () {
     createLguAccountFor($this->mati);
     createLguAccountFor($this->baganga);
 
-    expect(User::query()->where('role', UserRole::Lgu)->count())->toBe(2);
+    expect(User::query()->where('usr_role', UserRole::Lgu)->count())->toBe(2);
 });
 
 test('a signed-in LGU account cannot change its own municipality', function () {
@@ -75,18 +75,18 @@ test('a signed-in LGU account cannot change its own municipality', function () {
 
     $this->actingAs($objLgu);
 
-    expect(fn () => $objLgu->update(['municipality_id' => $this->baganga->id]))->toThrow(AuthorizationException::class);
-    expect($objLgu->fresh()->municipality_id)->toBe($this->mati->id);
+    expect(fn () => $objLgu->update(['mun_id' => $this->baganga->mun_id]))->toThrow(AuthorizationException::class);
+    expect($objLgu->fresh()->mun_id)->toBe($this->mati->mun_id);
 });
 
 test('a signed-in PTO Administrator can reassign an LGU account', function () {
     $objLgu = createLguAccountFor($this->mati);
-    $objPto = User::factory()->create(['role' => UserRole::PtoAdministrator]);
+    $objPto = User::factory()->create(['usr_role' => UserRole::PtoAdministrator]);
 
     $this->actingAs($objPto);
-    $objLgu->update(['municipality_id' => $this->baganga->id]);
+    $objLgu->update(['mun_id' => $this->baganga->mun_id]);
 
-    expect($objLgu->fresh()->municipality_id)->toBe($this->baganga->id);
+    expect($objLgu->fresh()->mun_id)->toBe($this->baganga->mun_id);
 });
 
 test('the LGU profile form ignores a forged municipality_id or role in the payload', function () {
@@ -95,15 +95,15 @@ test('the LGU profile form ignores a forged municipality_id or role in the paylo
     $this->actingAs($objLgu)
         ->post(route('lgu.settings.profile'), [
             'name' => 'Renamed Officer',
-            'email' => $objLgu->email,
-            'municipality_id' => $this->baganga->id,
+            'email' => $objLgu->usr_email,
+            'municipality_id' => $this->baganga->mun_id,
             'role' => UserRole::PtoAdministrator->value,
         ])
         ->assertRedirect();
 
     $objLgu->refresh();
 
-    expect($objLgu->name)->toBe('Renamed Officer');
-    expect($objLgu->municipality_id)->toBe($this->mati->id);
-    expect($objLgu->role)->toBe(UserRole::Lgu);
+    expect($objLgu->usr_name)->toBe('Renamed Officer');
+    expect($objLgu->mun_id)->toBe($this->mati->mun_id);
+    expect($objLgu->usr_role)->toBe(UserRole::Lgu);
 });

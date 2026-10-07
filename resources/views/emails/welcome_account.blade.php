@@ -1,8 +1,9 @@
 {{--
-    System     : iTOUR - Integrated Tourism Information and Monitoring System
-    Purpose    : Plain-text welcome email body for a newly created account.
-    Programmer : <name(s)>
-    Copyright  : 2026 University of Mindanao. All rights reserved.
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: Plain-text welcome email body for a newly created account.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
 --}}
 Hi {{ $strName }},
 

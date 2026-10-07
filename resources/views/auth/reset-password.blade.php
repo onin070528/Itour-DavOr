@@ -1,3 +1,10 @@
+{{--
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: Set-a-new-password page opened from the emailed reset link.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+--}}
 <x-layouts.auth title="Set New Password">
     <h1 class="mt-6 text-xl sm:text-2xl">Set a new password</h1>
     <p class="mt-1.5 text-sm text-sand-600">Choose a new password for your account.</p>

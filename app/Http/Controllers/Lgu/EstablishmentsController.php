@@ -55,14 +55,14 @@ class EstablishmentsController extends LguController
 
         $colEstablishments = $this->_ownEstablishmentsQuery($request)
             ->with(['categoryRecord', 'establishmentUser'])
-            ->orderBy('name')
+            ->orderBy('lst_name')
             ->get();
 
         $colAttractions = Listing::query()
-            ->where('municipality_id', $objUser->municipality_id)
-            ->where('category', 'destinations')
+            ->where('mun_id', $objUser->mun_id)
+            ->where('lst_category', 'destinations')
             ->withCount(['establishmentImages as intPhotoCount' => fn ($objQuery) => $objQuery->where('img_status', ImageStatus::Published)])
-            ->orderBy('name')
+            ->orderBy('lst_name')
             ->get();
 
         return $this->renderLgu($request, 'lgu.directory.establishments.index', $blnIsAttractionsView ? 'directory.attractions' : 'directory.establishments', $blnIsAttractionsView ? 'Tourist Attractions' : 'Establishments', [
@@ -98,16 +98,16 @@ class EstablishmentsController extends LguController
                 $objCategory = Category::query()->findOrFail($arrFields['cat_id']);
 
                 $objNewListing = Listing::query()->make([
-                    ...$arrFields,
-                    'slug' => $this->uniqueDestinationSlug($arrFields['name']),
-                    'category' => $objCategory->legacySlug(),
+                    ...self::_prefixed($arrFields),
+                    'lst_slug' => $this->uniqueDestinationSlug($arrFields['name']),
+                    'lst_category' => $objCategory->legacySlug(),
                     // Municipality always comes from the LGU's own account.
-                    'municipality' => $objLgu->organization_subtitle,
-                    'municipality_id' => $objLgu->municipality_id,
+                    'lst_municipality' => $objLgu->usr_organization_subtitle,
+                    'mun_id' => $objLgu->mun_id,
                     // Not requested as a destination listing yet.
-                    'status' => 'DRAFT',
+                    'lst_status' => 'DRAFT',
                 ]);
-                $objNewListing->reporting_mode = ReportingMethod::default();
+                $objNewListing->lst_reporting_mode = ReportingMethod::default();
                 $objNewListing->save();
 
                 return $objNewListing;
@@ -118,11 +118,11 @@ class EstablishmentsController extends LguController
             return back()->withInput()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
 
-        OperationLogger::created($objLgu, 'establishment', $objListing->id, $objListing->municipality_id, $objListing->id, [
-            'name' => $objListing->name,
+        OperationLogger::created($objLgu, 'establishment', $objListing->lst_id, $objListing->mun_id, $objListing->lst_id, [
+            'name' => $objListing->lst_name,
             'category' => $objListing->categoryRecord?->cat_name,
-            'type' => $objListing->type,
-            'municipality' => $objListing->municipality,
+            'type' => $objListing->lst_type,
+            'municipality' => $objListing->lst_municipality,
             'reporting_mode' => $objListing->reportingMethod()->value,
         ]);
 
@@ -130,7 +130,7 @@ class EstablishmentsController extends LguController
 
         if ($arrPhotos === []) {
             return redirect()->route('lgu.directory.establishments.show', $objListing)
-                ->with('toast', "{$objListing->name} was added.");
+                ->with('toast', "{$objListing->lst_name} was added.");
         }
 
         // Summary comment: photos go through the unchanged photo workflow.
@@ -139,19 +139,19 @@ class EstablishmentsController extends LguController
         } catch (ValidationException $e) {
             return redirect()->route('lgu.directory.establishments.edit', $objListing)
                 ->withFragment('photos')
-                ->with('toast', "{$objListing->name} was added, but the photos were not: {$e->validator->errors()->first()}")
+                ->with('toast', "{$objListing->lst_name} was added, but the photos were not: {$e->validator->errors()->first()}")
                 ->with('toast_tone', 'danger');
         } catch (\Throwable $e) {
-            Log::error('Failed to upload photos for a new LGU establishment.', ['exception' => $e, 'listing_id' => $objListing->id]);
+            Log::error('Failed to upload photos for a new LGU establishment.', ['exception' => $e, 'listing_id' => $objListing->lst_id]);
 
             return redirect()->route('lgu.directory.establishments.edit', $objListing)
                 ->withFragment('photos')
-                ->with('toast', "{$objListing->name} was added, but the photos could not be uploaded. Please try again below.")
+                ->with('toast', "{$objListing->lst_name} was added, but the photos could not be uploaded. Please try again below.")
                 ->with('toast_tone', 'danger');
         }
 
         return redirect()->route('lgu.directory.establishments.show', $objListing)
-            ->with('toast', "{$objListing->name} was added. Its photos were sent to the PTO for approval.");
+            ->with('toast', "{$objListing->lst_name} was added. Its photos were sent to the PTO for approval.");
     }
 
     /**
@@ -164,7 +164,7 @@ class EstablishmentsController extends LguController
 
         $listing->load(['categoryRecord', 'establishmentUser', 'establishmentImages']);
 
-        return $this->renderLgu($request, 'lgu.directory.establishments.show', 'directory.establishments', $listing->name, [
+        return $this->renderLgu($request, 'lgu.directory.establishments.show', 'directory.establishments', $listing->lst_name, [
             'listing' => $listing,
             'blnCanUploadPhotos' => $objImagePolicy->uploadFor($request->user(), $listing),
             'blnCanManageQr' => $request->user()->can('manageQr', $listing),
@@ -177,7 +177,7 @@ class EstablishmentsController extends LguController
 
         $listing->load(['categoryRecord', 'establishmentImages']);
 
-        return $this->renderLgu($request, 'lgu.directory.establishments.edit', 'directory.establishments', "Edit {$listing->name}", [
+        return $this->renderLgu($request, 'lgu.directory.establishments.edit', 'directory.establishments', "Edit {$listing->lst_name}", [
             'listing' => $listing,
             // A Published listing's held changes are what the LGU is editing.
             'formListing' => $listing->withPendingChanges(),
@@ -197,9 +197,9 @@ class EstablishmentsController extends LguController
      */
     public function update(SaveEstablishmentRequest $request, Listing $listing, ListingPublishWorkflow $objWorkflow): RedirectResponse
     {
-        abort_if($listing->category === 'destinations', 404);
+        abort_if($listing->lst_category === 'destinations', 404);
 
-        $arrFields = $this->_normalizedFields($request->establishmentFields());
+        $arrFields = self::_prefixed($this->_normalizedFields($request->establishmentFields()));
         $blnIsPublished = $listing->isPubliclyVisible();
         $arrProposed = [];
 
@@ -209,7 +209,7 @@ class EstablishmentsController extends LguController
         }
 
         if (isset($arrFields['cat_id'])) {
-            $arrFields['category'] = Category::query()->findOrFail($arrFields['cat_id'])->legacySlug();
+            $arrFields['lst_category'] = Category::query()->findOrFail($arrFields['cat_id'])->legacySlug();
         }
 
         $arrBefore = $listing->getOriginal();
@@ -217,12 +217,12 @@ class EstablishmentsController extends LguController
         try {
             $listing->update($arrFields);
         } catch (\Throwable $e) {
-            Log::error('Failed to update LGU establishment.', ['exception' => $e, 'listing_id' => $listing->id]);
+            Log::error('Failed to update LGU establishment.', ['exception' => $e, 'listing_id' => $listing->lst_id]);
 
             return back()->withInput()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
 
-        OperationLogger::updated($request->user(), 'establishment', $listing->id, $listing->municipality_id, $listing->id, OperationLogger::diff($arrBefore, $listing));
+        OperationLogger::updated($request->user(), 'establishment', $listing->lst_id, $listing->mun_id, $listing->lst_id, OperationLogger::diff($arrBefore, $listing));
 
         if (! $blnIsPublished) {
             return redirect()->route('lgu.directory.establishments.show', $listing)->with('toast', 'Establishment saved.');
@@ -249,7 +249,7 @@ class EstablishmentsController extends LguController
     private function _authorizeOwnEstablishment(Request $request, Listing $objListing): void
     {
         $this->authorizeOwnMunicipality($request, $objListing);
-        abort_if($objListing->category === 'destinations', 404);
+        abort_if($objListing->lst_category === 'destinations', 404);
     }
 
     /**
@@ -259,8 +259,8 @@ class EstablishmentsController extends LguController
     private function _ownEstablishmentsQuery(Request $request)
     {
         return Listing::query()
-            ->where('municipality_id', $request->user()->municipality_id)
-            ->where('category', '!=', 'destinations');
+            ->where('mun_id', $request->user()->mun_id)
+            ->where('lst_category', '!=', 'destinations');
     }
 
     /**
@@ -288,5 +288,24 @@ class EstablishmentsController extends LguController
         }
 
         return $arrFields;
+    }
+
+    /**
+     * Maps the form's unprefixed field names (SaveEstablishmentRequest::listingFieldRules())
+     * to their lst_-prefixed column names. `cat_id` is already the real
+     * column name and is left untouched.
+     *
+     * @param  array<string, mixed>  $arrFields
+     * @return array<string, mixed>
+     */
+    private static function _prefixed(array $arrFields): array
+    {
+        $arrPrefixed = [];
+
+        foreach ($arrFields as $strField => $mixValue) {
+            $arrPrefixed[$strField === 'cat_id' ? $strField : 'lst_'.$strField] = $mixValue;
+        } // end foreach field
+
+        return $arrPrefixed;
     }
 }

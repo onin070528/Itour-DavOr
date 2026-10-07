@@ -23,21 +23,21 @@ class AuditLogsController extends PtoController
 {
     use ExportsAuditLogs;
 
-    public function index(Request $request): View
+    public function index(Request $objRequest): View
     {
-        abort_unless($request->user()->can('viewAny', SecurityLog::class), 403);
-        $request->validate(['tab' => ['nullable', Rule::in(['security', 'operation'])]]);
-        $tab = $request->query('tab', 'security');
-        $filters = AuditLogQuery::validatedFilters($request);
-        $user = $request->user();
+        abort_unless($objRequest->user()->can('viewAny', SecurityLog::class), 403);
+        $objRequest->validate(['tab' => ['nullable', Rule::in(['security', 'operation'])]]);
+        $strTab = $objRequest->query('tab', 'security');
+        $arrFilters = AuditLogQuery::validatedFilters($objRequest);
+        $objUser = $objRequest->user();
 
-        return $this->renderPto($request, 'pto.audit-logs.index', 'auditLogs', 'Audit Logs', [
-            'tab' => $tab,
-            'filters' => $filters,
-            'rows' => $tab === 'security' ? AuditLogQuery::securityLogs($user, $filters) : AuditLogQuery::operationLogs($user, $filters),
-            'securitySummary' => AuditLogQuery::securitySummary($user),
-            'operationSummary' => AuditLogQuery::operationSummary($user),
-            'municipalities' => Municipality::query()->orderBy('name')->get(['id', 'name']),
+        return $this->renderPto($objRequest, 'pto.audit-logs.index', 'auditLogs', 'Audit Logs', [
+            'tab' => $strTab,
+            'filters' => $arrFilters,
+            'rows' => $strTab === 'security' ? AuditLogQuery::securityLogs($objUser, $arrFilters) : AuditLogQuery::operationLogs($objUser, $arrFilters),
+            'securitySummary' => AuditLogQuery::securitySummary($objUser),
+            'operationSummary' => AuditLogQuery::operationSummary($objUser),
+            'municipalities' => Municipality::query()->orderBy('mun_name')->get(['mun_id', 'mun_name']),
             'subtitle' => 'Security events and system operations across the province.',
         ]);
     }

@@ -2,19 +2,19 @@
 @php
     $arrDetails = [
         'Category' => $listing->categoryName(),
-        'Establishment type' => $listing->type ?? 'Not set',
-        'Owner / Manager' => $listing->owner_name,
-        'Barangay / Address' => $listing->barangay,
-        'Municipality / City' => $listing->municipality,
-        'Coordinates' => $listing->lat !== null && $listing->lng !== null ? $listing->lat.', '.$listing->lng : null,
-        'Contact person / office' => $listing->contact_office,
-        'Contact number' => $listing->contact_phone,
-        'Email' => $listing->email,
-        'Website or social page' => $listing->website,
-        'Operating hours' => $listing->hours,
-        'Accreditation status' => $listing->accreditation_status,
-        'License number' => $listing->license_number,
-        'Category note' => $listing->category_note,
+        'Establishment type' => $listing->lst_type ?? 'Not set',
+        'Owner / Manager' => $listing->lst_owner_name,
+        'Barangay / Address' => $listing->lst_barangay,
+        'Municipality / City' => $listing->lst_municipality,
+        'Coordinates' => $listing->lst_lat !== null && $listing->lst_lng !== null ? $listing->lst_lat.', '.$listing->lst_lng : null,
+        'Contact person / office' => $listing->lst_contact_office,
+        'Contact number' => $listing->lst_contact_phone,
+        'Email' => $listing->lst_email,
+        'Website or social page' => $listing->lst_website,
+        'Operating hours' => $listing->lst_hours,
+        'Accreditation status' => $listing->lst_accreditation_status,
+        'License number' => $listing->lst_license_number,
+        'Category note' => $listing->lst_category_note,
     ];
 @endphp
 
@@ -32,7 +32,7 @@
 
         <div class="sm:col-span-2">
             <dt class="detail-term">Description</dt>
-            <dd class="detail-value whitespace-pre-line">{{ $listing->description ?: 'No description yet.' }}</dd>
+            <dd class="detail-value whitespace-pre-line">{{ $listing->lst_description ?: 'No description yet.' }}</dd>
         </div>
     </dl>
 </section>

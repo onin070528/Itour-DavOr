@@ -1,10 +1,12 @@
 <?php
 
-/*
- * System     : iTOUR - Integrated Tourism Information and Monitoring System
- * Purpose    : Validates an uploaded file's real, content-sniffed MIME type — never the filename extension.
- * Programmer : <name(s)>
- * Copyright  : 2026 University of Mindanao. All rights reserved.
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Validates an uploaded file's real, content-sniffed MIME type — never the filename
+ * extension.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
  */
 
 namespace App\Rules;
@@ -21,22 +23,22 @@ use Illuminate\Http\UploadedFile;
  */
 class RealImageMimeType implements ValidationRule
 {
-    public function validate(string $attribute, mixed $value, Closure $fail): void
+    public function validate(string $strAttribute, mixed $objValue, Closure $fnFail): void
     {
-        if (! $value instanceof UploadedFile) {
-            $fail('Please choose a photo to upload.');
+        if (! $objValue instanceof UploadedFile) {
+            $fnFail('Please choose a photo to upload.');
 
             return;
         }
 
         $objFileInfo = finfo_open(FILEINFO_MIME_TYPE);
-        $strRealMimeType = finfo_file($objFileInfo, $value->getRealPath());
+        $strRealMimeType = finfo_file($objFileInfo, $objValue->getRealPath());
         finfo_close($objFileInfo);
 
         $arrAllowedMimeTypes = config('establishment_images.allowed_mime_types');
 
         if (! in_array($strRealMimeType, $arrAllowedMimeTypes, true)) {
-            $fail('Please use a JPG, PNG, or WebP photo.');
+            $fnFail('Please use a JPG, PNG, or WebP photo.');
         }
     }
 }

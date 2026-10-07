@@ -1,5 +1,13 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Tests — password reset.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 use App\Enums\UserRole;
 use App\Models\Listing;
 use App\Models\Municipality;
@@ -26,7 +34,7 @@ test('a reset link is emailed to an existing account', function () {
     Notification::fake();
     $user = User::factory()->create();
 
-    $this->post(route('password.email'), ['email' => $user->email])
+    $this->post(route('password.email'), ['email' => $user->usr_email])
         ->assertSessionHas('status');
 
     Notification::assertSentTo($user, ResetPassword::class);
@@ -46,12 +54,12 @@ test('the reset link page renders with the email pre-filled', function () {
     Notification::fake();
     $user = User::factory()->create();
 
-    $this->post(route('password.email'), ['email' => $user->email]);
+    $this->post(route('password.email'), ['email' => $user->usr_email]);
 
     Notification::assertSentTo($user, ResetPassword::class, function (ResetPassword $notification) use ($user) {
-        $this->get(route('password.reset', ['token' => $notification->token, 'email' => $user->email]))
+        $this->get(route('password.reset', ['token' => $notification->token, 'email' => $user->usr_email]))
             ->assertOk()
-            ->assertSee($user->email)
+            ->assertSee($user->usr_email)
             ->assertSeeInOrder(['New Password', 'Password requirements:', 'At least 12 characters', 'At least 1 special character', 'Confirm New Password'])
             ->assertDontSee('at least 8 characters');
 
@@ -63,12 +71,12 @@ test('a new password can be set with a valid token and then used to sign in', fu
     Notification::fake();
     $user = User::factory()->create();
 
-    $this->post(route('password.email'), ['email' => $user->email]);
+    $this->post(route('password.email'), ['email' => $user->usr_email]);
 
     Notification::assertSentTo($user, ResetPassword::class, function (ResetPassword $notification) use ($user) {
         $this->post(route('password.store'), [
             'token' => $notification->token,
-            'email' => $user->email,
+            'email' => $user->usr_email,
             'password' => 'my-new-password1',
             'password_confirmation' => 'my-new-password1',
         ])->assertRedirect(route('login'))->assertSessionHas('status');
@@ -76,7 +84,7 @@ test('a new password can be set with a valid token and then used to sign in', fu
         return true;
     });
 
-    $this->post(route('login.store'), ['email' => $user->email, 'password' => 'my-new-password1'])
+    $this->post(route('login.store'), ['email' => $user->usr_email, 'password' => 'my-new-password1'])
         ->assertRedirect();
     $this->assertAuthenticatedAs($user);
 });
@@ -86,7 +94,7 @@ test('an invalid token is rejected', function () {
 
     $this->post(route('password.store'), [
         'token' => 'not-a-real-token',
-        'email' => $user->email,
+        'email' => $user->usr_email,
         'password' => 'my-new-password1',
         'password_confirmation' => 'my-new-password1',
     ])->assertSessionHasErrors('email');
@@ -94,21 +102,21 @@ test('an invalid token is rejected', function () {
 
 test('a newly registered establishment account cannot sign in with a default password but can set one via forgot password', function () {
     Notification::fake();
-    $mati = Municipality::query()->firstOrCreate(['code' => 'MATI'], ['name' => 'City of Mati']);
+    $mati = Municipality::query()->firstOrCreate(['mun_code' => 'MATI'], ['mun_name' => 'City of Mati']);
     $lgu = User::factory()->create([
-        'role' => UserRole::Lgu,
-        'organization_subtitle' => 'City of Mati',
-        'municipality_id' => $mati->id,
+        'usr_role' => UserRole::Lgu,
+        'usr_organization_subtitle' => 'City of Mati',
+        'mun_id' => $mati->mun_id,
     ]);
 
     $listing = Listing::query()->create([
-        'slug' => 'first-login-inn',
-        'name' => 'First Login Inn',
-        'category' => 'accommodation',
-        'municipality' => $mati->name,
-        'municipality_id' => $mati->id,
-        'barangay' => 'Dahican',
-        'status' => 'DRAFT',
+        'lst_slug' => 'first-login-inn',
+        'lst_name' => 'First Login Inn',
+        'lst_category' => 'accommodation',
+        'lst_municipality' => $mati->mun_name,
+        'mun_id' => $mati->mun_id,
+        'lst_barangay' => 'Dahican',
+        'lst_status' => 'DRAFT',
     ]);
 
     $this->actingAs($lgu)->post(route('lgu.directory.establishments.switchToOnline', $listing), [
@@ -122,7 +130,7 @@ test('a newly registered establishment account cannot sign in with a default pas
     $this->assertGuest();
 
     $this->post(route('password.email'), ['email' => 'owner@firstlogininn.test']);
-    $owner = User::query()->where('email', 'owner@firstlogininn.test')->first();
+    $owner = User::query()->where('usr_email', 'owner@firstlogininn.test')->first();
     Notification::assertSentTo($owner, ResetPassword::class);
 });
 
@@ -133,7 +141,7 @@ test('a mail server failure shows a friendly error instead of crashing', functio
         ->once()
         ->andThrow(new TransportException('Connection could not be established'));
 
-    $this->post(route('password.email'), ['email' => $user->email])
+    $this->post(route('password.email'), ['email' => $user->usr_email])
         ->assertSessionHasErrors('email');
 });
 
@@ -141,12 +149,12 @@ test('a too-short password is rejected when resetting', function () {
     Notification::fake();
     $user = User::factory()->create();
 
-    $this->post(route('password.email'), ['email' => $user->email]);
+    $this->post(route('password.email'), ['email' => $user->usr_email]);
 
     Notification::assertSentTo($user, ResetPassword::class, function (ResetPassword $notification) use ($user) {
         $this->post(route('password.store'), [
             'token' => $notification->token,
-            'email' => $user->email,
+            'email' => $user->usr_email,
             'password' => 'short11111',
             'password_confirmation' => 'short11111',
         ])->assertSessionHasErrors('password');
@@ -159,12 +167,12 @@ test('a password without a number is rejected when resetting', function () {
     Notification::fake();
     $user = User::factory()->create();
 
-    $this->post(route('password.email'), ['email' => $user->email]);
+    $this->post(route('password.email'), ['email' => $user->usr_email]);
 
     Notification::assertSentTo($user, ResetPassword::class, function (ResetPassword $notification) use ($user) {
         $this->post(route('password.store'), [
             'token' => $notification->token,
-            'email' => $user->email,
+            'email' => $user->usr_email,
             'password' => 'onlylettershere',
             'password_confirmation' => 'onlylettershere',
         ])->assertSessionHasErrors('password');
@@ -177,12 +185,12 @@ test('a used reset link cannot be reused', function () {
     Notification::fake();
     $user = User::factory()->create();
 
-    $this->post(route('password.email'), ['email' => $user->email]);
+    $this->post(route('password.email'), ['email' => $user->usr_email]);
 
     Notification::assertSentTo($user, ResetPassword::class, function (ResetPassword $notification) use ($user) {
         $payload = [
             'token' => $notification->token,
-            'email' => $user->email,
+            'email' => $user->usr_email,
             'password' => 'my-new-password1',
             'password_confirmation' => 'my-new-password1',
         ];
@@ -203,14 +211,14 @@ test('an expired reset link is rejected', function () {
     Notification::fake();
     $user = User::factory()->create();
 
-    $this->post(route('password.email'), ['email' => $user->email]);
+    $this->post(route('password.email'), ['email' => $user->usr_email]);
 
     Notification::assertSentTo($user, ResetPassword::class, function (ResetPassword $notification) use ($user) {
         $this->travel(61)->minutes();
 
         $this->post(route('password.store'), [
             'token' => $notification->token,
-            'email' => $user->email,
+            'email' => $user->usr_email,
             'password' => 'my-new-password1',
             'password_confirmation' => 'my-new-password1',
         ])->assertSessionHasErrors('email');
@@ -225,16 +233,16 @@ test('resetting a password logs out every existing session for that account', fu
 
     config(['session.driver' => 'database']);
     DB::table('sessions')->insert([
-        ['id' => 'stale-session-a', 'user_id' => $user->id, 'payload' => '', 'last_activity' => now()->timestamp],
-        ['id' => 'stale-session-b', 'user_id' => $user->id, 'payload' => '', 'last_activity' => now()->timestamp],
+        ['id' => 'stale-session-a', 'user_id' => $user->usr_id, 'payload' => '', 'last_activity' => now()->timestamp],
+        ['id' => 'stale-session-b', 'user_id' => $user->usr_id, 'payload' => '', 'last_activity' => now()->timestamp],
     ]);
 
-    $this->post(route('password.email'), ['email' => $user->email]);
+    $this->post(route('password.email'), ['email' => $user->usr_email]);
 
     Notification::assertSentTo($user, ResetPassword::class, function (ResetPassword $notification) use ($user) {
         $this->post(route('password.store'), [
             'token' => $notification->token,
-            'email' => $user->email,
+            'email' => $user->usr_email,
             'password' => 'my-new-password1',
             'password_confirmation' => 'my-new-password1',
         ]);
@@ -242,19 +250,19 @@ test('resetting a password logs out every existing session for that account', fu
         return true;
     });
 
-    expect(DB::table('sessions')->where('user_id', $user->id)->count())->toBe(0);
+    expect(DB::table('sessions')->where('user_id', $user->usr_id)->count())->toBe(0);
 });
 
 test('resetting a password records security log entries for the request and the completion', function () {
     Notification::fake();
     $user = User::factory()->create();
 
-    $this->post(route('password.email'), ['email' => $user->email]);
+    $this->post(route('password.email'), ['email' => $user->usr_email]);
 
     Notification::assertSentTo($user, ResetPassword::class, function (ResetPassword $notification) use ($user) {
         $this->post(route('password.store'), [
             'token' => $notification->token,
-            'email' => $user->email,
+            'email' => $user->usr_email,
             'password' => 'my-new-password1',
             'password_confirmation' => 'my-new-password1',
         ]);
@@ -262,6 +270,6 @@ test('resetting a password records security log entries for the request and the 
         return true;
     });
 
-    expect(SecurityLog::where('user_id', $user->id)->where('event_type', 'password_reset_requested')->exists())->toBeTrue();
-    expect(SecurityLog::where('user_id', $user->id)->where('event_type', 'password_reset_completed')->exists())->toBeTrue();
+    expect(SecurityLog::where('usr_id', $user->usr_id)->where('sec_event_type', 'password_reset_requested')->exists())->toBeTrue();
+    expect(SecurityLog::where('usr_id', $user->usr_id)->where('sec_event_type', 'password_reset_completed')->exists())->toBeTrue();
 });

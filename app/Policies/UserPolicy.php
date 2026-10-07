@@ -19,24 +19,24 @@ use App\Models\User;
 
 class UserPolicy
 {
-    public function viewAny(User $user): bool
+    public function viewAny(User $objUser): bool
     {
-        return in_array($user->role, [UserRole::PtoAdministrator, UserRole::Lgu], true);
+        return in_array($objUser->usr_role, [UserRole::PtoAdministrator, UserRole::Lgu], true);
     }
 
-    public function view(User $user, User $target): bool
+    public function view(User $objUser, User $objTarget): bool
     {
-        return match ($user->role) {
+        return match ($objUser->usr_role) {
             UserRole::PtoAdministrator => true,
-            UserRole::Lgu => $target->role === UserRole::Establishment && $target->municipality_id === $user->municipality_id,
-            UserRole::Establishment => $target->id === $user->id,
+            UserRole::Lgu => $objTarget->usr_role === UserRole::Establishment && $objTarget->mun_id === $objUser->mun_id,
+            UserRole::Establishment => $objTarget->usr_id === $objUser->usr_id,
             default => false,
         };
     }
 
-    public function update(User $user, User $target): bool
+    public function update(User $objUser, User $objTarget): bool
     {
-        return $this->view($user, $target);
+        return $this->view($objUser, $objTarget);
     }
 
     /**
@@ -44,15 +44,15 @@ class UserPolicy
      * that's the "nobody can change their own status" rule, enforced here
      * rather than only in the controller so it holds regardless of caller.
      */
-    public function deactivate(User $user, User $target): bool
+    public function deactivate(User $objUser, User $objTarget): bool
     {
-        if ($target->id === $user->id) {
+        if ($objTarget->usr_id === $objUser->usr_id) {
             return false;
         }
 
-        return match ($user->role) {
+        return match ($objUser->usr_role) {
             UserRole::PtoAdministrator => true,
-            UserRole::Lgu => $target->role === UserRole::Establishment && $target->municipality_id === $user->municipality_id,
+            UserRole::Lgu => $objTarget->usr_role === UserRole::Establishment && $objTarget->mun_id === $objUser->mun_id,
             default => false,
         };
     }

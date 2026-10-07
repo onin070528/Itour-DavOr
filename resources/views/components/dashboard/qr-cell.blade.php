@@ -7,13 +7,13 @@
 
 @switch($strQrStatus)
     @case(\App\Models\Listing::QR_STATUS_ACTIVE)
-        <button type="button" data-modal-open="qr-view-{{ $listing->id }}" class="rounded-sm border border-sand-300 px-2.5 py-1 text-xs font-semibold text-sand-800 hover:border-primary-300">
+        <button type="button" data-modal-open="qr-view-{{ $listing->lst_id }}" class="rounded-sm border border-sand-300 px-2.5 py-1 text-xs font-semibold text-sand-800 hover:border-primary-300">
             <i class="ti ti-qrcode" aria-hidden="true"></i> View
         </button>
         @break
 
     @case(\App\Models\Listing::QR_STATUS_SWITCHED_OFF)
-        <button type="button" data-modal-open="qr-view-{{ $listing->id }}" class="rounded-sm border border-warning/40 bg-warning-bg px-2.5 py-1 text-xs font-semibold text-warning hover:border-warning">
+        <button type="button" data-modal-open="qr-view-{{ $listing->lst_id }}" class="rounded-sm border border-warning/40 bg-warning-bg px-2.5 py-1 text-xs font-semibold text-warning hover:border-warning">
             <i class="ti ti-player-pause" aria-hidden="true"></i> QR off
         </button>
         @break

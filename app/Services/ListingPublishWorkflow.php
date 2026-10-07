@@ -1,10 +1,11 @@
 <?php
 
-/*
- * System     : iTOUR - Integrated Tourism Information and Monitoring System
- * Purpose    : The destination listing workflow — LGU request/resubmit/return, PTO approve & publish/return/unpublish, held changes to Published listings.
- * Programmer : <name(s)>
- * Copyright  : 2026 University of Mindanao. All rights reserved.
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: The destination listing workflow — LGU request/resubmit/return, PTO approve & publish/return/unpublish, held changes to Published listings.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
  */
 
 namespace App\Services;
@@ -53,17 +54,17 @@ class ListingPublishWorkflow
     {
         $this->_transition(
             $objListing,
-            fn (Listing $objLocked) => in_array($objLocked->status, ['DRAFT', 'UNPUBLISHED'], true),
+            fn (Listing $objLocked) => in_array($objLocked->lst_status, ['DRAFT', 'UNPUBLISHED'], true),
             'This listing was already updated by someone else. Please refresh and try again.',
             function (Listing $objLocked) use ($objEstablishment) {
                 $arrBefore = $objLocked->getOriginal();
-                $objLocked->update(['status' => 'FOR_LGU_REVIEW']);
+                $objLocked->update(['lst_status' => 'FOR_LGU_REVIEW']);
 
-                OperationLogger::submitted($objEstablishment, 'establishment', $objLocked->id, $objLocked->municipality_id, OperationLogger::diff($arrBefore, $objLocked));
+                OperationLogger::submitted($objEstablishment, 'establishment', $objLocked->lst_id, $objLocked->mun_id, OperationLogger::diff($arrBefore, $objLocked));
 
                 User::query()
-                    ->where('role', UserRole::Lgu)
-                    ->where('municipality_id', $objLocked->municipality_id)
+                    ->where('usr_role', UserRole::Lgu)
+                    ->where('mun_id', $objLocked->mun_id)
                     ->get()
                     ->each(fn (User $objLguUser) => $objLguUser->notify(new EstablishmentListingSubmittedToLgu($objLocked)));
             },
@@ -83,13 +84,13 @@ class ListingPublishWorkflow
     {
         $this->_transition(
             $objListing,
-            fn (Listing $objLocked) => in_array($objLocked->status, ['DRAFT', 'UNPUBLISHED', 'FOR_LGU_REVIEW', Listing::STATUS_FOR_CORRECTION], true),
+            fn (Listing $objLocked) => in_array($objLocked->lst_status, ['DRAFT', 'UNPUBLISHED', 'FOR_LGU_REVIEW', Listing::STATUS_FOR_CORRECTION], true),
             'This listing was already updated by someone else. Please refresh and try again.',
             function (Listing $objLocked) use ($objLgu) {
                 $arrBefore = $objLocked->getOriginal();
-                $objLocked->forceFill(['status' => 'FOR_PTO_REVIEW', 'lst_review_remarks' => null])->save();
+                $objLocked->forceFill(['lst_status' => 'FOR_PTO_REVIEW', 'lst_review_remarks' => null])->save();
 
-                OperationLogger::submitted($objLgu, $objLocked->auditEntityType(), $objLocked->id, $objLocked->municipality_id, OperationLogger::diff($arrBefore, $objLocked));
+                OperationLogger::submitted($objLgu, $objLocked->auditEntityType(), $objLocked->lst_id, $objLocked->mun_id, OperationLogger::diff($arrBefore, $objLocked));
                 $this->_notifyPto(new DestinationListingSubmittedForReview($objLocked));
             },
         );
@@ -128,12 +129,12 @@ class ListingPublishWorkflow
 
                 // Summary comment: putting the live values back simply withdraws the held changes.
                 if ($arrProposed === []) {
-                    OperationLogger::updated($objLgu, $objLocked->auditEntityType(), $objLocked->id, $objLocked->municipality_id, $objLocked->id, OperationLogger::diff($arrBefore, $objLocked), 'Held changes to the published listing withdrawn.');
+                    OperationLogger::updated($objLgu, $objLocked->auditEntityType(), $objLocked->lst_id, $objLocked->mun_id, $objLocked->lst_id, OperationLogger::diff($arrBefore, $objLocked), 'Held changes to the published listing withdrawn.');
 
                     return;
                 }
 
-                OperationLogger::submitted($objLgu, $objLocked->auditEntityType(), $objLocked->id, $objLocked->municipality_id, OperationLogger::diff($arrBefore, $objLocked));
+                OperationLogger::submitted($objLgu, $objLocked->auditEntityType(), $objLocked->lst_id, $objLocked->mun_id, OperationLogger::diff($arrBefore, $objLocked));
                 $this->_notifyPto(new DestinationListingSubmittedForReview($objLocked, true));
             },
         );
@@ -149,13 +150,13 @@ class ListingPublishWorkflow
     {
         $this->_transition(
             $objListing,
-            fn (Listing $objLocked) => in_array($objLocked->status, ['DRAFT', 'FOR_LGU_REVIEW', 'FOR_PTO_REVIEW', Listing::STATUS_FOR_CORRECTION], true),
+            fn (Listing $objLocked) => in_array($objLocked->lst_status, ['DRAFT', 'FOR_LGU_REVIEW', 'FOR_PTO_REVIEW', Listing::STATUS_FOR_CORRECTION], true),
             'This listing was already updated by someone else. Please refresh and try again.',
             function (Listing $objLocked) use ($objLgu, $strReason) {
                 $arrBefore = $objLocked->getOriginal();
-                $objLocked->forceFill(['status' => 'DRAFT', 'lst_review_remarks' => null])->save();
+                $objLocked->forceFill(['lst_status' => 'DRAFT', 'lst_review_remarks' => null])->save();
 
-                OperationLogger::returned($objLgu, $objLocked->auditEntityType(), $objLocked->id, $strReason, $objLocked->municipality_id, OperationLogger::diff($arrBefore, $objLocked), $objLocked->id);
+                OperationLogger::returned($objLgu, $objLocked->auditEntityType(), $objLocked->lst_id, $strReason, $objLocked->mun_id, OperationLogger::diff($arrBefore, $objLocked), $objLocked->lst_id);
                 $objLocked->establishmentUser?->notify(new EstablishmentListingReturned($objLocked, $strReason));
             },
         );
@@ -187,10 +188,10 @@ class ListingPublishWorkflow
                         'lst_review_remarks' => null,
                     ])->save();
                 } else {
-                    $objLocked->forceFill(['status' => $objLocked->liveStatus(), 'lst_review_remarks' => null])->save();
+                    $objLocked->forceFill(['lst_status' => $objLocked->liveStatus(), 'lst_review_remarks' => null])->save();
                 }
 
-                OperationLogger::published($objPto, $objLocked->auditEntityType(), $objLocked->id, $objLocked->municipality_id, OperationLogger::diff($arrBefore, $objLocked), $blnIsChangeRequest ? 'Changes to the published listing approved.' : null);
+                OperationLogger::published($objPto, $objLocked->auditEntityType(), $objLocked->lst_id, $objLocked->mun_id, OperationLogger::diff($arrBefore, $objLocked), $blnIsChangeRequest ? 'Changes to the published listing approved.' : null);
 
                 if (! $blnIsChangeRequest) {
                     $objLocked->establishmentUser?->notify(new EstablishmentListingPublished($objLocked));
@@ -220,11 +221,11 @@ class ListingPublishWorkflow
                 $blnIsChangeRequest = $objLocked->hasPendingChanges();
 
                 $objLocked->forceFill([
-                    ...($blnIsChangeRequest ? [] : ['status' => Listing::STATUS_FOR_CORRECTION]),
+                    ...($blnIsChangeRequest ? [] : ['lst_status' => Listing::STATUS_FOR_CORRECTION]),
                     'lst_review_remarks' => $strReason,
                 ])->save();
 
-                OperationLogger::returned($objPto, $objLocked->auditEntityType(), $objLocked->id, $strReason, $objLocked->municipality_id, OperationLogger::diff($arrBefore, $objLocked), $objLocked->id);
+                OperationLogger::returned($objPto, $objLocked->auditEntityType(), $objLocked->lst_id, $strReason, $objLocked->mun_id, OperationLogger::diff($arrBefore, $objLocked), $objLocked->lst_id);
                 $this->_notifyLgu($objLocked, new EstablishmentListingReturnedToLgu($objLocked, $strReason, $blnIsChangeRequest));
             },
         );
@@ -249,12 +250,12 @@ class ListingPublishWorkflow
                 $arrBefore = $objLocked->getOriginal();
                 $objLocked->forceFill([
                     ...$this->_withLegacyCategory($objLocked->lst_pending_changes ?? []),
-                    'status' => 'UNPUBLISHED',
+                    'lst_status' => 'UNPUBLISHED',
                     'lst_pending_changes' => null,
                     'lst_review_remarks' => null,
                 ])->save();
 
-                OperationLogger::unpublished($objPto, $objLocked->auditEntityType(), $objLocked->id, $strReason, $objLocked->municipality_id, OperationLogger::diff($arrBefore, $objLocked));
+                OperationLogger::unpublished($objPto, $objLocked->auditEntityType(), $objLocked->lst_id, $strReason, $objLocked->mun_id, OperationLogger::diff($arrBefore, $objLocked));
             },
         );
     }
@@ -269,10 +270,10 @@ class ListingPublishWorkflow
     private function _withLegacyCategory(array $arrChanges): array
     {
         if (isset($arrChanges['cat_id'])) {
-            $arrChanges['category'] = Category::query()->findOrFail($arrChanges['cat_id'])->legacySlug();
+            $arrChanges['lst_category'] = Category::query()->findOrFail($arrChanges['cat_id'])->legacySlug();
         }
 
-        return array_intersect_key($arrChanges, array_flip([...Listing::PUBLIC_CONTENT_FIELDS, 'category']));
+        return array_intersect_key($arrChanges, array_flip([...Listing::PUBLIC_CONTENT_FIELDS, 'lst_category']));
     } // end _withLegacyCategory
 
     /**
@@ -281,8 +282,8 @@ class ListingPublishWorkflow
     private function _notifyPto(Notification $objNotification): void
     {
         User::query()
-            ->where('role', UserRole::PtoAdministrator)
-            ->where('status', Listing::ACCOUNT_STATUS_ACTIVE)
+            ->where('usr_role', UserRole::PtoAdministrator)
+            ->where('usr_status', Listing::ACCOUNT_STATUS_ACTIVE)
             ->get()
             ->each(fn (User $objPtoUser) => $objPtoUser->notify($objNotification));
     } // end _notifyPto
@@ -293,8 +294,8 @@ class ListingPublishWorkflow
     private function _notifyLgu(Listing $objListing, Notification $objNotification): void
     {
         User::query()
-            ->where('role', UserRole::Lgu)
-            ->where('municipality_id', $objListing->municipality_id)
+            ->where('usr_role', UserRole::Lgu)
+            ->where('mun_id', $objListing->mun_id)
             ->get()
             ->each(fn (User $objLguUser) => $objLguUser->notify($objNotification));
     } // end _notifyLgu
@@ -314,7 +315,7 @@ class ListingPublishWorkflow
     {
         try {
             DB::transaction(function () use ($objListing, $fnPreconditionHolds, $strStaleMessage, $fnMutate) {
-                $objLocked = Listing::query()->lockForUpdate()->findOrFail($objListing->id);
+                $objLocked = Listing::query()->lockForUpdate()->findOrFail($objListing->lst_id);
 
                 if (! $fnPreconditionHolds($objLocked)) {
                     throw ValidationException::withMessages(['status' => $strStaleMessage]);
@@ -325,7 +326,7 @@ class ListingPublishWorkflow
         } catch (ValidationException $objValidationException) {
             throw $objValidationException;
         } catch (\Throwable $objException) {
-            Log::error('Failed to transition a listing in the publish workflow.', ['exception' => $objException, 'listing_id' => $objListing->id]);
+            Log::error('Failed to transition a listing in the publish workflow.', ['exception' => $objException, 'listing_id' => $objListing->lst_id]);
 
             throw ValidationException::withMessages(['status' => 'Something went wrong while saving. Please try again.']);
         }

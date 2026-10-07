@@ -1,3 +1,10 @@
+{{--
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: Counter field used by the QR self check-in party form.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+--}}
 @props(['name', 'label', 'caption' => null, 'compact' => false])
 
 {{-- One +/- counter block, wired up generically in initEstablishmentQrForm()

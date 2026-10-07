@@ -16,16 +16,20 @@ use App\Enums\UserRole;
 use App\Models\Concerns\AppendOnly;
 use Database\Factories\OperationLogFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['user_id', 'user_role', 'action', 'entity_type', 'entity_id', 'municipality_id', 'establishment_id', 'old_values', 'new_values', 'reason', 'ip_address'])]
+#[Table('tbl_operation_logs', key: 'opl_id')]
+#[Fillable(['usr_id', 'opl_user_role', 'opl_action', 'opl_entity_type', 'opl_entity_id', 'mun_id', 'lst_id', 'opl_old_values', 'opl_new_values', 'opl_reason', 'opl_ip_address'])]
 class OperationLog extends Model
 {
     /** @use HasFactory<OperationLogFactory> */
     use AppendOnly, HasFactory;
+
+    public const CREATED_AT = 'opl_created_at';
 
     public const UPDATED_AT = null;
 
@@ -42,38 +46,38 @@ class OperationLog extends Model
     protected function casts(): array
     {
         return [
-            'old_values' => 'array',
-            'new_values' => 'array',
+            'opl_old_values' => 'array',
+            'opl_new_values' => 'array',
         ];
     }
 
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class, 'usr_id', 'usr_id');
     }
 
     public function municipality(): BelongsTo
     {
-        return $this->belongsTo(Municipality::class);
+        return $this->belongsTo(Municipality::class, 'mun_id', 'mun_id');
     }
 
     /**
-     * The Listing row this action concerned, when `entity_type` is an
-     * establishment-shaped row. `establishment_id` mirrors the same FK
-     * users.establishment_id already points to (the `listings` table).
+     * The Listing row this action concerned, when `opl_entity_type` is an
+     * establishment-shaped row. `lst_id` mirrors the same FK
+     * tbl_users.lst_id already points to (the `tbl_listings` table).
      */
     public function establishment(): BelongsTo
     {
-        return $this->belongsTo(Listing::class, 'establishment_id');
+        return $this->belongsTo(Listing::class, 'lst_id', 'lst_id');
     }
 
     /**
      * Badge tone for the Audit Logs page — see resources/views/components/
      * dashboard/status-badge.blade.php for the tone => classes mapping.
      */
-    public static function badgeTone(string $action): string
+    public static function badgeTone(string $strAction): string
     {
-        return match ($action) {
+        return match ($strAction) {
             'approve', 'validate', 'publish' => 'success',
             'return', 'unlock', 'reopen', 'replace', 'unpublish' => 'warning',
             'reject', 'delete', 'purge' => 'danger',
@@ -86,13 +90,13 @@ class OperationLog extends Model
      * PTO sees every row; LGU sees only its own municipality's; Establishment
      * sees only its own establishment's. Default deny for any other role.
      */
-    public function scopeVisibleTo(Builder $query, User $viewer): Builder
+    public function scopeVisibleTo(Builder $objQuery, User $objViewer): Builder
     {
-        return match ($viewer->role) {
-            UserRole::PtoAdministrator => $query,
-            UserRole::Lgu => $query->where('municipality_id', $viewer->municipality_id),
-            UserRole::Establishment => $query->where('establishment_id', $viewer->establishment_id),
-            default => $query->whereRaw('1 = 0'),
+        return match ($objViewer->usr_role) {
+            UserRole::PtoAdministrator => $objQuery,
+            UserRole::Lgu => $objQuery->where('mun_id', $objViewer->mun_id),
+            UserRole::Establishment => $objQuery->where('lst_id', $objViewer->lst_id),
+            default => $objQuery->whereRaw('1 = 0'),
         };
     }
 }

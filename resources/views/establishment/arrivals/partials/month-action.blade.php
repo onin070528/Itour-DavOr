@@ -18,7 +18,7 @@
 --}}
 @php
     $report = $row['report'];
-    $status = $report?->status;
+    $status = $report?->mar_status;
     $primaryClasses = 'rounded-sm bg-primary-700 px-3 py-1.5 text-xs font-semibold text-sand-0 hover:bg-primary-900';
     $secondaryClasses = 'rounded-sm border border-sand-300 px-3 py-1.5 text-xs font-semibold text-sand-800 hover:border-primary-300';
 @endphp
@@ -33,10 +33,10 @@
     @elseif ($status === \App\Enums\MonthlyReportStatus::Draft)
         <a href="{{ route('establishment.arrivals.monthly.show', $report) }}" class="{{ $primaryClasses }}">Continue &amp; Submit</a>
     @elseif ($status === \App\Enums\MonthlyReportStatus::ForCorrection)
-        <button type="button" data-modal-open="report-modal-{{ $report->id }}" class="{{ $secondaryClasses }}">View Remarks</button>
+        <button type="button" data-modal-open="report-modal-{{ $report->mar_id }}" class="{{ $secondaryClasses }}">View Remarks</button>
         <a href="{{ route('establishment.arrivals.monthly.show', $report) }}" class="{{ $primaryClasses }}">Correct Report</a>
     @else
-        <button type="button" data-modal-open="report-modal-{{ $report->id }}" class="{{ $secondaryClasses }}">View</button>
+        <button type="button" data-modal-open="report-modal-{{ $report->mar_id }}" class="{{ $secondaryClasses }}">View</button>
         <a href="{{ route('establishment.arrivals.monthly.show', [$report, 'view' => 'a4']) }}" class="{{ $secondaryClasses }}">Report Preview</a>
     @endif
 </div>

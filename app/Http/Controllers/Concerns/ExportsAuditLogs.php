@@ -27,64 +27,64 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 trait ExportsAuditLogs
 {
-    public function export(Request $request): StreamedResponse
+    public function export(Request $objRequest): StreamedResponse
     {
-        $request->validate(['tab' => ['required', Rule::in(['security', 'operation'])]]);
-        $tab = $request->query('tab');
-        $filters = AuditLogQuery::validatedFilters($request);
-        $user = Auth::user();
+        $objRequest->validate(['tab' => ['required', Rule::in(['security', 'operation'])]]);
+        $strTab = $objRequest->query('tab');
+        $arrFilters = AuditLogQuery::validatedFilters($objRequest);
+        $objUser = Auth::user();
 
-        abort_unless($user->can('export', $tab === 'security' ? SecurityLog::class : OperationLog::class), 403);
+        abort_unless($objUser->can('export', $strTab === 'security' ? SecurityLog::class : OperationLog::class), 403);
 
-        $rows = $tab === 'security'
-            ? AuditLogQuery::securityLogsForExport($user, $filters)
-            : AuditLogQuery::operationLogsForExport($user, $filters);
+        $objRows = $strTab === 'security'
+            ? AuditLogQuery::securityLogsForExport($objUser, $arrFilters)
+            : AuditLogQuery::operationLogsForExport($objUser, $arrFilters);
 
-        OperationLogger::exported($user, $tab === 'security' ? 'security_log' : 'operation_log', $user->municipality_id, [
-            'row_count' => $rows->count(),
-            'filters' => array_filter($filters),
+        OperationLogger::exported($objUser, $strTab === 'security' ? 'security_log' : 'operation_log', $objUser->mun_id, [
+            'row_count' => $objRows->count(),
+            'filters' => array_filter($arrFilters),
         ]);
 
-        $filename = ($tab === 'security' ? 'security-logs' : 'operation-logs').'-'.now()->format('Y-m-d-His').'.csv';
+        $strFilename = ($strTab === 'security' ? 'security-logs' : 'operation-logs').'-'.now()->format('Y-m-d-His').'.csv';
 
-        return response()->streamDownload(function () use ($tab, $rows) {
-            $handle = fopen('php://output', 'w');
+        return response()->streamDownload(function () use ($strTab, $objRows) {
+            $objHandle = fopen('php://output', 'w');
 
-            if ($tab === 'security') {
-                fputcsv($handle, ['Date & Time (Asia/Manila)', 'User', 'Attempted Email', 'Event', 'Municipality', 'IP Address', 'Details']);
+            if ($strTab === 'security') {
+                fputcsv($objHandle, ['Date & Time (Asia/Manila)', 'User', 'Attempted Email', 'Event', 'Municipality', 'IP Address', 'Details']);
 
-                foreach ($rows as $row) {
-                    fputcsv($handle, [
-                        $row->created_at->timezone('Asia/Manila')->format('Y-m-d H:i'),
-                        $row->user?->name ?? '—',
-                        $row->attempted_email ?? '',
-                        $row->event_type,
-                        $row->municipality?->name ?? '',
-                        $row->ip_address ?? '',
-                        $row->details ? json_encode($row->details) : '',
+                foreach ($objRows as $objRow) {
+                    fputcsv($objHandle, [
+                        $objRow->sec_created_at->timezone('Asia/Manila')->format('Y-m-d H:i'),
+                        $objRow->user?->usr_name ?? '—',
+                        $objRow->sec_attempted_email ?? '',
+                        $objRow->sec_event_type,
+                        $objRow->municipality?->mun_name ?? '',
+                        $objRow->sec_ip_address ?? '',
+                        $objRow->sec_details ? json_encode($objRow->sec_details) : '',
                     ]);
                 }
             } else {
-                fputcsv($handle, ['Date & Time (Asia/Manila)', 'User', 'Role', 'Action', 'Entity Type', 'Entity ID', 'Municipality', 'Establishment', 'Reason', 'Old Values', 'New Values']);
+                fputcsv($objHandle, ['Date & Time (Asia/Manila)', 'User', 'Role', 'Action', 'Entity Type', 'Entity ID', 'Municipality', 'Establishment', 'Reason', 'Old Values', 'New Values']);
 
-                foreach ($rows as $row) {
-                    fputcsv($handle, [
-                        $row->created_at->timezone('Asia/Manila')->format('Y-m-d H:i'),
-                        $row->user?->name ?? '—',
-                        $row->user_role,
-                        $row->action,
-                        $row->entity_type,
-                        $row->entity_id,
-                        $row->municipality?->name ?? '',
-                        $row->establishment?->name ?? '',
-                        $row->reason ?? '',
-                        $row->old_values ? json_encode($row->old_values) : '',
-                        $row->new_values ? json_encode($row->new_values) : '',
+                foreach ($objRows as $objRow) {
+                    fputcsv($objHandle, [
+                        $objRow->opl_created_at->timezone('Asia/Manila')->format('Y-m-d H:i'),
+                        $objRow->user?->usr_name ?? '—',
+                        $objRow->opl_user_role,
+                        $objRow->opl_action,
+                        $objRow->opl_entity_type,
+                        $objRow->opl_entity_id,
+                        $objRow->municipality?->mun_name ?? '',
+                        $objRow->establishment?->lst_name ?? '',
+                        $objRow->opl_reason ?? '',
+                        $objRow->opl_old_values ? json_encode($objRow->opl_old_values) : '',
+                        $objRow->opl_new_values ? json_encode($objRow->opl_new_values) : '',
                     ]);
                 }
             }
 
-            fclose($handle);
-        }, $filename, ['Content-Type' => 'text/csv']);
+            fclose($objHandle);
+        }, $strFilename, ['Content-Type' => 'text/csv']);
     }
 }

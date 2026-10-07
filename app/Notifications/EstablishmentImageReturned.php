@@ -1,10 +1,11 @@
 <?php
 
-/*
- * System     : iTOUR - Integrated Tourism Information and Monitoring System
- * Purpose    : In-app notification telling an uploader their photo was returned, and why.
- * Programmer : <name(s)>
- * Copyright  : 2026 University of Mindanao. All rights reserved.
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: In-app notification telling an uploader their photo was returned, and why.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
  */
 
 namespace App\Notifications;
@@ -34,9 +35,9 @@ class EstablishmentImageReturned extends Notification
     {
         return [
             'image_id' => $this->objImage->img_id,
-            'listing_name' => $this->objImage->listing->name,
+            'listing_name' => $this->objImage->listing->lst_name,
             'reason' => $this->objImage->img_review_note,
-            'message' => "Your photo for {$this->objImage->listing->name} was returned: {$this->objImage->img_review_note}",
+            'message' => "Your photo for {$this->objImage->listing->lst_name} was returned: {$this->objImage->img_review_note}",
         ];
     }
 }

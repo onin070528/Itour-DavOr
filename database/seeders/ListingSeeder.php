@@ -1,10 +1,11 @@
 <?php
 
-/*
- * System     : iTOUR - Integrated Tourism Information and Monitoring System
- * Purpose    : Seeds the destinations and establishments authored in App\Support\TourismCatalog into `listings`.
- * Programmer : <name(s)>
- * Copyright  : 2026 University of Mindanao. All rights reserved.
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Seeds the destination and establishment listings (and gallery rows) from TourismCatalog.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
  */
 
 namespace Database\Seeders;
@@ -20,7 +21,7 @@ class ListingSeeder extends Seeder
      * The same synthetic 3-photo gallery App\Support\EstablishmentMockData
      * ::galleryImages() used to build on the fly for every establishment
      * profile (featured photo + 2 filler shots from this pool) — seeded
-     * here as real listing_images rows so the Establishment Profile
+     * here as real tbl_listing_images rows so the Establishment Profile
      * gallery isn't empty the moment it becomes DB-backed.
      */
     private const GALLERY_EXTRAS = ['dahican.jpg', 'pujada-bay.jpg', 'sunrise-point.jpg', 'cove.jpg'];
@@ -51,7 +52,7 @@ class ListingSeeder extends Seeder
 
     /**
      * Moves every destination/establishment already authored in
-     * App\Support\TourismCatalog::seedData() into the real `listings`
+     * App\Support\TourismCatalog::seedData() into the real `tbl_listings`
      * table, verbatim — TourismCatalog itself stays as the single source
      * of content, this just makes it durable/editable instead of static.
      *
@@ -63,68 +64,68 @@ class ListingSeeder extends Seeder
      */
     public function run(): void
     {
-        $draft = ['dahican-surf-guides', 'delicacies-hub'];
-        $unpublished = ['tourist-transport-terminal'];
+        $arrDraft = ['dahican-surf-guides', 'delicacies-hub'];
+        $arrUnpublished = ['tourist-transport-terminal'];
 
-        foreach (TourismCatalog::seedData() as $listing) {
-            $status = match (true) {
-                $listing['category'] === 'destinations' => 'Active',
-                in_array($listing['id'], $draft, true) => 'DRAFT',
-                in_array($listing['id'], $unpublished, true) => 'UNPUBLISHED',
+        foreach (TourismCatalog::seedData() as $arrListing) {
+            $strStatus = match (true) {
+                $arrListing['category'] === 'destinations' => 'Active',
+                in_array($arrListing['id'], $arrDraft, true) => 'DRAFT',
+                in_array($arrListing['id'], $arrUnpublished, true) => 'UNPUBLISHED',
                 default => 'PUBLISHED',
             };
 
             // Summary comment: type and reporting method apply to establishments only.
             $arrClassification = [];
 
-            if ($listing['category'] !== 'destinations') {
-                $blnIsManualPaper = in_array($listing['id'], self::MANUAL_PAPER_SLUGS, true);
+            if ($arrListing['category'] !== 'destinations') {
+                $blnIsManualPaper = in_array($arrListing['id'], self::MANUAL_PAPER_SLUGS, true);
 
                 $arrClassification = [
-                    'type' => self::ESTABLISHMENT_TYPES[$listing['id']] ?? null,
-                    'reporting_mode' => $blnIsManualPaper ? ReportingMethod::ManualPaper : ReportingMethod::OnlineItour,
+                    'lst_type' => self::ESTABLISHMENT_TYPES[$arrListing['id']] ?? null,
+                    'lst_reporting_mode' => $blnIsManualPaper ? ReportingMethod::ManualPaper : ReportingMethod::OnlineItour,
                 ];
             }
 
-            $model = Listing::query()->updateOrCreate(
-                ['slug' => $listing['id']],
+            $objModel = Listing::query()->updateOrCreate(
+                ['lst_slug' => $arrListing['id']],
                 [
                     ...$arrClassification,
-                    'name' => $listing['name'],
-                    'category' => $listing['category'],
-                    'municipality' => $listing['municipality'],
-                    'barangay' => $listing['barangay'],
-                    'lat' => $listing['lat'] ?? null,
-                    'lng' => $listing['lng'] ?? null,
-                    'description' => $listing['description'],
-                    'rating' => $listing['rating'],
-                    'tags' => $listing['tags'],
-                    'image' => $listing['image'],
-                    'contact_office' => $listing['contactOffice'],
-                    'contact_phone' => $listing['contactPhone'],
-                    'hours' => $listing['hours'],
-                    'status' => $status,
+                    'lst_name' => $arrListing['name'],
+                    'lst_category' => $arrListing['category'],
+                    'lst_municipality' => $arrListing['municipality'],
+                    'lst_barangay' => $arrListing['barangay'],
+                    'lst_lat' => $arrListing['lat'] ?? null,
+                    'lst_lng' => $arrListing['lng'] ?? null,
+                    'lst_description' => $arrListing['description'],
+                    'lst_rating' => $arrListing['rating'],
+                    'lst_tags' => $arrListing['tags'],
+                    'lst_image' => $arrListing['image'],
+                    'lst_contact_office' => $arrListing['contactOffice'],
+                    'lst_contact_phone' => $arrListing['contactPhone'],
+                    'lst_hours' => $arrListing['hours'],
+                    'lst_status' => $strStatus,
                 ]
             );
 
-            if ($listing['category'] !== 'destinations') {
-                $this->seedGallery($model);
+            if ($arrListing['category'] !== 'destinations') {
+                $this->seedGallery($objModel);
             }
         }
     }
 
-    private function seedGallery(Listing $listing): void
+    private function seedGallery(Listing $objListing): void
     {
-        if ($listing->images()->exists()) {
+        if ($objListing->images()->exists()) {
             return;
         }
 
-        $extras = array_values(array_diff(self::GALLERY_EXTRAS, [$listing->image]));
+        $arrExtras = array_values(array_diff(self::GALLERY_EXTRAS, [$objListing->lst_image]));
 
-        $listing->images()->createMany([
-            ['path' => $listing->image, 'caption' => 'Featured photo', 'is_primary' => true, 'sort_order' => 0],
-            ['path' => $extras[0], 'caption' => 'Grounds & surroundings', 'is_primary' => false, 'sort_order' => 1],
-            ['path' => $extras[1], 'caption' => 'Nearby view', 'is_primary' => false, 'sort_order' => 2],
+        $objListing->images()->createMany([
+            ['lsi_path' => $objListing->lst_image, 'lsi_caption' => 'Featured photo', 'lsi_is_primary' => true, 'lsi_sort_order' => 0],
+            ['lsi_path' => $arrExtras[0], 'lsi_caption' => 'Grounds & surroundings', 'lsi_is_primary' => false, 'lsi_sort_order' => 1],
+            ['lsi_path' => $arrExtras[1], 'lsi_caption' => 'Nearby view', 'lsi_is_primary' => false, 'lsi_sort_order' => 2],
         ]);
     }
 }

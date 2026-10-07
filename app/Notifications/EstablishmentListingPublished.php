@@ -1,10 +1,11 @@
 <?php
 
-/*
- * System     : iTOUR - Integrated Tourism Information and Monitoring System
- * Purpose    : In-app notification telling an establishment its listing is now live.
- * Programmer : <name(s)>
- * Copyright  : 2026 University of Mindanao. All rights reserved.
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: In-app notification telling an establishment its listing is now live.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
  */
 
 namespace App\Notifications;
@@ -33,9 +34,9 @@ class EstablishmentListingPublished extends Notification
     public function toDatabase(object $objNotifiable): array
     {
         return [
-            'listing_id' => $this->objListing->id,
-            'listing_name' => $this->objListing->name,
-            'message' => "Your listing \"{$this->objListing->name}\" is now live.",
+            'listing_id' => $this->objListing->lst_id,
+            'listing_name' => $this->objListing->lst_name,
+            'message' => "Your listing \"{$this->objListing->lst_name}\" is now live.",
         ];
     }
 }

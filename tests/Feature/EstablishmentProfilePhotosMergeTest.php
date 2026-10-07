@@ -1,5 +1,13 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Tests — establishment profile photos merge.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 use App\Enums\ImageSourceRole;
 use App\Enums\ImageStatus;
 use App\Enums\UserRole;
@@ -21,45 +29,45 @@ function mergeCategoryFixture(): Category
 
 function mergeListingFixture(array $overrides = []): Listing
 {
-    $municipality = Municipality::query()->firstOrCreate(['code' => 'MATI'], ['name' => 'City of Mati']);
+    $municipality = Municipality::query()->firstOrCreate(['mun_code' => 'MATI'], ['mun_name' => 'City of Mati']);
 
     return Listing::query()->create(array_merge([
-        'slug' => Str::slug('merge-fixture-'.Str::random(6)),
-        'name' => 'Merge Fixture Inn',
-        'category' => 'accommodation',
+        'lst_slug' => Str::slug('merge-fixture-'.Str::random(6)),
+        'lst_name' => 'Merge Fixture Inn',
+        'lst_category' => 'accommodation',
         'cat_id' => mergeCategoryFixture()->cat_id,
-        'municipality' => 'City of Mati',
-        'municipality_id' => $municipality->id,
-        'barangay' => 'Dahican',
-        'description' => 'A cozy inn by the beach.',
-        'contact_phone' => '09171234567',
-        'status' => 'DRAFT',
+        'lst_municipality' => 'City of Mati',
+        'mun_id' => $municipality->mun_id,
+        'lst_barangay' => 'Dahican',
+        'lst_description' => 'A cozy inn by the beach.',
+        'lst_contact_phone' => '09171234567',
+        'lst_status' => 'DRAFT',
     ], $overrides));
 }
 
 function mergeEstablishmentUserFixture(Listing $listing): User
 {
     return User::factory()->create([
-        'role' => UserRole::Establishment,
-        'municipality_id' => $listing->municipality_id,
-        'establishment_id' => $listing->id,
-        'organization_name' => $listing->name,
+        'usr_role' => UserRole::Establishment,
+        'mun_id' => $listing->mun_id,
+        'lst_id' => $listing->lst_id,
+        'usr_organization_name' => $listing->lst_name,
     ]);
 }
 
 function mergePublishedImageFixture(Listing $listing, User $uploader): EstablishmentImage
 {
     return EstablishmentImage::query()->create([
-        'listing_id' => $listing->id,
-        'img_path' => 'establishment-images/'.$listing->id.'/cover.jpg',
-        'img_thumbnail_path' => 'establishment-images/'.$listing->id.'/cover_thumb.jpg',
-        'img_alt_text' => $listing->name,
+        'lst_id' => $listing->lst_id,
+        'img_path' => 'establishment-images/'.$listing->lst_id.'/cover.jpg',
+        'img_thumbnail_path' => 'establishment-images/'.$listing->lst_id.'/cover_thumb.jpg',
+        'img_alt_text' => $listing->lst_name,
         'img_source_role' => ImageSourceRole::Establishment,
         'img_status' => ImageStatus::Published,
         'img_is_cover' => true,
         'img_sort_order' => 1,
         'img_hash' => hash('sha256', 'merge-fixture-'.uniqid()),
-        'img_uploaded_by' => $uploader->id,
+        'img_uploaded_by' => $uploader->usr_id,
         'img_has_ownership_declared' => true,
     ]);
 }
@@ -86,21 +94,21 @@ test('Save draft saves without validating required fields and never submits', fu
     $user = mergeEstablishmentUserFixture($listing);
 
     test()->actingAs($user)->put(route('establishment.profile.update'), [
-        'name' => $listing->name,
+        'name' => $listing->lst_name,
         'category' => 'accommodation',
         'address' => 'Dahican',
         // description, phone/email all omitted — must not block the save.
     ])->assertSessionHasNoErrors();
 
-    expect($listing->fresh()->status)->toBe('DRAFT');
+    expect($listing->fresh()->lst_status)->toBe('DRAFT');
 });
 
 test('Save and submit with a missing field lists it in plain words and does not submit', function () {
-    $listing = mergeListingFixture(['description' => null, 'contact_phone' => null, 'email' => null]);
+    $listing = mergeListingFixture(['lst_description' => null, 'lst_contact_phone' => null, 'lst_email' => null]);
     $user = mergeEstablishmentUserFixture($listing);
 
     $response = test()->actingAs($user)->patch(route('establishment.profile.submit'), [
-        'name' => $listing->name,
+        'name' => $listing->lst_name,
         'category' => 'accommodation',
         'address' => 'Dahican',
     ]);
@@ -109,7 +117,7 @@ test('Save and submit with a missing field lists it in plain words and does not 
     expect(session('arrMissingFields'))->not->toBeEmpty();
     expect(session('arrMissingFields'))->toContain('Description');
     expect(session('arrMissingFields'))->toContain('A public phone number or email');
-    expect($listing->fresh()->status)->toBe('DRAFT');
+    expect($listing->fresh()->lst_status)->toBe('DRAFT');
 });
 
 test('Save and submit with everything ready moves the package to FOR_LGU_REVIEW and the page becomes read-only', function () {
@@ -117,14 +125,14 @@ test('Save and submit with everything ready moves the package to FOR_LGU_REVIEW 
     $user = mergeEstablishmentUserFixture($listing);
 
     test()->actingAs($user)->patch(route('establishment.profile.submit'), [
-        'name' => $listing->name,
+        'name' => $listing->lst_name,
         'category' => 'accommodation',
         'address' => 'Dahican',
         'description' => 'A cozy inn by the beach.',
         'phone' => '09171234567',
     ])->assertSessionHasNoErrors();
 
-    expect($listing->fresh()->status)->toBe('FOR_LGU_REVIEW');
+    expect($listing->fresh()->lst_status)->toBe('FOR_LGU_REVIEW');
 
     $response = test()->actingAs($user)->get(route('establishment.profile'));
     $response->assertOk();
@@ -132,7 +140,7 @@ test('Save and submit with everything ready moves the package to FOR_LGU_REVIEW 
 });
 
 test('the form and photo management are read-only in FOR_LGU_REVIEW, FOR_PTO_REVIEW, and PUBLISHED', function (string $status) {
-    $listing = mergeListingFixture(['status' => $status]);
+    $listing = mergeListingFixture(['lst_status' => $status]);
     $user = mergeEstablishmentUserFixture($listing);
     $image = mergePublishedImageFixture($listing, $user);
 
@@ -144,19 +152,19 @@ test('the form and photo management are read-only in FOR_LGU_REVIEW, FOR_PTO_REV
 
     test()->actingAs($user)->patch(route('establishment.images.cover', $image))->assertForbidden();
 
-    expect($listing->fresh()->name)->not->toBe('Should Not Save');
+    expect($listing->fresh()->lst_name)->not->toBe('Should Not Save');
 })->with(['FOR_LGU_REVIEW', 'FOR_PTO_REVIEW', 'PUBLISHED']);
 
 test('a returned package shows the reason in the banner and allows editing and resubmission', function () {
-    $listing = mergeListingFixture(['status' => 'FOR_LGU_REVIEW']);
-    $lgu = User::factory()->create(['role' => UserRole::Lgu, 'municipality_id' => $listing->municipality_id]);
+    $listing = mergeListingFixture(['lst_status' => 'FOR_LGU_REVIEW']);
+    $lgu = User::factory()->create(['usr_role' => UserRole::Lgu, 'mun_id' => $listing->mun_id]);
     $user = mergeEstablishmentUserFixture($listing);
 
     test()->actingAs($lgu)->patch(route('lgu.directory.establishments.return', $listing), [
         'reason' => 'Please add a clearer description.',
     ])->assertRedirect();
 
-    expect($listing->fresh()->status)->toBe('DRAFT');
+    expect($listing->fresh()->lst_status)->toBe('DRAFT');
 
     $response = test()->actingAs($user)->get(route('establishment.profile'));
     $response->assertOk();
@@ -164,12 +172,12 @@ test('a returned package shows the reason in the banner and allows editing and r
     $response->assertSee('Please add a clearer description.');
 
     test()->actingAs($user)->put(route('establishment.profile.update'), [
-        'name' => $listing->name,
+        'name' => $listing->lst_name,
         'category' => 'accommodation',
         'address' => 'Updated Address',
     ])->assertSessionHasNoErrors();
 
-    expect($listing->fresh()->barangay)->toBe('Updated Address');
+    expect($listing->fresh()->lst_barangay)->toBe('Updated Address');
 });
 
 test('the old Photos URL redirects permanently to the profile page with the #photos fragment', function () {
@@ -199,24 +207,24 @@ test('the Photos sidebar item is gone and no other item changed', function () {
 
 test('the LGU directory still receives the submitted package unchanged', function () {
     $listing = mergeListingFixture();
-    $lgu = User::factory()->create(['role' => UserRole::Lgu, 'municipality_id' => $listing->municipality_id]);
+    $lgu = User::factory()->create(['usr_role' => UserRole::Lgu, 'mun_id' => $listing->mun_id]);
     $user = mergeEstablishmentUserFixture($listing);
 
     test()->actingAs($user)->patch(route('establishment.profile.submit'), [
-        'name' => $listing->name,
+        'name' => $listing->lst_name,
         'category' => 'accommodation',
         'address' => 'Dahican',
         'description' => 'A cozy inn by the beach.',
         'phone' => '09171234567',
     ])->assertSessionHasNoErrors();
 
-    expect($listing->fresh()->status)->toBe('FOR_LGU_REVIEW');
+    expect($listing->fresh()->lst_status)->toBe('FOR_LGU_REVIEW');
 
     test()->actingAs($lgu)->patch(route('lgu.directory.establishments.submit', $listing))->assertRedirect();
 
-    expect($listing->fresh()->status)->toBe('FOR_PTO_REVIEW');
+    expect($listing->fresh()->lst_status)->toBe('FOR_PTO_REVIEW');
 
-    $log = OperationLog::where('entity_type', 'establishment')->where('entity_id', $listing->id)->where('action', 'submit')->where('user_role', 'lgu')->first();
+    $log = OperationLog::where('opl_entity_type', 'establishment')->where('opl_entity_id', $listing->lst_id)->where('opl_action', 'submit')->where('opl_user_role', 'lgu')->first();
     expect($log)->not->toBeNull();
 });
 

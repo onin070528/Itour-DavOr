@@ -23,19 +23,19 @@ abstract class EstablishmentController extends Controller
      * shared sidebar chrome already wired up, plus the account's own
      * establishment name — every page here is scoped to it.
      *
-     * @param  array<string, mixed>  $data
+     * @param  array<string, mixed>  $arrData
      */
-    protected function renderEstablishment(Request $request, string $view, string $activeKey, string $pageTitle, array $data = []): View
+    protected function renderEstablishment(Request $objRequest, string $strView, string $strActiveKey, string $strPageTitle, array $arrData = []): View
     {
-        $user = $request->user();
+        $objUser = $objRequest->user();
 
-        return view($view, array_merge([
-            'user' => $user,
-            'establishmentName' => $user->organization_name,
-            'navSections' => DashboardNavigation::sections($user, $activeKey),
-            'pageTitle' => $pageTitle,
+        return view($strView, array_merge([
+            'user' => $objUser,
+            'establishmentName' => $objUser->usr_organization_name,
+            'navSections' => DashboardNavigation::sections($objUser, $strActiveKey),
+            'pageTitle' => $strPageTitle,
             'accountHeading' => 'System',
             'settingsHref' => route('establishment.settings'),
-        ], $data));
+        ], $arrData));
     }
 }

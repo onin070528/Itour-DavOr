@@ -1,5 +1,13 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Model factory for generating user test records.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 namespace Database\Factories;
 
 use App\Models\User;
@@ -25,11 +33,11 @@ class UserFactory extends Factory
     public function definition(): array
     {
         return [
-            'name' => fake()->name(),
-            'email' => fake()->unique()->safeEmail(),
-            'email_verified_at' => now(),
-            'password' => static::$password ??= Hash::make('password'),
-            'remember_token' => Str::random(10),
+            'usr_name' => fake()->name(),
+            'usr_email' => fake()->unique()->safeEmail(),
+            'usr_email_verified_at' => now(),
+            'usr_password' => static::$password ??= Hash::make('password'),
+            'usr_remember_token' => Str::random(10),
         ];
     }
 
@@ -38,8 +46,8 @@ class UserFactory extends Factory
      */
     public function unverified(): static
     {
-        return $this->state(fn (array $attributes) => [
-            'email_verified_at' => null,
+        return $this->state(fn (array $arrAttributes) => [
+            'usr_email_verified_at' => null,
         ]);
     }
 }

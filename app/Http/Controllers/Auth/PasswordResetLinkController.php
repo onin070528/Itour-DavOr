@@ -38,35 +38,35 @@ class PasswordResetLinkController extends Controller
      * email belongs to an account, so this form can't be used to discover
      * which emails are registered.
      */
-    public function store(Request $request): RedirectResponse
+    public function store(Request $objRequest): RedirectResponse
     {
-        $request->validate([
+        $objRequest->validate([
             'email' => ['required', 'string', 'email'],
         ]);
 
         try {
-            $status = Password::sendResetLink($request->only('email'));
-        } catch (TransportExceptionInterface $e) {
+            $strStatus = Password::sendResetLink(['usr_email' => $objRequest->input('email')]);
+        } catch (TransportExceptionInterface $objException) {
             // Mail server unreachable or rejected the login (e.g. wrong
             // MAIL_* settings in .env) — show a friendly error, not a 500.
-            Log::error('Failed to send password reset email.', ['exception' => $e]);
+            Log::error('Failed to send password reset email.', ['exception' => $objException]);
 
             throw ValidationException::withMessages([
                 'email' => __('We couldn\'t send the reset email right now. Please try again later or contact your administrator.'),
             ]);
         }
 
-        if ($status === Password::RESET_THROTTLED) {
+        if ($strStatus === Password::RESET_THROTTLED) {
             throw ValidationException::withMessages([
                 'email' => __('Please wait a minute before requesting another reset link.'),
             ]);
         }
 
-        if ($status === Password::RESET_LINK_SENT) {
-            $user = User::query()->where('email', $request->input('email'))->first();
+        if ($strStatus === Password::RESET_LINK_SENT) {
+            $objUser = User::query()->where('usr_email', $objRequest->input('email'))->first();
 
-            if ($user) {
-                event(new PasswordResetLinkRequested($user));
+            if ($objUser) {
+                event(new PasswordResetLinkRequested($objUser));
             }
         }
 

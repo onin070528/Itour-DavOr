@@ -1,4 +1,11 @@
 {{--
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: Public QR self check-in form for visitors.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+--}}
+{{--
     Public visitor self-registration form, reached by scanning the QR code
     posted at a municipality's registered establishment (hence living next
     to the rest of the LGU views, but served without auth — the visitor

@@ -47,37 +47,37 @@ class MonthlyReportsController extends PtoController
      * Submissions, and expand each LGU to its establishments) and
      * Statistics. Official totals count PTO-verified municipal reports only.
      */
-    public function index(Request $request): View
+    public function index(Request $objRequest): View
     {
         $arrYearOptions = TourismAnalytics::scopedYearOptions(null);
-        $intYear = in_array((int) $request->query('year'), $arrYearOptions, true) ? (int) $request->query('year') : CarbonImmutable::now()->year;
-        $strTab = in_array($request->query('tab'), ['records', 'statistics'], true) ? $request->query('tab') : 'overview';
+        $intYear = in_array((int) $objRequest->query('year'), $arrYearOptions, true) ? (int) $objRequest->query('year') : CarbonImmutable::now()->year;
+        $strTab = in_array($objRequest->query('tab'), ['records', 'statistics'], true) ? $objRequest->query('tab') : 'overview';
 
-        $objMunicipalities = Municipality::query()->orderBy('name')->get();
+        $objMunicipalities = Municipality::query()->orderBy('mun_name')->get();
         $intMunicipalityCount = $objMunicipalities->count();
 
         // Latest revision of every LGU's municipal report this year.
         $objMunicipalReports = MunicipalReport::query()
             ->with(['submitter', 'reviewer'])
-            ->whereNotNull('municipality_id')
-            ->whereYear('period_start', $intYear)
+            ->whereNotNull('mun_id')
+            ->whereYear('mrp_period_start', $intYear)
             ->whereDoesntHave('supersededBy')
             ->get();
-        $objReportsByMonth = $objMunicipalReports->groupBy(fn (MunicipalReport $objReport) => $objReport->period_start->month);
+        $objReportsByMonth = $objMunicipalReports->groupBy(fn (MunicipalReport $objReport) => $objReport->mrp_period_start->month);
 
         // Establishment level, for the per-LGU drill-down inside each month's
         // modal. Drafts are owner-only, so they read as Not Submitted.
         $objEstablishmentReports = MonthlyArrivalReport::query()
-            ->where('status', '!=', MonthlyReportStatus::Draft)
-            ->whereYear('period_month', $intYear)
+            ->where('mar_status', '!=', MonthlyReportStatus::Draft)
+            ->whereYear('mar_period_month', $intYear)
             ->get()
-            ->groupBy(fn (MonthlyArrivalReport $objReport) => $objReport->period_month->month.'-'.$objReport->municipality_id);
+            ->groupBy(fn (MonthlyArrivalReport $objReport) => $objReport->mar_period_month->month.'-'.$objReport->mun_id);
         $objListingsByMunicipality = Listing::query()
-            ->whereNotNull('municipality_id')
-            ->where('category', '!=', 'destinations')
-            ->orderBy('name')
-            ->get(['id', 'name', 'municipality_id'])
-            ->groupBy('municipality_id');
+            ->whereNotNull('mun_id')
+            ->where('lst_category', '!=', 'destinations')
+            ->orderBy('lst_name')
+            ->get(['lst_id', 'lst_name', 'mun_id'])
+            ->groupBy('mun_id');
 
         $objRecords = TourismAnalytics::provincialMonthlyRecords($intYear);
         $objRecordsByMonth = $objRecords->keyBy('month');
@@ -89,7 +89,7 @@ class MonthlyReportsController extends PtoController
             ->map(fn (CarbonImmutable $dtMonth) => $this->_provincialMonth(
                 $dtMonth,
                 $objMunicipalities,
-                ($objReportsByMonth->get($dtMonth->month) ?? collect())->keyBy('municipality_id'),
+                ($objReportsByMonth->get($dtMonth->month) ?? collect())->keyBy('mun_id'),
                 $objEstablishmentReports,
                 $objListingsByMunicipality,
                 $objRecordsByMonth->get($dtMonth->month),
@@ -98,7 +98,7 @@ class MonthlyReportsController extends PtoController
 
         // Overview figures for the year.
         $intMonthsElapsed = $objMonths->count();
-        $intApprovedCount = $objMunicipalReports->where('status', MunicipalReport::STATUS_APPROVED)->count();
+        $intApprovedCount = $objMunicipalReports->where('mrp_status', MunicipalReport::STATUS_APPROVED)->count();
         $intExpectedReports = $intMunicipalityCount * $intMonthsElapsed;
 
         $objPreviousRecords = TourismAnalytics::provincialMonthlyRecords($intYear - 1);
@@ -106,19 +106,19 @@ class MonthlyReportsController extends PtoController
 
         // Statistics: LGU reporting coverage for the year.
         $objLguCoverage = $objMunicipalities->map(function (Municipality $objMunicipality) use ($objMunicipalReports, $intMonthsElapsed) {
-            $objOwn = $objMunicipalReports->where('municipality_id', $objMunicipality->id);
-            $objApproved = $objOwn->where('status', MunicipalReport::STATUS_APPROVED);
+            $objOwn = $objMunicipalReports->where('mun_id', $objMunicipality->mun_id);
+            $objApproved = $objOwn->where('mrp_status', MunicipalReport::STATUS_APPROVED);
 
             return [
                 'municipality' => $objMunicipality,
                 'submittedMonths' => $objOwn->count(),
                 'verifiedMonths' => $objApproved->count(),
                 'expectedMonths' => $intMonthsElapsed,
-                'verifiedArrivals' => (int) $objApproved->sum('total_arrivals'),
+                'verifiedArrivals' => (int) $objApproved->sum('mrp_total_arrivals'),
             ];
         })->sortByDesc('verifiedArrivals')->values();
 
-        return $this->renderPto($request, 'pto.monthly-reports.index', 'monthlyReports', 'Provincial Reports', [
+        return $this->renderPto($objRequest, 'pto.monthly-reports.index', 'monthlyReports', 'Provincial Reports', [
             'year' => $intYear,
             'yearOptions' => $arrYearOptions,
             'activeTab' => $strTab,
@@ -126,9 +126,9 @@ class MonthlyReportsController extends PtoController
             'municipalityCount' => $intMunicipalityCount,
             'overview' => [
                 'total' => (int) $objRecords->sum('total'),
-                'lgusReported' => $objMunicipalReports->pluck('municipality_id')->unique()->count(),
+                'lgusReported' => $objMunicipalReports->pluck('mun_id')->unique()->count(),
                 'verifiedCount' => $intApprovedCount,
-                'forCorrectionCount' => $objMunicipalReports->where('status', MunicipalReport::STATUS_RETURNED)->count(),
+                'forCorrectionCount' => $objMunicipalReports->where('mrp_status', MunicipalReport::STATUS_RETURNED)->count(),
                 'monthsCompleted' => $objMonths->where('isComplete', true)->count(),
                 'monthsElapsed' => $intMonthsElapsed,
                 'coveragePercent' => $intExpectedReports > 0 ? round($intApprovedCount / $intExpectedReports * 100, 1) : 0,
@@ -138,7 +138,7 @@ class MonthlyReportsController extends PtoController
                 'records' => $objRecords,
                 'summary' => TourismAnalytics::yearSummary($objRecords),
                 'hasPrevious' => $blnHasPrevious,
-                'compare' => $request->boolean('compare') && $blnHasPrevious,
+                'compare' => $objRequest->boolean('compare') && $blnHasPrevious,
                 'previousRecords' => $objPreviousRecords,
                 'yearComparison' => TourismAnalytics::yearComparison($objRecords, $objPreviousRecords, $intYear),
                 'visitorBreakdown' => TourismAnalytics::provincialVisitorBreakdown($intYear),
@@ -163,28 +163,28 @@ class MonthlyReportsController extends PtoController
     private function _provincialMonth(CarbonImmutable $dtMonth, Collection $objMunicipalities, Collection $objReportsByMunicipality, Collection $objEstablishmentReports, Collection $objListingsByMunicipality, ?array $arrRecord): array
     {
         $objLgus = $objMunicipalities->map(function (Municipality $objMunicipality) use ($dtMonth, $objReportsByMunicipality, $objEstablishmentReports, $objListingsByMunicipality) {
-            $objReport = $objReportsByMunicipality->get($objMunicipality->id);
-            $objEstReports = ($objEstablishmentReports->get($dtMonth->month.'-'.$objMunicipality->id) ?? collect())->keyBy('listing_id');
+            $objReport = $objReportsByMunicipality->get($objMunicipality->mun_id);
+            $objEstReports = ($objEstablishmentReports->get($dtMonth->month.'-'.$objMunicipality->mun_id) ?? collect())->keyBy('lst_id');
 
-            $objEstablishments = ($objListingsByMunicipality->get($objMunicipality->id) ?? collect())->map(fn (Listing $objListing) => [
-                'name' => $objListing->name,
-                'report' => $objEstReports->get($objListing->id),
+            $objEstablishments = ($objListingsByMunicipality->get($objMunicipality->mun_id) ?? collect())->map(fn (Listing $objListing) => [
+                'name' => $objListing->lst_name,
+                'report' => $objEstReports->get($objListing->lst_id),
             ]);
 
             return [
                 'municipality' => $objMunicipality,
                 'report' => $objReport,
-                'status' => MunicipalReportsController::statusLabel($objReport?->status),
-                'isPendingPto' => in_array($objReport?->status, [MunicipalReport::STATUS_SUBMITTED, MunicipalReport::STATUS_REVIEWED], true),
+                'status' => MunicipalReportsController::statusLabel($objReport?->mrp_status),
+                'isPendingPto' => in_array($objReport?->mrp_status, [MunicipalReport::STATUS_SUBMITTED, MunicipalReport::STATUS_REVIEWED], true),
                 'establishments' => $objEstablishments,
-                'verifiedEstablishmentCount' => $objEstReports->where('status', MonthlyReportStatus::Verified)->count(),
+                'verifiedEstablishmentCount' => $objEstReports->where('mar_status', MonthlyReportStatus::Verified)->count(),
             ];
         });
 
         $intTotal = $objMunicipalities->count();
-        $intApproved = $objLgus->filter(fn (array $arrLgu) => $arrLgu['report']?->status === MunicipalReport::STATUS_APPROVED)->count();
+        $intApproved = $objLgus->filter(fn (array $arrLgu) => $arrLgu['report']?->mrp_status === MunicipalReport::STATUS_APPROVED)->count();
         $intPending = $objLgus->where('isPendingPto', true)->count();
-        $intReturned = $objLgus->filter(fn (array $arrLgu) => $arrLgu['report']?->status === MunicipalReport::STATUS_RETURNED)->count();
+        $intReturned = $objLgus->filter(fn (array $arrLgu) => $arrLgu['report']?->mrp_status === MunicipalReport::STATUS_RETURNED)->count();
         $intReported = $objLgus->filter(fn (array $arrLgu) => $arrLgu['report'] !== null)->count();
 
         [$strStatus, $strTone] = match (true) {
@@ -219,13 +219,13 @@ class MonthlyReportsController extends PtoController
      * Read-only mirror of Lgu\MonthlyReportsController::show() — same
      * detail, no Verify action. Drafts are owner-only, so never shown here.
      */
-    public function show(Request $request, MonthlyArrivalReport $monthlyArrivalReport): View
+    public function show(Request $objRequest, MonthlyArrivalReport $monthlyArrivalReport): View
     {
-        abort_unless($request->user()->can('view', $monthlyArrivalReport), 403);
+        abort_unless($objRequest->user()->can('view', $monthlyArrivalReport), 403);
 
         $monthlyArrivalReport->loadMissing(['listing', 'submitter', 'verifier', 'arrivals']);
 
-        return $this->renderPto($request, 'pto.monthly-reports.show', 'monthlyReports', 'Monthly Report', [
+        return $this->renderPto($objRequest, 'pto.monthly-reports.show', 'monthlyReports', 'Monthly Report', [
             'report' => $monthlyArrivalReport,
             'history' => $this->reportHistory($monthlyArrivalReport),
             'originBreakdown' => $monthlyArrivalReport->originBreakdown(),
@@ -241,86 +241,86 @@ class MonthlyReportsController extends PtoController
      * divergent one. Otherwise renders a live Draft straight from
      * establishment-level data, useful before the LGU has consolidated yet.
      */
-    public function officialReport(Request $request): View|RedirectResponse
+    public function officialReport(Request $objRequest): View|RedirectResponse
     {
-        $municipality = $this->resolveMunicipality($request, Municipality::query()->orderBy('name')->get());
-        abort_if(! $municipality, 404, 'Select a municipality first.');
-        $month = $this->resolvePeriod($request);
+        $objMunicipality = $this->resolveMunicipality($objRequest, Municipality::query()->orderBy('mun_name')->get());
+        abort_if(! $objMunicipality, 404, 'Select a municipality first.');
+        $dtmMonth = $this->resolvePeriod($objRequest);
 
-        $municipalReport = $this->currentMunicipalReport($municipality, $month);
-        if ($municipalReport?->isFrozen()) {
-            return redirect()->route('pto.municipalReports.officialReport', $municipalReport);
+        $objMunicipalReport = $this->currentMunicipalReport($objMunicipality, $dtmMonth);
+        if ($objMunicipalReport?->isFrozen()) {
+            return redirect()->route('pto.municipalReports.officialReport', $objMunicipalReport);
         }
 
-        $data = $this->officialReportData($municipality, $month);
+        $arrData = $this->officialReportData($objMunicipality, $dtmMonth);
 
-        OperationLogger::exported($request->user(), 'provincial_report', $municipality->id, ['action' => 'preview', 'period' => $month->toDateString()]);
+        OperationLogger::exported($objRequest->user(), 'provincial_report', $objMunicipality->mun_id, ['action' => 'preview', 'period' => $dtmMonth->toDateString()]);
 
         return view('pdf.official-report', [
-            'report' => $data,
+            'report' => $arrData,
             'preview' => true,
-            'pdfUrl' => route('pto.monthlyReports.officialReport.pdf', ['period' => $month->format('Y-m'), 'municipality_id' => $municipality->id]),
-            'excelUrl' => route('pto.monthlyReports.officialReport.excel', ['period' => $month->format('Y-m'), 'municipality_id' => $municipality->id]),
+            'pdfUrl' => route('pto.monthlyReports.officialReport.pdf', ['period' => $dtmMonth->format('Y-m'), 'municipality_id' => $objMunicipality->mun_id]),
+            'excelUrl' => route('pto.monthlyReports.officialReport.excel', ['period' => $dtmMonth->format('Y-m'), 'municipality_id' => $objMunicipality->mun_id]),
         ]);
     }
 
-    public function officialReportPdf(Request $request): Response|RedirectResponse
+    public function officialReportPdf(Request $objRequest): Response|RedirectResponse
     {
-        $municipality = $this->resolveMunicipality($request, Municipality::query()->orderBy('name')->get());
-        abort_if(! $municipality, 404, 'Select a municipality first.');
-        $month = $this->resolvePeriod($request);
+        $objMunicipality = $this->resolveMunicipality($objRequest, Municipality::query()->orderBy('mun_name')->get());
+        abort_if(! $objMunicipality, 404, 'Select a municipality first.');
+        $dtmMonth = $this->resolvePeriod($objRequest);
 
-        $municipalReport = $this->currentMunicipalReport($municipality, $month);
-        if ($municipalReport?->isFrozen()) {
-            return redirect()->route('pto.municipalReports.officialReport.pdf', $municipalReport);
+        $objMunicipalReport = $this->currentMunicipalReport($objMunicipality, $dtmMonth);
+        if ($objMunicipalReport?->isFrozen()) {
+            return redirect()->route('pto.municipalReports.officialReport.pdf', $objMunicipalReport);
         }
 
-        $data = $this->officialReportData($municipality, $month);
-        $this->abortIfUnbalanced($data);
+        $arrData = $this->officialReportData($objMunicipality, $dtmMonth);
+        $this->abortIfUnbalanced($arrData);
 
-        OperationLogger::exported($request->user(), 'provincial_report', $municipality->id, ['action' => 'download_pdf', 'period' => $month->toDateString()]);
+        OperationLogger::exported($objRequest->user(), 'provincial_report', $objMunicipality->mun_id, ['action' => 'download_pdf', 'period' => $dtmMonth->toDateString()]);
 
-        return Pdf::loadView('pdf.official-report', ['report' => $data, 'preview' => false])
+        return Pdf::loadView('pdf.official-report', ['report' => $arrData, 'preview' => false])
             ->setPaper('a4')
-            ->download("{$data['reference_number']}.pdf");
+            ->download("{$arrData['reference_number']}.pdf");
     }
 
-    public function officialReportExcel(Request $request)
+    public function officialReportExcel(Request $objRequest)
     {
-        $municipality = $this->resolveMunicipality($request, Municipality::query()->orderBy('name')->get());
-        abort_if(! $municipality, 404, 'Select a municipality first.');
-        $month = $this->resolvePeriod($request);
+        $objMunicipality = $this->resolveMunicipality($objRequest, Municipality::query()->orderBy('mun_name')->get());
+        abort_if(! $objMunicipality, 404, 'Select a municipality first.');
+        $dtmMonth = $this->resolvePeriod($objRequest);
 
-        $municipalReport = $this->currentMunicipalReport($municipality, $month);
-        if ($municipalReport?->isFrozen()) {
-            return redirect()->route('pto.municipalReports.officialReport.excel', $municipalReport);
+        $objMunicipalReport = $this->currentMunicipalReport($objMunicipality, $dtmMonth);
+        if ($objMunicipalReport?->isFrozen()) {
+            return redirect()->route('pto.municipalReports.officialReport.excel', $objMunicipalReport);
         }
 
-        $data = $this->officialReportData($municipality, $month);
-        $this->abortIfUnbalanced($data);
+        $arrData = $this->officialReportData($objMunicipality, $dtmMonth);
+        $this->abortIfUnbalanced($arrData);
 
-        OperationLogger::exported($request->user(), 'provincial_report', $municipality->id, ['action' => 'export_excel', 'period' => $month->toDateString()]);
+        OperationLogger::exported($objRequest->user(), 'provincial_report', $objMunicipality->mun_id, ['action' => 'export_excel', 'period' => $dtmMonth->toDateString()]);
 
-        return Excel::download(new OfficialReportExport($data), "{$data['reference_number']}.xlsx");
+        return Excel::download(new OfficialReportExport($arrData), "{$arrData['reference_number']}.xlsx");
     }
 
     /**
-     * @param  array<string, mixed>  $data
+     * @param  array<string, mixed>  $arrData
      */
-    private function abortIfUnbalanced(array $data): void
+    private function abortIfUnbalanced(array $arrData): void
     {
-        $rows = $data['groups']->flatMap(fn (array $group) => $group['rows']);
-        $errors = OfficialReportBuilder::validateColumnSums($rows);
+        $objRows = $arrData['groups']->flatMap(fn (array $arrGroup) => $arrGroup['rows']);
+        $arrErrors = OfficialReportBuilder::validateColumnSums($objRows);
 
-        abort_if($errors !== [], 422, 'This report cannot be generated until its Male/Female, Adults/Children/Seniors, and Local/Foreign columns all add up to the Total for every establishment: '.implode(' ', $errors));
+        abort_if($arrErrors !== [], 422, 'This report cannot be generated until its Male/Female, Adults/Children/Seniors, and Local/Foreign columns all add up to the Total for every establishment: '.implode(' ', $arrErrors));
     }
 
-    private function currentMunicipalReport(Municipality $municipality, CarbonImmutable $month): ?MunicipalReport
+    private function currentMunicipalReport(Municipality $objMunicipality, CarbonImmutable $dtmMonth): ?MunicipalReport
     {
         return MunicipalReport::query()
             ->with('reviewer')
-            ->where('municipality_id', $municipality->id)
-            ->whereDate('period_start', $month->toDateString())
+            ->where('mun_id', $objMunicipality->mun_id)
+            ->whereDate('mrp_period_start', $dtmMonth->toDateString())
             ->whereDoesntHave('supersededBy')
             ->first();
     }
@@ -334,62 +334,62 @@ class MonthlyReportsController extends PtoController
      *
      * @return array<string, mixed>
      */
-    private function officialReportData(Municipality $municipality, CarbonImmutable $month): array
+    private function officialReportData(Municipality $objMunicipality, CarbonImmutable $dtmMonth): array
     {
-        $establishments = Listing::query()
+        $objEstablishments = Listing::query()
             ->with('categoryRecord')
-            ->where('municipality_id', $municipality->id)
+            ->where('mun_id', $objMunicipality->mun_id)
             ->get()
-            ->filter(fn (Listing $listing) => $listing->isQrEnabled());
+            ->filter(fn (Listing $objListing) => $objListing->isQrEnabled());
 
-        $reportsByListing = MonthlyArrivalReport::query()
-            ->where('municipality_id', $municipality->id)
-            ->where('status', '!=', MonthlyReportStatus::Draft)
-            ->forPeriod($month)
+        $objReportsByListing = MonthlyArrivalReport::query()
+            ->where('mun_id', $objMunicipality->mun_id)
+            ->where('mar_status', '!=', MonthlyReportStatus::Draft)
+            ->forPeriod($dtmMonth)
             ->with('submitter')
             ->get()
-            ->keyBy('listing_id');
+            ->keyBy('lst_id');
 
-        $reported = $establishments->filter(fn (Listing $listing) => $reportsByListing->has($listing->id));
+        $objReported = $objEstablishments->filter(fn (Listing $objListing) => $objReportsByListing->has($objListing->lst_id));
 
-        $rows = $reported->map(function (Listing $listing) use ($reportsByListing) {
-            $monthlyReport = $reportsByListing->get($listing->id);
+        $objRows = $objReported->map(function (Listing $objListing) use ($objReportsByListing) {
+            $objMonthlyReport = $objReportsByListing->get($objListing->lst_id);
 
             return [
-                'establishment' => $listing->name,
-                'category' => $listing->categoryRecord?->cat_name ?? 'Uncategorized',
-                'source' => $monthlyReport->submission_source->label(),
-                'male' => (int) $monthlyReport->party_male,
-                'female' => (int) $monthlyReport->party_female,
-                'total' => (int) $monthlyReport->total_visitors,
-                'adults' => (int) $monthlyReport->party_adults,
-                'children' => (int) $monthlyReport->party_children,
-                'seniors' => (int) $monthlyReport->party_seniors,
-                'local' => (int) $monthlyReport->party_local,
-                'foreign' => (int) $monthlyReport->party_foreign,
+                'establishment' => $objListing->lst_name,
+                'category' => $objListing->categoryRecord?->cat_name ?? 'Uncategorized',
+                'source' => $objMonthlyReport->mar_submission_source->label(),
+                'male' => (int) $objMonthlyReport->mar_party_male,
+                'female' => (int) $objMonthlyReport->mar_party_female,
+                'total' => (int) $objMonthlyReport->mar_total_visitors,
+                'adults' => (int) $objMonthlyReport->mar_party_adults,
+                'children' => (int) $objMonthlyReport->mar_party_children,
+                'seniors' => (int) $objMonthlyReport->mar_party_seniors,
+                'local' => (int) $objMonthlyReport->mar_party_local,
+                'foreign' => (int) $objMonthlyReport->mar_party_foreign,
             ];
         })->values();
 
-        $digitalCount = $reported->filter(fn (Listing $listing) => $reportsByListing->get($listing->id)->submission_source === ReportSubmissionSource::Digital)->count();
-        $paperCount = $reported->count() - $digitalCount;
+        $intDigitalCount = $objReported->filter(fn (Listing $objListing) => $objReportsByListing->get($objListing->lst_id)->mar_submission_source === ReportSubmissionSource::Digital)->count();
+        $intPaperCount = $objReported->count() - $intDigitalCount;
 
         return [
             'title' => 'Provincial Tourism Report',
             'letterhead' => [
                 'office_name' => 'Provincial Tourism Office',
-                'office_subtitle' => 'Province of Davao Oriental — '.$municipality->name,
+                'office_subtitle' => 'Province of Davao Oriental — '.$objMunicipality->mun_name,
                 'address' => 'Capitol Compound, Brgy. Dahican, City of Mati, Davao Oriental',
             ],
-            'period_label' => $month->format('F Y'),
-            'reference_number' => sprintf('PTR-%03d-%s', $municipality->id, $month->format('Ym')),
+            'period_label' => $dtmMonth->format('F Y'),
+            'reference_number' => sprintf('PTR-%03d-%s', $objMunicipality->mun_id, $dtmMonth->format('Ym')),
             'status_label' => 'Draft',
             'is_draft' => true,
             'verified_label' => null,
             'revision_number' => 1,
             'supersedes_reference' => null,
-            'submission_summary' => "{$reported->count()} of {$establishments->count()} establishments reported ({$digitalCount} digital, {$paperCount} paper)",
-            'groups' => OfficialReportBuilder::groupByCategory($rows),
-            'grand_total' => OfficialReportBuilder::sumRows($rows),
+            'submission_summary' => "{$objReported->count()} of {$objEstablishments->count()} establishments reported ({$intDigitalCount} digital, {$intPaperCount} paper)",
+            'groups' => OfficialReportBuilder::groupByCategory($objRows),
+            'grand_total' => OfficialReportBuilder::sumRows($objRows),
             'remarks' => 'Preliminary — not yet consolidated or verified for this period.',
             'signatures' => [
                 'prepared_by' => ['name' => null, 'position' => 'Provincial Tourism Office', 'date' => null],
@@ -401,23 +401,23 @@ class MonthlyReportsController extends PtoController
         ];
     }
 
-    private function resolveMunicipality(Request $request, Collection $municipalities): ?Municipality
+    private function resolveMunicipality(Request $objRequest, Collection $objMunicipalities): ?Municipality
     {
-        $id = $request->query('municipality_id');
+        $strId = $objRequest->query('municipality_id');
 
-        if ($id && $match = $municipalities->firstWhere('id', (int) $id)) {
-            return $match;
+        if ($strId && $objMatch = $objMunicipalities->firstWhere('mun_id', (int) $strId)) {
+            return $objMatch;
         }
 
-        return $municipalities->first();
+        return $objMunicipalities->first();
     }
 
-    private function resolvePeriod(Request $request): CarbonImmutable
+    private function resolvePeriod(Request $objRequest): CarbonImmutable
     {
-        $period = $request->query('period');
+        $strPeriod = $objRequest->query('period');
 
-        if (is_string($period) && preg_match('/^\d{4}-\d{2}$/', $period)) {
-            return CarbonImmutable::createFromFormat('Y-m', $period)->startOfMonth();
+        if (is_string($strPeriod) && preg_match('/^\d{4}-\d{2}$/', $strPeriod)) {
+            return CarbonImmutable::createFromFormat('Y-m', $strPeriod)->startOfMonth();
         }
 
         return CarbonImmutable::now()->startOfMonth();

@@ -1,10 +1,12 @@
 <?php
 
-/*
- * System     : iTOUR - Integrated Tourism Information and Monitoring System
- * Purpose    : LGU photo upload on behalf of paper/no-account establishments, and the LGU's approval queue.
- * Programmer : <name(s)>
- * Copyright  : 2026 University of Mindanao. All rights reserved.
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: LGU photo upload on behalf of paper/no-account establishments, and the LGU's approval
+ * queue.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
  */
 
 namespace App\Http\Controllers\Lgu;
@@ -45,7 +47,7 @@ class ImagesController extends LguController
             ->with(['listing', 'uploadedBy', 'replaces'])
             ->where('img_status', ImageStatus::Pending->value)
             ->where('img_source_role', ImageSourceRole::Establishment->value)
-            ->whereHas('listing', fn ($query) => $query->where('municipality_id', $objUser->municipality_id))
+            ->whereHas('listing', fn ($objQuery) => $objQuery->where('mun_id', $objUser->mun_id))
             ->orderBy('img_created_at')
             ->get();
 
@@ -74,7 +76,7 @@ class ImagesController extends LguController
      */
     public function manage(Request $objRequest, Listing $listing, ImagePolicy $objPolicy): View
     {
-        abort_unless($objRequest->user()->municipality_id === $listing->municipality_id, 403);
+        abort_unless($objRequest->user()->mun_id === $listing->mun_id, 403);
 
         return $this->renderLgu($objRequest, 'lgu.images.manage', 'images.index', 'Photos', [
             'listing' => $listing,
@@ -126,7 +128,7 @@ class ImagesController extends LguController
      */
     public function approveBatch(Request $objRequest, Listing $listing, EstablishmentImageReviewer $objReviewer): RedirectResponse
     {
-        abort_unless($objRequest->user()->municipality_id === $listing->municipality_id, 403);
+        abort_unless($objRequest->user()->mun_id === $listing->mun_id, 403);
 
         $arrData = $objRequest->validate([
             'image_ids' => ['required', 'array', 'min:1'],
@@ -144,7 +146,7 @@ class ImagesController extends LguController
      */
     public function returnBatch(Request $objRequest, Listing $listing, EstablishmentImageReviewer $objReviewer): RedirectResponse
     {
-        abort_unless($objRequest->user()->municipality_id === $listing->municipality_id, 403);
+        abort_unless($objRequest->user()->mun_id === $listing->mun_id, 403);
 
         $arrData = $objRequest->validate([
             'image_ids' => ['required', 'array', 'min:1'],
@@ -165,11 +167,11 @@ class ImagesController extends LguController
         $objUser = $objRequest->user();
 
         return Listing::query()
-            ->where('municipality_id', $objUser->municipality_id)
-            ->where(function ($query) {
-                $query->whereDoesntHave('establishmentUser')->orWhere('reporting_mode', ReportingMethod::ManualPaper->value);
+            ->where('mun_id', $objUser->mun_id)
+            ->where(function ($objQuery) {
+                $objQuery->whereDoesntHave('establishmentUser')->orWhere('lst_reporting_mode', ReportingMethod::ManualPaper->value);
             })
-            ->orderBy('name')
+            ->orderBy('lst_name')
             ->get();
     }
 }

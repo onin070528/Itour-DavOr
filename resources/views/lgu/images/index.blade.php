@@ -1,8 +1,10 @@
 {{--
-    System     : iTOUR - Integrated Tourism Information and Monitoring System
-    Purpose    : LGU Photos page — "All photos" (upload on behalf) and "Waiting for approval" (the merged former Photo Approvals queue) in one page.
-    Programmer : <name(s)>
-    Copyright  : 2026 University of Mindanao. All rights reserved.
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: LGU Photos page — "All photos" (upload on behalf) and "Waiting for approval" (the merged
+    former Photo Approvals queue) in one page.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
 --}}
 @php
     $blnApprovalTabActive = request('tab') === 'approval';
@@ -33,7 +35,7 @@
                     <label class="mb-1 block text-xs font-semibold text-sand-700">Establishment <span class="text-danger" aria-hidden="true">*</span></label>
                     <select name="listing_id" required class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
                         @foreach ($listings as $listing)
-                            <option value="{{ $listing->id }}">{{ $listing->name }}</option>
+                            <option value="{{ $listing->lst_id }}">{{ $listing->lst_name }}</option>
                         @endforeach
                     </select>
                     @error('listing_id')

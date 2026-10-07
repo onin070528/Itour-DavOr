@@ -1,5 +1,13 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Pest bootstrap — binds the test case and defines shared test helpers.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 use App\Enums\UserRole;
 use App\Models\Category;
 use App\Models\Listing;
@@ -64,7 +72,7 @@ function something()
 function actingAsEstablishment(string $name, string $subtitle = 'Somewhere, Davao Oriental'): User
 {
     // Try to find the pre-seeded listing first (so ArrivalSeeder data works)
-    $listing = Listing::query()->where('name', $name)->first();
+    $listing = Listing::query()->where('lst_name', $name)->first();
 
     if (! $listing) {
         $category = Category::query()->firstOrCreate(
@@ -73,20 +81,20 @@ function actingAsEstablishment(string $name, string $subtitle = 'Somewhere, Dava
         );
 
         $listing = Listing::query()->create([
-            'slug' => Str::slug($name.'-'.Str::random(6)),
-            'name' => $name,
-            'category' => 'accommodation',
+            'lst_slug' => Str::slug($name.'-'.Str::random(6)),
+            'lst_name' => $name,
+            'lst_category' => 'accommodation',
             'cat_id' => $category->cat_id,
-            'municipality' => 'City of Mati',
-            'barangay' => 'Dahican',
-            'status' => 'DRAFT',
+            'lst_municipality' => 'City of Mati',
+            'lst_barangay' => 'Dahican',
+            'lst_status' => 'DRAFT',
         ]);
     }
 
     return User::factory()->create([
-        'role' => UserRole::Establishment,
-        'organization_name' => $name,
-        'organization_subtitle' => $subtitle,
-        'establishment_id' => $listing->id,
+        'usr_role' => UserRole::Establishment,
+        'usr_organization_name' => $name,
+        'usr_organization_subtitle' => $subtitle,
+        'lst_id' => $listing->lst_id,
     ]);
 }

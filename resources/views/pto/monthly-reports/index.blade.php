@@ -23,7 +23,7 @@
     $percentOf = fn (int $value, int $total) => $total > 0 ? round($value / $total * 100, 1) : 0;
 @endphp
 
-<x-layouts.dashboard :user="$user" :nav-sections="$navSections" :page-title="$pageTitle" account-heading="System" :settings-href="route('pto.settings')" :show-breadcrumb="true">
+<x-layouts.dashboard :user="$user" :nav-sections="$navSections" :page-title="$pageTitle" account-heading="System" :settings-href="route('pto.settings')" :show-breadcrumb="false">
     <x-dashboard.page-header
         title="Provincial Reports"
         description="The province's consolidated tourism reporting records, built from LGU reports. Only reports verified by the PTO count in the official totals."
@@ -69,7 +69,7 @@
                     <ul class="mt-3 divide-y divide-sand-100">
                         @foreach ($overview['pendingReports'] as $pending)
                             <li class="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">
-                                <p><span class="font-semibold text-sand-900">{{ $pending['municipality']->name }}</span> <span class="text-sand-600">· {{ $pending['month']->format('F Y') }} · {{ number_format($pending['report']->total_arrivals) }} arrivals</span></p>
+                                <p><span class="font-semibold text-sand-900">{{ $pending['municipality']->mun_name }}</span> <span class="text-sand-600">· {{ $pending['month']->format('F Y') }} · {{ number_format($pending['report']->mrp_total_arrivals) }} arrivals</span></p>
                                 <button type="button" data-modal-open="province-month-{{ $pending['month']->month }}" class="rounded-sm bg-primary-700 px-3 py-1.5 text-xs font-semibold text-sand-0 hover:bg-primary-900">Review</button>
                             </li>
                         @endforeach
@@ -227,7 +227,7 @@
                             <tbody class="divide-y divide-sand-100">
                                 @foreach ($stats['lguCoverage'] as $coverage)
                                     <tr>
-                                        <td class="px-4 py-2.5 font-medium text-sand-900">{{ $coverage['municipality']->name }}</td>
+                                        <td class="px-4 py-2.5 font-medium text-sand-900">{{ $coverage['municipality']->mun_name }}</td>
                                         <td class="px-4 py-2.5 text-right text-sand-700">{{ $coverage['submittedMonths'] }} of {{ $coverage['expectedMonths'] }}</td>
                                         <td class="px-4 py-2.5 text-right text-sand-700">{{ $coverage['verifiedMonths'] }}</td>
                                         <td class="px-4 py-2.5 text-right font-semibold text-sand-900">{{ number_format($coverage['verifiedArrivals']) }}</td>

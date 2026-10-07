@@ -14,6 +14,7 @@ use App\Models\Listing;
 use App\Rules\EstablishmentTypeBelongsToCategory;
 use App\Support\SecurityLogger;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 /**
@@ -39,7 +40,7 @@ class SaveEstablishmentRequest extends FormRequest
     {
         $objUser = $this->user();
 
-        if ($objUser === null || ! $objUser->isLgu() || $objUser->municipality_id === null) {
+        if ($objUser === null || ! $objUser->isLgu() || $objUser->mun_id === null) {
             return false;
         }
 
@@ -49,16 +50,16 @@ class SaveEstablishmentRequest extends FormRequest
             return true;
         }
 
-        $blnIsOwnMunicipality = $objListing->municipality_id !== null && $objListing->municipality_id === $objUser->municipality_id;
+        $blnIsOwnMunicipality = $objListing->mun_id !== null && $objListing->mun_id === $objUser->mun_id;
 
         if (! $blnIsOwnMunicipality) {
-            SecurityLogger::accessDenied($objUser, 'municipality_scope', Listing::class, $objListing->municipality_id);
+            SecurityLogger::accessDenied($objUser, 'municipality_scope', Listing::class, $objListing->mun_id);
 
             return false;
         }
 
         // A destination is not edited through the establishment form.
-        abort_if($objListing->category === 'destinations', 404);
+        abort_if($objListing->lst_category === 'destinations', 404);
 
         return true;
     }
@@ -75,7 +76,7 @@ class SaveEstablishmentRequest extends FormRequest
             'cat_id' => [
                 'required',
                 'integer',
-                Rule::exists('tblcategories', 'cat_id')
+                Rule::exists('tbl_categories', 'cat_id')
                     ->where('cat_is_active', true)
                     ->whereNot('cat_name', Category::DESTINATION_CATEGORY_NAME),
             ],
@@ -86,7 +87,8 @@ class SaveEstablishmentRequest extends FormRequest
         $objListing = $this->_routeListing();
 
         if ($objListing !== null && $objListing->hasLockedPublicContent()) {
-            $arrRules = array_diff_key($arrRules, array_flip(Listing::PUBLIC_CONTENT_FIELDS));
+            $arrLockedFields = array_map(fn (string $strField) => Str::startsWith($strField, 'lst_') ? Str::after($strField, 'lst_') : $strField, Listing::PUBLIC_CONTENT_FIELDS);
+            $arrRules = array_diff_key($arrRules, array_flip($arrLockedFields));
         }
 
         // Summary comment: the Photos section exists on the Add form only —

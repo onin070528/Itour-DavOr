@@ -22,13 +22,13 @@ trait TracksReportHistory
     /**
      * @return Collection<int, OperationLog>
      */
-    private function reportHistory(MonthlyArrivalReport $report): Collection
+    private function reportHistory(MonthlyArrivalReport $objReport): Collection
     {
         return OperationLog::query()
-            ->where('entity_type', 'monthly_arrival_report')
-            ->where('entity_id', $report->id)
+            ->where('opl_entity_type', 'monthly_arrival_report')
+            ->where('opl_entity_id', $objReport->mar_id)
             ->with('user')
-            ->orderByDesc('created_at')
+            ->orderByDesc('opl_created_at')
             ->get();
     }
 }

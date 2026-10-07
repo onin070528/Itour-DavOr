@@ -1,4 +1,11 @@
 {{--
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: Ori chatbot panel opened from the floating launcher.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+--}}
+{{--
     Floating Ori tourism assistant widget, pinned to the bottom-right corner of
     the public site. The panel and message list are fully wired up; the reply
     in app.js's initChatbot() is a placeholder — swap it for a real request

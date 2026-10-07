@@ -66,13 +66,13 @@
             <li @class(['rounded-md border p-3', 'border-warning/40 bg-warning-bg/40' => $lgu['isPendingPto'], 'border-sand-200' => ! $lgu['isPendingPto']])>
                 <div class="flex flex-wrap items-start justify-between gap-2">
                     <div>
-                        <p class="font-semibold text-sand-900">{{ $lgu['municipality']->name }}</p>
+                        <p class="font-semibold text-sand-900">{{ $lgu['municipality']->mun_name }}</p>
                         @if ($report)
                             <p class="text-xs text-sand-600">
-                                {{ number_format($report->total_arrivals) }} arrivals ·
-                                submitted by {{ $report->submitter->name ?? '—' }} on {{ $report->updated_at->format('M j, Y') }}
-                                @if ($report->reviewed_at)
-                                    · reviewed by {{ $report->reviewer->name ?? 'PTO' }} on {{ $report->reviewed_at->format('M j, Y') }}
+                                {{ number_format($report->mrp_total_arrivals) }} arrivals ·
+                                submitted by {{ $report->submitter->usr_name ?? '—' }} on {{ $report->mrp_updated_at->format('M j, Y') }}
+                                @if ($report->mrp_reviewed_at)
+                                    · reviewed by {{ $report->reviewer->usr_name ?? 'PTO' }} on {{ $report->mrp_reviewed_at->format('M j, Y') }}
                                 @endif
                             </p>
                         @else
@@ -82,8 +82,8 @@
                     <x-dashboard.status-badge :tone="$lguTone($lgu['status'])">{{ $lgu['status'] }}</x-dashboard.status-badge>
                 </div>
 
-                @if ($report?->status === \App\Models\MunicipalReport::STATUS_RETURNED && $report->remarks)
-                    <p class="mt-2 rounded-sm bg-danger-bg px-2.5 py-1.5 text-xs text-danger">Returned with remarks: {{ $report->remarks }}</p>
+                @if ($report?->mrp_status === \App\Models\MunicipalReport::STATUS_RETURNED && $report->mrp_remarks)
+                    <p class="mt-2 rounded-sm bg-danger-bg px-2.5 py-1.5 text-xs text-danger">Returned with remarks: {{ $report->mrp_remarks }}</p>
                 @endif
 
                 @if ($report)
@@ -100,7 +100,7 @@
                                 <button
                                     type="button"
                                     data-confirm-trigger
-                                    data-confirm-title="Verify {{ $lgu['municipality']->name }}'s report?"
+                                    data-confirm-title="Verify {{ $lgu['municipality']->mun_name }}'s report?"
                                     data-confirm-message="Once verified, it becomes part of the official provincial report and is locked."
                                     data-confirm-label="Verify Report"
                                     data-confirm-tone="success"
@@ -115,8 +115,8 @@
                                 <form method="POST" action="{{ route('pto.municipalReports.return', $report) }}" class="mt-2 flex flex-col gap-2">
                                     @csrf
                                     @method('PATCH')
-                                    <label for="return-remarks-{{ $report->id }}" class="text-xs font-semibold text-sand-700">What should the LGU correct? <span class="text-danger" aria-hidden="true">*</span></label>
-                                    <textarea id="return-remarks-{{ $report->id }}" name="remarks" rows="2" required maxlength="2000" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm"></textarea>
+                                    <label for="return-remarks-{{ $report->mrp_id }}" class="text-xs font-semibold text-sand-700">What should the LGU correct? <span class="text-danger" aria-hidden="true">*</span></label>
+                                    <textarea id="return-remarks-{{ $report->mrp_id }}" name="remarks" rows="2" required maxlength="2000" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm"></textarea>
                                     <div>
                                         <button type="submit" class="rounded-sm bg-danger px-3 py-1.5 text-xs font-semibold text-sand-0 hover:opacity-90">Return to LGU</button>
                                     </div>
@@ -137,9 +137,9 @@
                                     <tr>
                                         <td class="py-1.5 pr-2 text-sand-800">{{ $establishment['name'] }}</td>
                                         <td class="py-1.5 pr-2">
-                                            <x-dashboard.status-badge :tone="$establishment['report']?->status->badgeTone() ?? 'danger'">{{ $establishment['report']?->status->label() ?? 'Not Submitted' }}</x-dashboard.status-badge>
+                                            <x-dashboard.status-badge :tone="$establishment['report']?->mar_status->badgeTone() ?? 'danger'">{{ $establishment['report']?->mar_status->label() ?? 'Not Submitted' }}</x-dashboard.status-badge>
                                         </td>
-                                        <td class="py-1.5 text-right font-semibold text-sand-800">{{ $establishment['report'] ? number_format($establishment['report']->total_visitors) : '—' }}</td>
+                                        <td class="py-1.5 text-right font-semibold text-sand-800">{{ $establishment['report'] ? number_format($establishment['report']->mar_total_visitors) : '—' }}</td>
                                     </tr>
                                 @endforeach
                             </tbody>

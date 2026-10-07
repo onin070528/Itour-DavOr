@@ -19,19 +19,19 @@
                 <tr
                     data-row
                     data-category-id="{{ $establishment->cat_id }}"
-                    data-type="{{ $establishment->type }}"
+                    data-type="{{ $establishment->lst_type }}"
                     data-reporting="{{ $objReportingMethod->value }}"
-                    data-search-text="{{ Str::lower($establishment->name.' '.$establishment->barangay) }}"
+                    data-search-text="{{ Str::lower($establishment->lst_name.' '.$establishment->lst_barangay) }}"
                     class="hover:bg-sand-50"
                 >
                     <td class="px-4 py-3">
-                        <a href="{{ route('lgu.directory.establishments.show', $establishment) }}" class="font-medium text-sand-900 hover:text-primary-700">{{ $establishment->name }}</a>
+                        <a href="{{ route('lgu.directory.establishments.show', $establishment) }}" class="font-medium text-sand-900 hover:text-primary-700">{{ $establishment->lst_name }}</a>
                     </td>
                     <td class="px-4 py-3 text-sand-700">
                         {{ $establishment->categoryName() }}
-                        <span class="block text-xs text-sand-500">{{ $establishment->type ?? 'Type not set' }}</span>
+                        <span class="block text-xs text-sand-500">{{ $establishment->lst_type ?? 'Type not set' }}</span>
                     </td>
-                    <td class="px-4 py-3 text-sand-700">{{ $establishment->barangay ?: '—' }}</td>
+                    <td class="px-4 py-3 text-sand-700">{{ $establishment->lst_barangay ?: '—' }}</td>
                     <td class="px-4 py-3 text-sand-700">
                         <span class="inline-flex items-center gap-1.5">
                             <i class="ti {{ $objReportingMethod->icon() }} text-sand-500" aria-hidden="true"></i>

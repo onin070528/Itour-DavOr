@@ -1,10 +1,12 @@
 <?php
 
-/*
- * System     : iTOUR - Integrated Tourism Information and Monitoring System
- * Purpose    : Validates an establishment photo upload — real content type, size, dimensions, and the ownership checkbox.
- * Programmer : <name(s)>
- * Copyright  : 2026 University of Mindanao. All rights reserved.
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Validates an establishment photo upload — real content type, size, dimensions, and the
+ * ownership checkbox.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
  */
 
 namespace App\Http\Requests;
@@ -44,7 +46,7 @@ class UploadEstablishmentImageRequest extends FormRequest
         $intMinLiveImages = (int) config('establishment_images.min_live_images_per_listing');
 
         return [
-            'listing_id' => ['required', 'integer', 'exists:listings,id'],
+            'listing_id' => ['required', 'integer', 'exists:tbl_listings,lst_id'],
             'photos' => ['required', 'array', 'min:'.$intMinLiveImages],
             'photos.*' => self::photoFileRules(),
             'ownership_declared' => ['required', 'accepted'],

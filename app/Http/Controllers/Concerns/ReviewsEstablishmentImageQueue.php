@@ -1,10 +1,12 @@
 <?php
 
-/*
- * System     : iTOUR - Integrated Tourism Information and Monitoring System
- * Purpose    : Shared queue-card grouping and batch-outcome messaging behind the LGU and PTO photo approval queues.
- * Programmer : <name(s)>
- * Copyright  : 2026 University of Mindanao. All rights reserved.
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Shared queue-card grouping and batch-outcome messaging behind the LGU and PTO photo
+ * approval queues.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
  */
 
 namespace App\Http\Controllers\Concerns;
@@ -36,7 +38,7 @@ trait ReviewsEstablishmentImageQueue
     private function _queueCards(Collection $objPendingImages): Collection
     {
         return $objPendingImages
-            ->groupBy('listing_id')
+            ->groupBy('lst_id')
             ->map(function (Collection $objImagesForListing) {
                 $objMostRecentImage = $objImagesForListing->sortByDesc('img_created_at')->first();
 

@@ -1,8 +1,10 @@
 {{--
-    System     : iTOUR - Integrated Tourism Information and Monitoring System
-    Purpose    : Shared photo management grid — thumbnails, status, Add/Replace/Remove/Set Cover, drag-to-reorder. Used by all three portals.
-    Programmer : <name(s)>
-    Copyright  : 2026 University of Mindanao. All rights reserved.
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: Shared photo management grid — thumbnails, status, Add/Replace/Remove/Set Cover,
+    drag-to-reorder. Used by all three portals.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
 --}}
 @props(['listing', 'images', 'uploadRoute', 'replaceRouteName', 'removeRouteName', 'coverRouteName', 'creditRouteName', 'reorderRouteName', 'canUpload' => true, 'readOnly' => false])
 
@@ -127,7 +129,7 @@
     <x-dashboard.modal id="add-photo-modal" title="Add Photo">
         <form id="add-photo-form" method="POST" action="{{ $uploadRoute }}" enctype="multipart/form-data" class="flex flex-col gap-3">
             @csrf
-            <input type="hidden" name="listing_id" value="{{ $listing->id }}">
+            <input type="hidden" name="listing_id" value="{{ $listing->lst_id }}">
             <div>
                 <label class="mb-1 block text-xs font-semibold text-sand-700">Photos <span class="text-danger" aria-hidden="true">*</span></label>
                 <input name="photos[]" type="file" accept="image/jpeg,image/png,image/webp" multiple required class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">

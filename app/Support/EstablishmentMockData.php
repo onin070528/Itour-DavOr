@@ -31,41 +31,41 @@ class EstablishmentMockData
     /**
      * The establishment's own tourism directory listing, if it has one.
      */
-    public static function profile(string $name): ?array
+    public static function profile(string $strName): ?array
     {
-        return collect(TourismCatalog::listings())->firstWhere('name', $name);
+        return collect(TourismCatalog::listings())->firstWhere('name', $strName);
     }
 
     /**
      * The establishment's photo gallery, read from the real
-     * `listing_images` table (App\Models\ListingImage) — backs add/
+     * `tbl_listing_images` table (App\Models\ListingImage) — backs add/
      * remove/set-featured on the Establishment Profile page.
      *
      * @return array<int, array{id: int, path: string, caption: ?string, primary: bool}>
      */
-    public static function galleryImages(string $name): array
+    public static function galleryImages(string $strName): array
     {
-        $profile = self::profile($name);
-        if (! $profile) {
+        $arrProfile = self::profile($strName);
+        if (! $arrProfile) {
             return [];
         }
 
         return Listing::query()
-            ->where('slug', $profile['id'])
+            ->where('lst_slug', $arrProfile['id'])
             ->firstOrFail()
             ->images
-            ->map(fn ($image) => [
-                'id' => $image->id,
-                'path' => $image->path,
-                'caption' => $image->caption,
-                'primary' => $image->is_primary,
+            ->map(fn ($objImage) => [
+                'id' => $objImage->lsi_id,
+                'path' => $objImage->lsi_path,
+                'caption' => $objImage->lsi_caption,
+                'primary' => $objImage->lsi_is_primary,
             ])
             ->all();
     }
 
     /**
      * Individual guest arrival records for this establishment, read from
-     * the real `arrivals` table (App\Models\Arrival, source=staff — i.e.
+     * the real `tbl_arrivals` table (App\Models\Arrival, arr_source=staff — i.e.
      * submissions from the front-desk "Record Arrival" wizard). Seeded
      * verbatim from self::seedArrivals() by ArrivalSeeder, so every
      * existing caller of arrivals() (this class' own dashboardSummary(),
@@ -74,28 +74,28 @@ class EstablishmentMockData
      *
      * @return array<int, array{id: string, date: string, visitorName: ?string, gender: ?string, classification: ?string, remarks: ?string, status: string}>
      */
-    public static function arrivals(string $name): array
+    public static function arrivals(string $strName): array
     {
-        $listing = collect(TourismCatalog::listings())->firstWhere('name', $name);
+        $objListing = collect(TourismCatalog::listings())->firstWhere('name', $strName);
 
-        if (! $listing) {
+        if (! $objListing) {
             return [];
         }
 
         return Arrival::query()
-            ->whereHas('listing', fn ($q) => $q->where('slug', $listing['id']))
-            ->where('source', 'staff')
-            ->orderByDesc('date')
-            ->orderByDesc('id')
+            ->whereHas('listing', fn ($objQuery) => $objQuery->where('lst_slug', $objListing['id']))
+            ->where('arr_source', 'staff')
+            ->orderByDesc('arr_date')
+            ->orderByDesc('arr_id')
             ->get()
-            ->map(fn ($arrival) => [
-                'id' => 'GR-'.$arrival->id,
-                'date' => $arrival->date->toDateString(),
-                'visitorName' => $arrival->visitor_name,
-                'gender' => $arrival->gender,
-                'classification' => $arrival->classification,
-                'remarks' => $arrival->remarks,
-                'status' => $arrival->status,
+            ->map(fn ($objArrival) => [
+                'id' => 'GR-'.$objArrival->arr_id,
+                'date' => $objArrival->arr_date->toDateString(),
+                'visitorName' => $objArrival->arr_visitor_name,
+                'gender' => $objArrival->arr_gender,
+                'classification' => $objArrival->arr_classification,
+                'remarks' => $objArrival->arr_remarks,
+                'status' => $objArrival->arr_status,
             ])
             ->all();
     }
@@ -103,14 +103,14 @@ class EstablishmentMockData
     /**
      * The original, hand-authored arrival demo rows for Botanika Nature
      * Resort — the only establishment with any — kept here as the single
-     * authored source ArrivalSeeder loads into the `arrivals` table. Not
+     * authored source ArrivalSeeder loads into the `tbl_arrivals` table. Not
      * used for reads anymore (see arrivals() above).
      *
      * @return array<int, array{id: string, date: string, visitorName: ?string, gender: string, classification: string, remarks: ?string, status: string}>
      */
-    public static function seedArrivals(string $name): array
+    public static function seedArrivals(string $strName): array
     {
-        $rows = match ($name) {
+        $arrRows = match ($strName) {
             'Botanika Nature Resort' => [
                 ['2026-08-22', 'Kim Soo-jin', 'Female', 'Foreign', 'Celebrating a birthday', 'Recorded'],
                 ['2026-08-22', null, 'Male', 'Domestic (Other Province)', null, 'Recorded'],
@@ -128,34 +128,34 @@ class EstablishmentMockData
             default => [],
         };
 
-        return collect($rows)->map(fn ($row, $i) => [
+        return collect($arrRows)->map(fn ($arrRow, $i) => [
             'id' => 'GR-'.(2026080100 - $i),
-            'date' => $row[0],
-            'visitorName' => $row[1],
-            'gender' => $row[2],
-            'classification' => $row[3],
-            'remarks' => $row[4],
-            'status' => $row[5],
+            'date' => $arrRow[0],
+            'visitorName' => $arrRow[1],
+            'gender' => $arrRow[2],
+            'classification' => $arrRow[3],
+            'remarks' => $arrRow[4],
+            'status' => $arrRow[5],
         ])->all();
     }
 
     /**
      * @return array<int, array{label: string, value: string, delta: string, tone: string}>
      */
-    public static function dashboardSummary(string $name): array
+    public static function dashboardSummary(string $strName): array
     {
-        $arrivals = collect(self::arrivals($name));
-        $thisMonth = $arrivals->filter(fn ($row) => str_starts_with($row['date'], '2026-08'));
-        $feedback = collect(self::feedback($name));
-        $sentiment = self::sentimentBreakdown($name);
-        $total = array_sum($sentiment);
-        $positivePct = $total ? round(($sentiment['positive'] / $total) * 100) : null;
+        $objArrivals = collect(self::arrivals($strName));
+        $objThisMonth = $objArrivals->filter(fn ($arrRow) => str_starts_with($arrRow['date'], '2026-08'));
+        $objFeedback = collect(self::feedback($strName));
+        $arrSentiment = self::sentimentBreakdown($strName);
+        $intTotal = array_sum($arrSentiment);
+        $fltPositivePct = $intTotal ? round(($arrSentiment['positive'] / $intTotal) * 100) : null;
 
         return [
-            ['label' => 'Total Tourist Arrivals', 'value' => (string) $arrivals->count(), 'delta' => 'All recorded visits', 'tone' => 'neutral'],
-            ['label' => "This Month's Visitors", 'value' => (string) $thisMonth->count(), 'delta' => 'August 2026', 'tone' => 'success'],
-            ['label' => 'Tourist Feedback', 'value' => (string) $feedback->count(), 'delta' => 'All time', 'tone' => 'neutral'],
-            ['label' => 'Overall Sentiment', 'value' => $positivePct !== null ? "{$positivePct}% Positive" : '—', 'delta' => $total ? "{$total} entries analyzed" : 'No feedback yet', 'tone' => 'success'],
+            ['label' => 'Total Tourist Arrivals', 'value' => (string) $objArrivals->count(), 'delta' => 'All recorded visits', 'tone' => 'neutral'],
+            ['label' => "This Month's Visitors", 'value' => (string) $objThisMonth->count(), 'delta' => 'August 2026', 'tone' => 'success'],
+            ['label' => 'Tourist Feedback', 'value' => (string) $objFeedback->count(), 'delta' => 'All time', 'tone' => 'neutral'],
+            ['label' => 'Overall Sentiment', 'value' => $fltPositivePct !== null ? "{$fltPositivePct}% Positive" : '—', 'delta' => $intTotal ? "{$intTotal} entries analyzed" : 'No feedback yet', 'tone' => 'success'],
         ];
     }
 
@@ -166,13 +166,13 @@ class EstablishmentMockData
      *
      * @return array<string, array<int, array{label: string, value: int}>>
      */
-    public static function arrivalTrend(string $name): array
+    public static function arrivalTrend(string $strName): array
     {
-        $share = max(0.01, (crc32($name) % 7 + 3) / 100);
+        $fltShare = max(0.01, (crc32($strName) % 7 + 3) / 100);
 
         return collect(PtoMockData::arrivalTrend())
-            ->map(fn (array $series) => collect($series)
-                ->map(fn (array $point) => ['label' => $point['label'], 'value' => max(0, (int) round($point['value'] * $share))])
+            ->map(fn (array $arrSeries) => collect($arrSeries)
+                ->map(fn (array $arrPoint) => ['label' => $arrPoint['label'], 'value' => max(0, (int) round($arrPoint['value'] * $fltShare))])
                 ->all())
             ->all();
     }
@@ -180,18 +180,18 @@ class EstablishmentMockData
     /**
      * @return Collection<string, int>
      */
-    public static function classificationBreakdown(string $name)
+    public static function classificationBreakdown(string $strName)
     {
-        return collect(self::arrivals($name))->countBy('classification');
+        return collect(self::arrivals($strName))->countBy('classification');
     }
 
     /**
      * @return array<int, array<string, mixed>>
      */
-    public static function feedback(string $name): array
+    public static function feedback(string $strName): array
     {
         return collect(PtoMockData::feedback())
-            ->where('subject', $name)
+            ->where('subject', $strName)
             ->values()
             ->all();
     }
@@ -199,27 +199,27 @@ class EstablishmentMockData
     /**
      * @return array{positive: int, neutral: int, negative: int}
      */
-    public static function sentimentBreakdown(string $name): array
+    public static function sentimentBreakdown(string $strName): array
     {
-        $feedback = collect(self::feedback($name));
+        $objFeedback = collect(self::feedback($strName));
 
         return [
-            'positive' => $feedback->where('sentiment', 'Positive')->count(),
-            'neutral' => $feedback->where('sentiment', 'Neutral')->count(),
-            'negative' => $feedback->where('sentiment', 'Negative')->count(),
+            'positive' => $objFeedback->where('sentiment', 'Positive')->count(),
+            'neutral' => $objFeedback->where('sentiment', 'Neutral')->count(),
+            'negative' => $objFeedback->where('sentiment', 'Negative')->count(),
         ];
     }
 
     /**
      * @return array<string, array<int, array{label: string, value: int}>>
      */
-    public static function sentimentTrend(string $name): array
+    public static function sentimentTrend(string $strName): array
     {
-        $offset = (crc32($name) % 15) - 7;
+        $intOffset = (crc32($strName) % 15) - 7;
 
         return collect(PtoMockData::sentimentTrend())
-            ->map(fn (array $series) => collect($series)
-                ->map(fn (array $point) => ['label' => $point['label'], 'value' => max(0, min(100, $point['value'] + $offset))])
+            ->map(fn (array $arrSeries) => collect($arrSeries)
+                ->map(fn (array $arrPoint) => ['label' => $arrPoint['label'], 'value' => max(0, min(100, $arrPoint['value'] + $intOffset))])
                 ->all())
             ->all();
     }
@@ -227,10 +227,10 @@ class EstablishmentMockData
     /**
      * @return array<int, array{type: string, title: string, description: string, icon: string, time: string}>
      */
-    public static function recentActivity(string $name): array
+    public static function recentActivity(string $strName): array
     {
         return collect(PtoMockData::recentActivity())
-            ->filter(fn (array $activity) => str_contains($activity['description'], $name))
+            ->filter(fn (array $arrActivity) => str_contains($arrActivity['description'], $strName))
             ->values()
             ->all();
     }
@@ -251,15 +251,15 @@ class EstablishmentMockData
     /**
      * @return array<int, array{name: string, typeKey: string, type: string, range: string, generatedAt: string, generatedBy: string}>
      */
-    public static function reportHistory(string $name): array
+    public static function reportHistory(string $strName): array
     {
-        if (! self::arrivals($name)) {
+        if (! self::arrivals($strName)) {
             return [];
         }
 
         return [
-            ['name' => "Tourist Arrival Report — {$name}, July 2026", 'typeKey' => 'arrivals', 'type' => 'Tourist Arrival Report', 'range' => 'Jul 1 – Jul 31, 2026', 'generatedAt' => '2026-08-02', 'generatedBy' => 'Front Desk Account'],
-            ['name' => "Tourist Feedback Report — {$name}, July 2026", 'typeKey' => 'feedback', 'type' => 'Tourist Feedback Report', 'range' => 'Jul 1 – Jul 31, 2026', 'generatedAt' => '2026-08-01', 'generatedBy' => 'Front Desk Account'],
+            ['name' => "Tourist Arrival Report — {$strName}, July 2026", 'typeKey' => 'arrivals', 'type' => 'Tourist Arrival Report', 'range' => 'Jul 1 – Jul 31, 2026', 'generatedAt' => '2026-08-02', 'generatedBy' => 'Front Desk Account'],
+            ['name' => "Tourist Feedback Report — {$strName}, July 2026", 'typeKey' => 'feedback', 'type' => 'Tourist Feedback Report', 'range' => 'Jul 1 – Jul 31, 2026', 'generatedAt' => '2026-08-01', 'generatedBy' => 'Front Desk Account'],
         ];
     }
 
@@ -271,82 +271,82 @@ class EstablishmentMockData
      *
      * @return array<string, array{summary: array<int, array{label: string, value: string}>, chart: array<string, mixed>|null, breakdown: array{label: string, columns: array<int, string>, rows: array<int, array<int, string>>}|null, columns: array<int, string>, rows: array<int, array<int, string>>, filterable: bool, empty: bool}>
      */
-    public static function reportPreviewData(string $name): array
+    public static function reportPreviewData(string $strName): array
     {
-        $arrivals = self::arrivals($name);
-        $feedback = self::feedback($name);
-        $sentiment = self::sentimentBreakdown($name);
-        $sentimentTotal = array_sum($sentiment);
-        $classifications = self::classificationBreakdown($name);
-        $foreignCount = collect($arrivals)->where('classification', 'Foreign')->count();
+        $arrArrivals = self::arrivals($strName);
+        $arrFeedback = self::feedback($strName);
+        $arrSentiment = self::sentimentBreakdown($strName);
+        $intSentimentTotal = array_sum($arrSentiment);
+        $objClassifications = self::classificationBreakdown($strName);
+        $intForeignCount = collect($arrArrivals)->where('classification', 'Foreign')->count();
 
         return [
             'arrivals' => [
                 'summary' => [
-                    ['label' => 'Total Arrivals', 'value' => (string) count($arrivals)],
-                    ['label' => 'Domestic Visitors', 'value' => (string) (count($arrivals) - $foreignCount)],
-                    ['label' => 'Foreign Visitors', 'value' => (string) $foreignCount],
-                    ['label' => 'Recorded', 'value' => (string) collect($arrivals)->where('status', 'Recorded')->count()],
+                    ['label' => 'Total Arrivals', 'value' => (string) count($arrArrivals)],
+                    ['label' => 'Domestic Visitors', 'value' => (string) (count($arrArrivals) - $intForeignCount)],
+                    ['label' => 'Foreign Visitors', 'value' => (string) $intForeignCount],
+                    ['label' => 'Recorded', 'value' => (string) collect($arrArrivals)->where('status', 'Recorded')->count()],
                 ],
                 'chart' => [
                     'type' => 'bar',
                     'title' => 'Visitor Classification Distribution',
-                    'items' => $classifications->map(fn ($value, $label) => ['label' => $label, 'value' => $value])->values()->all(),
+                    'items' => $objClassifications->map(fn ($value, $strLabel) => ['label' => $strLabel, 'value' => $value])->values()->all(),
                 ],
                 'breakdown' => null,
                 'columns' => ['Date', 'Visitor Name', 'Gender', 'Classification', 'Remarks'],
-                'rows' => collect($arrivals)->map(fn ($row) => [
-                    Carbon::parse($row['date'])->format('M j, Y'),
-                    $row['visitorName'] ?? 'Guest', $row['gender'], $row['classification'], $row['remarks'] ?? '—',
+                'rows' => collect($arrArrivals)->map(fn ($arrRow) => [
+                    Carbon::parse($arrRow['date'])->format('M j, Y'),
+                    $arrRow['visitorName'] ?? 'Guest', $arrRow['gender'], $arrRow['classification'], $arrRow['remarks'] ?? '—',
                 ])->all(),
                 'filterable' => true,
-                'empty' => count($arrivals) === 0,
+                'empty' => count($arrArrivals) === 0,
             ],
             'statistics' => [
                 'summary' => [
-                    ['label' => 'Total Arrivals', 'value' => (string) count($arrivals)],
-                    ['label' => 'Classifications Tracked', 'value' => (string) $classifications->count()],
+                    ['label' => 'Total Arrivals', 'value' => (string) count($arrArrivals)],
+                    ['label' => 'Classifications Tracked', 'value' => (string) $objClassifications->count()],
                 ],
                 'chart' => [
                     'type' => 'trend',
                     'title' => 'Visitor Trend',
-                    'labels' => collect(self::arrivalTrend($name)['month'])->pluck('label')->all(),
-                    'values' => collect(self::arrivalTrend($name)['month'])->pluck('value')->all(),
+                    'labels' => collect(self::arrivalTrend($strName)['month'])->pluck('label')->all(),
+                    'values' => collect(self::arrivalTrend($strName)['month'])->pluck('value')->all(),
                 ],
                 'breakdown' => null,
                 'columns' => ['Classification', 'Visitors'],
-                'rows' => $classifications->map(fn ($count, $label) => [$label, (string) $count])->values()->all(),
+                'rows' => $objClassifications->map(fn ($intCount, $strLabel) => [$strLabel, (string) $intCount])->values()->all(),
                 'filterable' => false,
-                'empty' => count($arrivals) === 0,
+                'empty' => count($arrArrivals) === 0,
             ],
             'feedback' => [
                 'summary' => [
-                    ['label' => 'Feedback Entries', 'value' => (string) count($feedback)],
-                    ['label' => 'Positive', 'value' => (string) collect($feedback)->where('sentiment', 'Positive')->count()],
-                    ['label' => 'Negative', 'value' => (string) collect($feedback)->where('sentiment', 'Negative')->count()],
+                    ['label' => 'Feedback Entries', 'value' => (string) count($arrFeedback)],
+                    ['label' => 'Positive', 'value' => (string) collect($arrFeedback)->where('sentiment', 'Positive')->count()],
+                    ['label' => 'Negative', 'value' => (string) collect($arrFeedback)->where('sentiment', 'Negative')->count()],
                 ],
-                'chart' => ['type' => 'donut', 'positive' => $sentiment['positive'], 'neutral' => $sentiment['neutral'], 'negative' => $sentiment['negative']],
+                'chart' => ['type' => 'donut', 'positive' => $arrSentiment['positive'], 'neutral' => $arrSentiment['neutral'], 'negative' => $arrSentiment['negative']],
                 'breakdown' => null,
                 'columns' => ['Date', 'Sentiment', 'Feedback'],
-                'rows' => collect($feedback)->map(fn ($row) => [
-                    Carbon::parse($row['date'])->format('M j, Y'),
-                    $row['sentiment'], Str::limit($row['text'], 70),
+                'rows' => collect($arrFeedback)->map(fn ($arrRow) => [
+                    Carbon::parse($arrRow['date'])->format('M j, Y'),
+                    $arrRow['sentiment'], Str::limit($arrRow['text'], 70),
                 ])->all(),
                 'filterable' => true,
-                'empty' => count($feedback) === 0,
+                'empty' => count($arrFeedback) === 0,
             ],
             'experience' => [
                 'summary' => [
-                    ['label' => 'Feedback Analyzed', 'value' => number_format($sentimentTotal)],
-                    ['label' => 'Positive Share', 'value' => $sentimentTotal ? round(($sentiment['positive'] / $sentimentTotal) * 100).'%' : '—'],
-                    ['label' => 'Negative Entries', 'value' => number_format($sentiment['negative'])],
+                    ['label' => 'Feedback Analyzed', 'value' => number_format($intSentimentTotal)],
+                    ['label' => 'Positive Share', 'value' => $intSentimentTotal ? round(($arrSentiment['positive'] / $intSentimentTotal) * 100).'%' : '—'],
+                    ['label' => 'Negative Entries', 'value' => number_format($arrSentiment['negative'])],
                 ],
-                'chart' => ['type' => 'donut', 'positive' => $sentiment['positive'], 'neutral' => $sentiment['neutral'], 'negative' => $sentiment['negative']],
+                'chart' => ['type' => 'donut', 'positive' => $arrSentiment['positive'], 'neutral' => $arrSentiment['neutral'], 'negative' => $arrSentiment['negative']],
                 'breakdown' => null,
                 'columns' => [],
                 'rows' => [],
                 'filterable' => false,
-                'empty' => $sentimentTotal === 0,
+                'empty' => $intSentimentTotal === 0,
             ],
         ];
     }

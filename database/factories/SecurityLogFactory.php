@@ -1,5 +1,13 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Model factory for generating security log test records.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 namespace Database\Factories;
 
 use App\Models\SecurityLog;
@@ -19,15 +27,15 @@ class SecurityLogFactory extends Factory
     public function definition(): array
     {
         return [
-            'event_type' => 'login_success',
-            'user_id' => User::factory(),
-            'attempted_email' => null,
-            'target_user_id' => null,
-            'municipality_id' => null,
-            'ip_address' => fake()->ipv4(),
-            'user_agent' => fake()->userAgent(),
-            'details' => null,
-            'created_at' => now(),
+            'sec_event_type' => 'login_success',
+            'usr_id' => User::factory(),
+            'sec_attempted_email' => null,
+            'sec_target_user_id' => null,
+            'mun_id' => null,
+            'sec_ip_address' => fake()->ipv4(),
+            'sec_user_agent' => fake()->userAgent(),
+            'sec_details' => null,
+            'sec_created_at' => now(),
         ];
     }
 }

@@ -26,16 +26,16 @@ use App\Models\User;
 class DashboardNavigation
 {
     /**
-     * @param  string  $active  Dot-path of the current page, e.g. "monitoring.arrivals".
+     * @param  string  $strActive  Dot-path of the current page, e.g. "monitoring.arrivals".
      * @param  int  $intImageApprovalCount  Establishments (not photos) waiting for this user's photo decision — 0 for a role that never approves.
      * @return array<string, array<int, array<string, mixed>>>
      */
-    public static function sections(User $user, string $active, int $intImageApprovalCount = 0): array
+    public static function sections(User $objUser, string $strActive, int $intImageApprovalCount = 0): array
     {
         $arrSections = match (true) {
-            $user->isPto() => self::_ptoSections($active, $intImageApprovalCount),
-            $user->isLgu() => self::_lguSections($active, $intImageApprovalCount),
-            $user->isEstablishment() => self::_establishmentSections($active),
+            $objUser->isPto() => self::_ptoSections($strActive, $intImageApprovalCount),
+            $objUser->isLgu() => self::_lguSections($strActive, $intImageApprovalCount),
+            $objUser->isEstablishment() => self::_establishmentSections($strActive),
             default => [],
         };
 
@@ -46,10 +46,10 @@ class DashboardNavigation
     /**
      * @return array<string, array<int, array<string, mixed>>>
      */
-    private static function _ptoSections(string $active, int $intImageApprovalCount): array
+    private static function _ptoSections(string $strActive, int $intImageApprovalCount): array
     {
-        $item = self::_itemBuilder($active);
-        $group = self::_groupBuilder($active);
+        $item = self::_itemBuilder($strActive);
+        $group = self::_groupBuilder($strActive);
 
         return [
             'Main' => [
@@ -81,10 +81,10 @@ class DashboardNavigation
     /**
      * @return array<string, array<int, array<string, mixed>>>
      */
-    private static function _lguSections(string $active, int $intImageApprovalCount): array
+    private static function _lguSections(string $strActive, int $intImageApprovalCount): array
     {
-        $item = self::_itemBuilder($active);
-        $group = self::_groupBuilder($active);
+        $item = self::_itemBuilder($strActive);
+        $group = self::_groupBuilder($strActive);
         $objAttractions = $item('directory.attractions', 'ti-mountain', 'Attractions', 'lgu.directory.establishments');
         $objAttractions['href'] = route('lgu.directory.establishments', ['view' => 'attractions']);
 
@@ -131,10 +131,10 @@ class DashboardNavigation
     /**
      * @return array<string, array<int, array<string, mixed>>>
      */
-    private static function _establishmentSections(string $active): array
+    private static function _establishmentSections(string $strActive): array
     {
-        $item = self::_itemBuilder($active);
-        $group = self::_groupBuilder($active);
+        $item = self::_itemBuilder($strActive);
+        $group = self::_groupBuilder($strActive);
 
         return [
             'Main' => [
@@ -170,14 +170,14 @@ class DashboardNavigation
     /**
      * @return \Closure(string, string, string, string, ?int=): array<string, mixed>
      */
-    private static function _itemBuilder(string $active): \Closure
+    private static function _itemBuilder(string $strActive): \Closure
     {
-        return fn (string $key, string $icon, string $label, string $route, ?int $intBadge = null) => [
-            'key' => $key,
-            'icon' => $icon,
-            'label' => $label,
-            'href' => route($route),
-            'active' => $active === $key,
+        return fn (string $strKey, string $strIcon, string $strLabel, string $strRoute, ?int $intBadge = null) => [
+            'key' => $strKey,
+            'icon' => $strIcon,
+            'label' => $strLabel,
+            'href' => route($strRoute),
+            'active' => $strActive === $strKey,
             'soon' => false,
             'badge' => $intBadge,
         ];
@@ -186,14 +186,14 @@ class DashboardNavigation
     /**
      * @return \Closure(string, string, string, array): array<string, mixed>
      */
-    private static function _groupBuilder(string $active): \Closure
+    private static function _groupBuilder(string $strActive): \Closure
     {
-        return fn (string $key, string $icon, string $label, array $children) => [
-            'key' => $key,
-            'icon' => $icon,
-            'label' => $label,
-            'children' => $children,
-            'active' => $active === $key || str_starts_with($active, "{$key}."),
+        return fn (string $strKey, string $strIcon, string $strLabel, array $arrChildren) => [
+            'key' => $strKey,
+            'icon' => $strIcon,
+            'label' => $strLabel,
+            'children' => $arrChildren,
+            'active' => $strActive === $strKey || str_starts_with($strActive, "{$strKey}."),
         ];
     }
 }

@@ -40,39 +40,39 @@ class OfficialReportBuilder
      *
      * @return array{0: Collection, 1: Collection}
      */
-    public static function municipalBreakdown(MunicipalReport $municipalReport): array
+    public static function municipalBreakdown(MunicipalReport $objMunicipalReport): array
     {
-        $municipalReport->loadMissing(['submitter', 'reviewer', 'monthlyArrivalReports.listing.categoryRecord', 'monthlyArrivalReports.submitter', 'monthlyArrivalReports.verifier']);
+        $objMunicipalReport->loadMissing(['submitter', 'reviewer', 'monthlyArrivalReports.listing.categoryRecord', 'monthlyArrivalReports.submitter', 'monthlyArrivalReports.verifier']);
 
-        $breakdown = $municipalReport->monthlyArrivalReports->filter(
-            fn ($monthlyReport) => $monthlyReport->listing?->isQrEnabled()
+        $objBreakdown = $objMunicipalReport->monthlyArrivalReports->filter(
+            fn ($objMonthlyReport) => $objMonthlyReport->listing?->isQrEnabled()
         )->values();
 
-        $missingEstablishments = $municipalReport->municipality_id
-            ? self::_missingEstablishments($municipalReport->municipality_id, $breakdown)
+        $objMissingEstablishments = $objMunicipalReport->mun_id
+            ? self::_missingEstablishments($objMunicipalReport->mun_id, $objBreakdown)
             : collect();
 
-        return [$breakdown, $missingEstablishments];
+        return [$objBreakdown, $objMissingEstablishments];
     } // end municipalBreakdown
 
     /**
-     * @param  Collection<int, MonthlyArrivalReport>  $breakdown
+     * @param  Collection<int, MonthlyArrivalReport>  $objBreakdown
      * @return Collection<int, array<string, mixed>>
      */
-    public static function breakdownRows(Collection $breakdown): Collection
+    public static function breakdownRows(Collection $objBreakdown): Collection
     {
-        return $breakdown->map(fn ($monthlyReport) => [
-            'establishment' => $monthlyReport->listing->name,
-            'category' => $monthlyReport->listing->categoryRecord?->cat_name ?? 'Uncategorized',
-            'source' => $monthlyReport->submission_source->label(),
-            'male' => (int) $monthlyReport->party_male,
-            'female' => (int) $monthlyReport->party_female,
-            'total' => (int) $monthlyReport->total_visitors,
-            'adults' => (int) $monthlyReport->party_adults,
-            'children' => (int) $monthlyReport->party_children,
-            'seniors' => (int) $monthlyReport->party_seniors,
-            'local' => (int) $monthlyReport->party_local,
-            'foreign' => (int) $monthlyReport->party_foreign,
+        return $objBreakdown->map(fn ($objMonthlyReport) => [
+            'establishment' => $objMonthlyReport->listing->lst_name,
+            'category' => $objMonthlyReport->listing->categoryRecord?->cat_name ?? 'Uncategorized',
+            'source' => $objMonthlyReport->mar_submission_source->label(),
+            'male' => (int) $objMonthlyReport->mar_party_male,
+            'female' => (int) $objMonthlyReport->mar_party_female,
+            'total' => (int) $objMonthlyReport->mar_total_visitors,
+            'adults' => (int) $objMonthlyReport->mar_party_adults,
+            'children' => (int) $objMonthlyReport->mar_party_children,
+            'seniors' => (int) $objMonthlyReport->mar_party_seniors,
+            'local' => (int) $objMonthlyReport->mar_party_local,
+            'foreign' => (int) $objMonthlyReport->mar_party_foreign,
         ])->values();
     } // end breakdownRows
 
@@ -82,42 +82,42 @@ class OfficialReportBuilder
      *
      * @return array<string, mixed>
      */
-    public static function fromMunicipalReport(MunicipalReport $municipalReport): array
+    public static function fromMunicipalReport(MunicipalReport $objMunicipalReport): array
     {
-        [$breakdown, $missingEstablishments] = self::municipalBreakdown($municipalReport);
+        [$objBreakdown, $objMissingEstablishments] = self::municipalBreakdown($objMunicipalReport);
 
         return [
             'title' => 'LGU Consolidated Tourism Report',
-            'letterhead' => self::_lguLetterhead($municipalReport->municipality),
-            'period_label' => $municipalReport->period_start->format('F Y'),
-            'reference_number' => sprintf('MRP-%06d', $municipalReport->id),
-            'status_label' => MunicipalReportsController::statusLabel($municipalReport->status),
-            'is_draft' => ! $municipalReport->isFrozen(),
-            'verified_label' => $municipalReport->isFrozen() && $municipalReport->reviewed_at
-                ? 'Verified on '.$municipalReport->reviewed_at->format('F j, Y').' by '.($municipalReport->reviewer->name ?? 'PTO Administrator')
+            'letterhead' => self::_lguLetterhead($objMunicipalReport->mrp_municipality),
+            'period_label' => $objMunicipalReport->mrp_period_start->format('F Y'),
+            'reference_number' => sprintf('MRP-%06d', $objMunicipalReport->mrp_id),
+            'status_label' => MunicipalReportsController::statusLabel($objMunicipalReport->mrp_status),
+            'is_draft' => ! $objMunicipalReport->isFrozen(),
+            'verified_label' => $objMunicipalReport->isFrozen() && $objMunicipalReport->mrp_reviewed_at
+                ? 'Verified on '.$objMunicipalReport->mrp_reviewed_at->format('F j, Y').' by '.($objMunicipalReport->reviewer->usr_name ?? 'PTO Administrator')
                 : null,
-            'revision_number' => $municipalReport->revision_number,
-            'supersedes_reference' => $municipalReport->supersedes_id ? sprintf('MRP-%06d', $municipalReport->supersedes_id) : null,
-            ...self::_consolidatedBody($breakdown, $missingEstablishments),
-            'remarks' => $municipalReport->remarks,
+            'revision_number' => $objMunicipalReport->mrp_revision_number,
+            'supersedes_reference' => $objMunicipalReport->mrp_supersedes_id ? sprintf('MRP-%06d', $objMunicipalReport->mrp_supersedes_id) : null,
+            ...self::_consolidatedBody($objBreakdown, $objMissingEstablishments),
+            'remarks' => $objMunicipalReport->mrp_remarks,
             'signatures' => [
                 'prepared_by' => [
-                    'name' => $municipalReport->submitter->name ?? null,
-                    'position' => $municipalReport->submitter?->role?->title(),
-                    'date' => $municipalReport->created_at->format('M j, Y'),
+                    'name' => $objMunicipalReport->submitter->usr_name ?? null,
+                    'position' => $objMunicipalReport->submitter?->usr_role?->title(),
+                    'date' => $objMunicipalReport->mrp_created_at->format('M j, Y'),
                 ],
                 'reviewed_by' => [
-                    'name' => $municipalReport->reviewer->name ?? null,
-                    'position' => $municipalReport->reviewer?->role?->title(),
-                    'date' => $municipalReport->reviewed_at?->format('M j, Y'),
+                    'name' => $objMunicipalReport->reviewer->usr_name ?? null,
+                    'position' => $objMunicipalReport->reviewer?->usr_role?->title(),
+                    'date' => $objMunicipalReport->mrp_reviewed_at?->format('M j, Y'),
                 ],
                 'approved_by' => [
-                    'name' => $municipalReport->reviewer->name ?? null,
-                    'position' => $municipalReport->reviewer?->role?->title(),
-                    'date' => $municipalReport->reviewed_at?->format('M j, Y'),
+                    'name' => $objMunicipalReport->reviewer->usr_name ?? null,
+                    'position' => $objMunicipalReport->reviewer?->usr_role?->title(),
+                    'date' => $objMunicipalReport->mrp_reviewed_at?->format('M j, Y'),
                 ],
             ],
-            'verification_code' => $municipalReport->verification_code,
+            'verification_code' => $objMunicipalReport->mrp_verification_code,
             'generated_at' => now()->format('M j, Y g:i A'),
         ];
     } // end fromMunicipalReport
@@ -138,13 +138,13 @@ class OfficialReportBuilder
             ->loadMissing(['listing.categoryRecord', 'submitter', 'verifier']);
 
         $objBreakdown = $objVerifiedReports->filter(fn (MonthlyArrivalReport $objReport) => $objReport->listing?->isQrEnabled())->values();
-        $objMissing = self::_missingEstablishments($objMunicipality->id, $objBreakdown);
+        $objMissing = self::_missingEstablishments($objMunicipality->mun_id, $objBreakdown);
 
-        $strMissingNames = $objMissing->pluck('name')->implode(', ');
+        $strMissingNames = $objMissing->pluck('lst_name')->implode(', ');
 
         return [
             'title' => 'LGU Consolidated Tourism Report',
-            'letterhead' => self::_lguLetterhead($objMunicipality->name),
+            'letterhead' => self::_lguLetterhead($objMunicipality->mun_name),
             'period_label' => $dtMonth->format('F Y'),
             'reference_number' => 'Not yet submitted',
             'status_label' => 'Not yet submitted to PTO',
@@ -179,17 +179,17 @@ class OfficialReportBuilder
 
         $objListing = $objReport->listing;
         $arrOrigin = $objReport->originBreakdown();
-        $blnIsVerified = $objReport->verified_at !== null && $objReport->status === MonthlyReportStatus::Verified;
+        $blnIsVerified = $objReport->mar_verified_at !== null && $objReport->mar_status === MonthlyReportStatus::Verified;
 
         $arrDetails = [
-            'Establishment' => $objListing->name,
+            'Establishment' => $objListing->lst_name,
             'Category' => $objListing->categoryRecord?->cat_name ?? 'Uncategorized',
-            'Address' => trim($objListing->barangay.', '.$objListing->municipality, ', '),
-            'Report Source' => $objReport->submission_source->label(),
-            ($objReport->submission_source === ReportSubmissionSource::ManualPaper ? 'Encoded by' : 'Submitted by') => $objReport->submitter
-                ? $objReport->submitter->name.' ('.$objReport->submitter->role?->title().')'
+            'Address' => trim($objListing->lst_barangay.', '.$objListing->lst_municipality, ', '),
+            'Report Source' => $objReport->mar_submission_source->label(),
+            ($objReport->mar_submission_source === ReportSubmissionSource::ManualPaper ? 'Encoded by' : 'Submitted by') => $objReport->submitter
+                ? $objReport->submitter->usr_name.' ('.$objReport->submitter->usr_role?->title().')'
                 : 'Not yet submitted',
-            'Date Submitted' => $objReport->submitted_at?->format('F j, Y g:i A') ?? '—',
+            'Date Submitted' => $objReport->mar_submitted_at?->format('F j, Y g:i A') ?? '—',
         ];
 
         if ($arrOrigin['withinProvince'] > 0 || $arrOrigin['outsideProvince'] > 0) {
@@ -208,31 +208,31 @@ class OfficialReportBuilder
 
         return [
             'title' => 'Monthly Tourist Arrival Report',
-            'letterhead' => self::_lguLetterhead($objReport->municipality?->name ?? $objListing->municipality),
-            'period_label' => $objReport->period_month->format('F Y'),
-            'reference_number' => sprintf('MAR-%06d', $objReport->id),
-            'status_label' => $objReport->status->label(),
+            'letterhead' => self::_lguLetterhead($objReport->municipality?->mun_name ?? $objListing->lst_municipality),
+            'period_label' => $objReport->mar_period_month->format('F Y'),
+            'reference_number' => sprintf('MAR-%06d', $objReport->mar_id),
+            'status_label' => $objReport->mar_status->label(),
             'is_draft' => ! $blnIsVerified,
             'verified_label' => $blnIsVerified
-                ? 'Verified on '.$objReport->verified_at->format('F j, Y').' by '.($objReport->verifier->name ?? 'LGU Tourism Office')
+                ? 'Verified on '.$objReport->mar_verified_at->format('F j, Y').' by '.($objReport->verifier->usr_name ?? 'LGU Tourism Office')
                 : null,
             'revision_number' => 1,
             'supersedes_reference' => null,
-            'submission_summary' => $objReport->submission_source->label(),
+            'submission_summary' => $objReport->mar_submission_source->label(),
             'details' => $arrDetails,
             'groups' => self::groupByCategory($objRows),
             'grand_total' => self::sumRows($objRows),
-            'remarks' => $objReport->remarks,
+            'remarks' => $objReport->mar_remarks,
             'signatures' => [
                 'prepared_by' => [
-                    'name' => $objReport->submitter->name ?? null,
-                    'position' => $objReport->submitter?->role?->title() ?? 'Prepared by',
-                    'date' => $objReport->submitted_at?->format('M j, Y'),
+                    'name' => $objReport->submitter->usr_name ?? null,
+                    'position' => $objReport->submitter?->usr_role?->title() ?? 'Prepared by',
+                    'date' => $objReport->mar_submitted_at?->format('M j, Y'),
                 ],
                 'reviewed_by' => [
-                    'name' => $objReport->verifier->name ?? null,
-                    'position' => $objReport->verifier?->role?->title() ?? 'Verified by (LGU)',
-                    'date' => $objReport->verified_at?->format('M j, Y'),
+                    'name' => $objReport->verifier->usr_name ?? null,
+                    'position' => $objReport->verifier?->usr_role?->title() ?? 'Verified by (LGU)',
+                    'date' => $objReport->mar_verified_at?->format('M j, Y'),
                 ],
                 'approved_by' => ['name' => null, 'position' => 'Noted by', 'date' => null],
             ],
@@ -251,7 +251,7 @@ class OfficialReportBuilder
     private static function _consolidatedBody(Collection $objBreakdown, Collection $objMissing): array
     {
         $objRows = self::breakdownRows($objBreakdown);
-        $intDigitalCount = $objBreakdown->filter(fn ($objReport) => $objReport->submission_source === ReportSubmissionSource::Digital)->count();
+        $intDigitalCount = $objBreakdown->filter(fn ($objReport) => $objReport->mar_submission_source === ReportSubmissionSource::Digital)->count();
         $intPaperCount = $objBreakdown->count() - $intDigitalCount;
         $intTotalEstablishments = $objBreakdown->count() + $objMissing->count();
 
@@ -270,9 +270,9 @@ class OfficialReportBuilder
     {
         return Listing::query()
             ->with('categoryRecord')
-            ->where('municipality_id', $intMunicipalityId)
+            ->where('mun_id', $intMunicipalityId)
             ->get()
-            ->filter(fn (Listing $listing) => $listing->isQrEnabled() && ! $objBreakdown->contains(fn ($r) => $r->listing_id === $listing->id))
+            ->filter(fn (Listing $objListing) => $objListing->isQrEnabled() && ! $objBreakdown->contains(fn ($objRow) => $objRow->lst_id === $objListing->lst_id))
             ->values();
     } // end _missingEstablishments
 
@@ -290,64 +290,64 @@ class OfficialReportBuilder
 
     // end _lguLetterhead
     /**
-     * @param  Collection<int, array<string, mixed>>  $rows  Each row must carry
-     *                                                       'establishment', 'category', 'male', 'female', 'total', 'adults',
-     *                                                       'children', 'seniors', 'local', 'foreign'.
+     * @param  Collection<int, array<string, mixed>>  $objRows  Each row must carry
+     *                                                          'establishment', 'category', 'male', 'female', 'total', 'adults',
+     *                                                          'children', 'seniors', 'local', 'foreign'.
      * @return array<int, string> One message per mismatched row/total — empty
      *                            when every group balances, which is the only time generation may
      *                            proceed.
      */
-    public static function validateColumnSums(Collection $rows): array
+    public static function validateColumnSums(Collection $objRows): array
     {
-        $errors = [];
+        $arrErrors = [];
 
-        foreach ($rows as $row) {
-            $errors = [...$errors, ...self::validateRow($row['establishment'], $row)];
+        foreach ($objRows as $arrRow) {
+            $arrErrors = [...$arrErrors, ...self::validateRow($arrRow['establishment'], $arrRow)];
         }
 
-        $errors = [...$errors, ...self::validateRow('Grand Total', self::sumRows($rows))];
+        $arrErrors = [...$arrErrors, ...self::validateRow('Grand Total', self::sumRows($objRows))];
 
-        return $errors;
+        return $arrErrors;
     }
 
     /**
-     * @param  array<string, mixed>  $row
+     * @param  array<string, mixed>  $arrRow
      * @return array<int, string>
      */
-    private static function validateRow(string $label, array $row): array
+    private static function validateRow(string $strLabel, array $arrRow): array
     {
-        $errors = [];
+        $arrErrors = [];
 
-        if ($row['total'] !== $row['male'] + $row['female']) {
-            $errors[] = "{$label}: Male + Female (".($row['male'] + $row['female']).") does not equal Total ({$row['total']}).";
+        if ($arrRow['total'] !== $arrRow['male'] + $arrRow['female']) {
+            $arrErrors[] = "{$strLabel}: Male + Female (".($arrRow['male'] + $arrRow['female']).") does not equal Total ({$arrRow['total']}).";
         }
 
-        if ($row['total'] !== $row['adults'] + $row['children'] + $row['seniors']) {
-            $errors[] = "{$label}: Adults + Children + Seniors (".($row['adults'] + $row['children'] + $row['seniors']).") does not equal Total ({$row['total']}).";
+        if ($arrRow['total'] !== $arrRow['adults'] + $arrRow['children'] + $arrRow['seniors']) {
+            $arrErrors[] = "{$strLabel}: Adults + Children + Seniors (".($arrRow['adults'] + $arrRow['children'] + $arrRow['seniors']).") does not equal Total ({$arrRow['total']}).";
         }
 
-        if ($row['total'] !== $row['local'] + $row['foreign']) {
-            $errors[] = "{$label}: Local + Foreign (".($row['local'] + $row['foreign']).") does not equal Total ({$row['total']}).";
+        if ($arrRow['total'] !== $arrRow['local'] + $arrRow['foreign']) {
+            $arrErrors[] = "{$strLabel}: Local + Foreign (".($arrRow['local'] + $arrRow['foreign']).") does not equal Total ({$arrRow['total']}).";
         }
 
-        return $errors;
+        return $arrErrors;
     }
 
     /**
-     * @param  Collection<int, array<string, mixed>>  $rows
+     * @param  Collection<int, array<string, mixed>>  $objRows
      * @return array<string, int>
      */
-    public static function sumRows(Collection $rows): array
+    public static function sumRows(Collection $objRows): array
     {
         return [
-            'male' => (int) $rows->sum('male'),
-            'female' => (int) $rows->sum('female'),
-            'total' => (int) $rows->sum('total'),
-            'adults' => (int) $rows->sum('adults'),
-            'children' => (int) $rows->sum('children'),
-            'seniors' => (int) $rows->sum('seniors'),
-            'local' => (int) $rows->sum('local'),
-            'foreign' => (int) $rows->sum('foreign'),
+            'male' => (int) $objRows->sum('male'),
+            'female' => (int) $objRows->sum('female'),
+            'total' => (int) $objRows->sum('total'),
+            'adults' => (int) $objRows->sum('adults'),
+            'children' => (int) $objRows->sum('children'),
+            'seniors' => (int) $objRows->sum('seniors'),
+            'local' => (int) $objRows->sum('local'),
+            'foreign' => (int) $objRows->sum('foreign'),
         ];
     }
 
@@ -356,14 +356,14 @@ class OfficialReportBuilder
      * row, for the "table of establishments grouped by category with
      * subtotals and a grand total" layout.
      *
-     * @param  Collection<int, array<string, mixed>>  $rows
+     * @param  Collection<int, array<string, mixed>>  $objRows
      * @return Collection<string, array{rows: Collection, subtotal: array}>
      */
-    public static function groupByCategory(Collection $rows): Collection
+    public static function groupByCategory(Collection $objRows): Collection
     {
-        return $rows->groupBy('category')->map(fn (Collection $group) => [
-            'rows' => $group,
-            'subtotal' => self::sumRows($group),
+        return $objRows->groupBy('category')->map(fn (Collection $objGroup) => [
+            'rows' => $objGroup,
+            'subtotal' => self::sumRows($objGroup),
         ])->sortKeys();
     }
 

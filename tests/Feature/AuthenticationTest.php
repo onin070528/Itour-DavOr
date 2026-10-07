@@ -1,5 +1,13 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Tests — authentication.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 use App\Enums\UserRole;
 use App\Models\Municipality;
 use App\Models\User;
@@ -16,18 +24,18 @@ test('guests are redirected to login when visiting a protected dashboard', funct
 
 test('each role can sign in and reach their own dashboard', function (UserRole $role, string $path) {
     $municipality = $role === UserRole::Lgu
-        ? Municipality::query()->firstOrCreate(['code' => 'MATI'], ['name' => 'City of Mati'])
+        ? Municipality::query()->firstOrCreate(['mun_code' => 'MATI'], ['mun_name' => 'City of Mati'])
         : null;
 
     $user = User::factory()->create([
-        'role' => $role,
-        'organization_name' => 'Test Organization',
-        'organization_subtitle' => $role === UserRole::Lgu ? 'City of Mati' : 'Test Coverage',
-        'municipality_id' => $municipality?->id,
+        'usr_role' => $role,
+        'usr_organization_name' => 'Test Organization',
+        'usr_organization_subtitle' => $role === UserRole::Lgu ? 'City of Mati' : 'Test Coverage',
+        'mun_id' => $municipality?->mun_id,
     ]);
 
     $this->post('/login', [
-        'email' => $user->email,
+        'email' => $user->usr_email,
         'password' => 'password',
     ])->assertRedirect($path);
 
@@ -39,8 +47,8 @@ test('each role can sign in and reach their own dashboard', function (UserRole $
 ]);
 
 test('a role cannot access another role\'s dashboard', function () {
-    $municipality = Municipality::query()->firstOrCreate(['code' => 'MATI'], ['name' => 'City of Mati']);
-    $lgu = User::factory()->create(['role' => UserRole::Lgu, 'organization_subtitle' => 'City of Mati', 'municipality_id' => $municipality->id]);
+    $municipality = Municipality::query()->firstOrCreate(['mun_code' => 'MATI'], ['mun_name' => 'City of Mati']);
+    $lgu = User::factory()->create(['usr_role' => UserRole::Lgu, 'usr_organization_subtitle' => 'City of Mati', 'mun_id' => $municipality->mun_id]);
 
     $this->actingAs($lgu);
 
@@ -50,10 +58,10 @@ test('a role cannot access another role\'s dashboard', function () {
 });
 
 test('an invalid password is rejected', function () {
-    $user = User::factory()->create(['role' => UserRole::PtoAdministrator]);
+    $user = User::factory()->create(['usr_role' => UserRole::PtoAdministrator]);
 
     $this->post('/login', [
-        'email' => $user->email,
+        'email' => $user->usr_email,
         'password' => 'wrong-password',
     ])->assertSessionHasErrors('email');
 
@@ -61,7 +69,7 @@ test('an invalid password is rejected', function () {
 });
 
 test('a user can log out', function () {
-    $user = User::factory()->create(['role' => UserRole::PtoAdministrator]);
+    $user = User::factory()->create(['usr_role' => UserRole::PtoAdministrator]);
 
     $this->actingAs($user);
 

@@ -45,31 +45,49 @@ class AttractionRecordService
     {
         $objListing = DB::transaction(function () use ($arrFields, $objLgu): Listing {
             $objNewListing = Listing::query()->make([
-                ...array_intersect_key($arrFields, array_flip(self::FIELDS)),
-                'barangay' => $arrFields['barangay'] ?? '',
-                'slug' => Listing::uniqueSlug((string) $arrFields['name']),
-                'category' => 'destinations',
+                ...self::_prefixed(array_intersect_key($arrFields, array_flip(self::FIELDS))),
+                'lst_barangay' => $arrFields['barangay'] ?? '',
+                'lst_slug' => Listing::uniqueSlug((string) $arrFields['name']),
+                'lst_category' => 'destinations',
                 'cat_id' => Category::query()->where('cat_name', Category::DESTINATION_CATEGORY_NAME)->value('cat_id'),
-                'municipality' => $objLgu->organization_subtitle,
-                'municipality_id' => $objLgu->municipality_id,
-                'status' => 'DRAFT',
+                'lst_municipality' => $objLgu->usr_organization_subtitle,
+                'mun_id' => $objLgu->mun_id,
+                'lst_status' => 'DRAFT',
             ]);
             // Destination-only records do not participate in reporting.
-            $objNewListing->reporting_mode = null;
+            $objNewListing->lst_reporting_mode = null;
             $objNewListing->save();
 
             return $objNewListing;
         });
 
-        OperationLogger::created($objLgu, 'destination', $objListing->id, $objListing->municipality_id, null, [
-            'name' => $objListing->name,
-            'barangay' => $objListing->barangay,
-            'municipality' => $objListing->municipality,
+        OperationLogger::created($objLgu, 'destination', $objListing->lst_id, $objListing->mun_id, null, [
+            'name' => $objListing->lst_name,
+            'barangay' => $objListing->lst_barangay,
+            'municipality' => $objListing->lst_municipality,
             'status' => 'DRAFT',
         ]);
 
         return $objListing;
     } // end create
+
+    /**
+     * Maps unprefixed form field names (self::FIELDS) to their lst_-prefixed
+     * column names.
+     *
+     * @param  array<string, mixed>  $arrFields
+     * @return array<string, mixed>
+     */
+    private static function _prefixed(array $arrFields): array
+    {
+        $arrPrefixed = [];
+
+        foreach ($arrFields as $strField => $mixValue) {
+            $arrPrefixed['lst_'.$strField] = $mixValue;
+        } // end foreach field
+
+        return $arrPrefixed;
+    }
 
     /**
      * Saves an edit. Public destination content is locked while a request
@@ -87,6 +105,8 @@ class AttractionRecordService
             $arrFields['barangay'] ??= '';
         }
 
+        $arrFields = self::_prefixed($arrFields);
+
         $arrPublicFields = array_intersect_key($arrFields, array_flip(Listing::PUBLIC_CONTENT_FIELDS));
         $blnIsLive = $objListing->isPubliclyVisible();
         $arrProposed = $blnIsLive ? $objListing->publicFieldChanges($arrPublicFields) : [];
@@ -99,7 +119,7 @@ class AttractionRecordService
         $arrBefore = $objListing->getOriginal();
         $objListing->update($arrFields);
 
-        OperationLogger::updated($objLgu, 'destination', $objListing->id, $objListing->municipality_id, null, OperationLogger::diff($arrBefore, $objListing));
+        OperationLogger::updated($objLgu, 'destination', $objListing->lst_id, $objListing->mun_id, null, OperationLogger::diff($arrBefore, $objListing));
 
         if ($blnIsLive) {
             $this->objWorkflow->submitPendingChanges($objLgu, $objListing, $arrProposed);

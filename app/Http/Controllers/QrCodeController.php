@@ -56,7 +56,7 @@ class QrCodeController extends Controller
     public function download(Request $objRequest, Listing $listing): Response
     {
         $strSvg = $this->_resolveSvg($objRequest, $listing);
-        $strFileName = str($listing->name)->slug()->append('-qr-code.svg')->toString();
+        $strFileName = str($listing->lst_name)->slug()->append('-qr-code.svg')->toString();
 
         return response($strSvg, 200, [
             'Content-Type' => 'image/svg+xml',
@@ -78,8 +78,8 @@ class QrCodeController extends Controller
         $strCheckinUrl = $this->qrCodeService->buildCheckinUrl($listing);
 
         return view('establishment.qr-poster', [
-            'establishmentName' => $listing->name,
-            'municipalityName' => $listing->municipality,
+            'establishmentName' => $listing->lst_name,
+            'municipalityName' => $listing->lst_municipality,
             'qrSvg' => $strSvg,
             'checkinUrlLabel' => preg_replace('#^https?://#', '', $strCheckinUrl),
             'layout' => $strLayout,
@@ -109,8 +109,8 @@ class QrCodeController extends Controller
 
         if ($blnIsUnchanged) {
             return back()->with('toast', $blnIsEnabled
-                ? "QR check-in is already on for {$listing->name}."
-                : "QR check-in is already off for {$listing->name}.");
+                ? "QR check-in is already on for {$listing->lst_name}."
+                : "QR check-in is already off for {$listing->lst_name}.");
         }
 
         $arrBefore = $listing->getOriginal();
@@ -121,21 +121,21 @@ class QrCodeController extends Controller
             OperationLogger::updated(
                 $objRequest->user(),
                 'establishment',
-                $listing->id,
-                $listing->municipality_id,
-                $listing->id,
+                $listing->lst_id,
+                $listing->mun_id,
+                $listing->lst_id,
                 OperationLogger::diff($arrBefore, $listing),
                 $blnIsEnabled ? 'QR check-in switched on' : 'QR check-in switched off'
             );
         } catch (Throwable $errUpdate) {
-            Log::error('Failed to change QR check-in status.', ['exception' => $errUpdate, 'listing_id' => $listing->id]);
+            Log::error('Failed to change QR check-in status.', ['exception' => $errUpdate, 'listing_id' => $listing->lst_id]);
 
             return back()->with('toast', 'The QR check-in setting could not be saved. Please try again.');
         } // end try update
 
         return back()->with('toast', $blnIsEnabled
-            ? "QR check-in is on again for {$listing->name}. The same QR code works again."
-            : "QR check-in is off for {$listing->name}. Scans now show \"not accepting registrations\"; existing arrivals are untouched.");
+            ? "QR check-in is on again for {$listing->lst_name}. The same QR code works again."
+            : "QR check-in is off for {$listing->lst_name}. Scans now show \"not accepting registrations\"; existing arrivals are untouched.");
     }
 
     /**

@@ -1,5 +1,13 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Tests — turnstile login.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 use App\Enums\UserRole;
 use App\Models\User;
 use App\Rules\Turnstile;
@@ -79,10 +87,10 @@ test('the login page renders the Turnstile widget with the configured site key, 
 });
 
 test('login still works end-to-end in the automated test suite (Turnstile is bypassed only for APP_ENV=testing)', function () {
-    $user = User::factory()->create(['role' => UserRole::PtoAdministrator]);
+    $user = User::factory()->create(['usr_role' => UserRole::PtoAdministrator]);
 
     test()->post(route('login.store'), [
-        'email' => $user->email,
+        'email' => $user->usr_email,
         'password' => 'password',
     ])->assertRedirect(route('pto.dashboard'));
 

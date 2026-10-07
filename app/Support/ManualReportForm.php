@@ -68,9 +68,9 @@ final class ManualReportForm
     } // end rules
 
     /**
-     * The columns to store from validated input, plus total_visitors —
-     * derived on the server (Male + Female, the same rule as a digital
-     * report), never typed in.
+     * The mar_party_* columns to store from validated input, plus
+     * mar_total_visitors — derived on the server (Male + Female, the same
+     * rule as a digital report), never typed in.
      *
      * @param  array<string, mixed>  $arrValidated
      * @return array<string, int>
@@ -80,10 +80,10 @@ final class ManualReportForm
         $arrFigures = [];
 
         foreach (array_keys(self::fields()) as $strColumn) {
-            $arrFigures[$strColumn] = (int) $arrValidated[$strColumn];
+            $arrFigures['mar_'.$strColumn] = (int) $arrValidated[$strColumn];
         }
 
-        $arrFigures['total_visitors'] = $arrFigures['party_male'] + $arrFigures['party_female'];
+        $arrFigures['mar_total_visitors'] = $arrFigures['mar_party_male'] + $arrFigures['mar_party_female'];
 
         return $arrFigures;
     } // end figures

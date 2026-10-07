@@ -24,15 +24,15 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('listings', function (Blueprint $table) {
-            $table->text('lst_review_remarks')->nullable()->after('status');
+        Schema::table('tbl_listings', function (Blueprint $table) {
+            $table->text('lst_review_remarks')->nullable()->after('lst_status');
             $table->json('lst_pending_changes')->nullable()->after('lst_review_remarks');
         });
     }
 
     public function down(): void
     {
-        Schema::table('listings', function (Blueprint $table) {
+        Schema::table('tbl_listings', function (Blueprint $table) {
             $table->dropColumn(['lst_review_remarks', 'lst_pending_changes']);
         });
     }

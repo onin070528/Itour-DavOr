@@ -27,12 +27,12 @@
                 </thead>
                 <tbody class="divide-y divide-sand-100">
                     @foreach ($attractions as $attraction)
-                        <tr data-row data-search-text="{{ Str::lower($attraction->name.' '.$attraction->barangay) }}" class="hover:bg-sand-50">
+                        <tr data-row data-search-text="{{ Str::lower($attraction->lst_name.' '.$attraction->lst_barangay) }}" class="hover:bg-sand-50">
                             <td class="px-4 py-3">
-                                <a href="{{ route('lgu.directory.attractions.show', $attraction) }}" class="font-medium text-sand-900 hover:text-primary-700">{{ $attraction->name }}</a>
+                                <a href="{{ route('lgu.directory.attractions.show', $attraction) }}" class="font-medium text-sand-900 hover:text-primary-700">{{ $attraction->lst_name }}</a>
                                 <span class="block text-xs text-sand-500">Tourist attraction</span>
                             </td>
-                            <td class="px-4 py-3 text-sand-700">{{ $attraction->barangay ?: '—' }}</td>
+                            <td class="px-4 py-3 text-sand-700">{{ $attraction->lst_barangay ?: '—' }}</td>
                             <td class="px-4 py-3 text-sand-700">{{ $attraction->intPhotoCount }}</td>
                             <td class="px-4 py-3 text-sand-700">{{ $attraction->destinationListingLabel() }}</td>
                             <td class="px-4 py-3">

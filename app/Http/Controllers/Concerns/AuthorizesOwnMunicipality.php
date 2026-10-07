@@ -20,14 +20,14 @@ use Illuminate\Http\Request;
 trait AuthorizesOwnMunicipality
 {
     /**
-     * Compares the real municipality_id FK, not the display-only
-     * municipality/organization_subtitle strings, so this can't be fooled
+     * Compares the real mun_id FK, not the display-only
+     * lst_municipality/usr_organization_subtitle strings, so this can't be fooled
      * by a name mismatch or a listing whose FK backfill didn't resolve.
      */
-    private function authorizeOwnMunicipality(Request $request, Listing $listing): void
+    private function authorizeOwnMunicipality(Request $objRequest, Listing $objListing): void
     {
-        if ($listing->municipality_id === null || $listing->municipality_id !== $request->user()->municipality_id) {
-            SecurityLogger::accessDenied($request->user(), 'municipality_scope', Listing::class, $listing->municipality_id);
+        if ($objListing->mun_id === null || $objListing->mun_id !== $objRequest->user()->mun_id) {
+            SecurityLogger::accessDenied($objRequest->user(), 'municipality_scope', Listing::class, $objListing->mun_id);
             abort(403);
         }
     }

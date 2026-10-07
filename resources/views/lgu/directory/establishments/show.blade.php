@@ -6,8 +6,8 @@
 --}}
 <x-layouts.dashboard :user="$user" :nav-sections="$navSections" :page-title="$pageTitle" account-heading="System" :settings-href="route('lgu.settings')">
     <x-dashboard.page-header
-        :title="$listing->name"
-        description="{{ $listing->categoryName() }}{{ $listing->type ? ' · '.$listing->type : '' }} · {{ $listing->barangay ? $listing->barangay.', ' : '' }}{{ $listing->municipality }}"
+        :title="$listing->lst_name"
+        description="{{ $listing->categoryName() }}{{ $listing->lst_type ? ' · '.$listing->lst_type : '' }} · {{ $listing->lst_barangay ? $listing->lst_barangay.', ' : '' }}{{ $listing->lst_municipality }}"
     >
         <x-slot:actions>
             <a href="{{ route('lgu.directory.establishments') }}" class="btn-secondary">

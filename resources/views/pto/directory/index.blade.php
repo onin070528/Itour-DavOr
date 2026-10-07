@@ -1,3 +1,10 @@
+{{--
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: PTO Tourism Directory — category-driven list and map.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+--}}
 @php
     $statusTone = fn ($status) => match ($status) {
         'Active', 'PUBLISHED' => 'success',
@@ -17,20 +24,20 @@
     };
 
     $plottedListings = $listings
-        ->filter(fn ($listing) => $listing->lat !== null && $listing->lng !== null && ! $listing->isTourGuide())
+        ->filter(fn ($listing) => $listing->lst_lat !== null && $listing->lst_lng !== null && ! $listing->isTourGuide())
         ->map(fn ($listing) => [
-            'name' => $listing->name,
+            'name' => $listing->lst_name,
             'category' => $listing->categoryRecord?->cat_name,
-            'municipality' => $listing->municipality,
-            'barangay' => $listing->barangay,
-            'status' => $listing->status,
-            'image' => $listing->image ? asset('storage/itour-images/'.$listing->image) : null,
-            'lat' => $listing->lat,
-            'lng' => $listing->lng,
+            'municipality' => $listing->lst_municipality,
+            'barangay' => $listing->lst_barangay,
+            'status' => $listing->lst_status,
+            'image' => $listing->lst_image ? asset('storage/itour-images/'.$listing->lst_image) : null,
+            'lat' => $listing->lst_lat,
+            'lng' => $listing->lst_lng,
         ])
         ->values();
     $unplottedCount = $listings->count() - $plottedListings->count();
-    $intReviewCount = $listings->filter(fn ($listing) => $listing->category !== 'destinations' && $listing->isAwaitingPtoDecision())->count();
+    $intReviewCount = $listings->filter(fn ($listing) => $listing->lst_category !== 'destinations' && $listing->isAwaitingPtoDecision())->count();
 @endphp
 
 @push('head')
@@ -94,7 +101,7 @@
                     <select data-filter-select data-filter-key="municipality" class="rounded-sm border border-sand-300 bg-sand-50 px-3 py-2.5 text-sm text-sand-700">
                         <option value="">All Municipalities</option>
                         @foreach ($municipalities as $m)
-                            <option value="{{ $m->name }}">{{ $m->name }}</option>
+                            <option value="{{ $m->mun_name }}">{{ $m->mun_name }}</option>
                         @endforeach
                     </select>
                     <select data-filter-select data-filter-key="status" class="rounded-sm border border-sand-300 bg-sand-50 px-3 py-2.5 text-sm text-sand-700">
@@ -142,44 +149,44 @@
                                 @php
                                     $isGuide = $listing->isTourGuide();
                                     $editValues = [
-                                        'name' => $listing->name,
+                                        'name' => $listing->lst_name,
                                         'cat_id' => $listing->cat_id,
-                                        'type' => $listing->type,
-                                        'owner_name' => $listing->owner_name,
-                                        'municipality' => $listing->municipality,
-                                        'barangay' => $listing->barangay,
-                                        'lat' => $listing->lat,
-                                        'lng' => $listing->lng,
-                                        'description' => $listing->description,
-                                        'contact_office' => $listing->contact_office,
-                                        'contact_phone' => $listing->contact_phone,
-                                        'email' => $listing->email,
-                                        'website' => $listing->website,
-                                        'hours' => $listing->hours,
-                                        'license_number' => $listing->license_number,
-                                        'accreditation_status' => $listing->accreditation_status,
-                                        'category_note' => $listing->category_note,
+                                        'type' => $listing->lst_type,
+                                        'owner_name' => $listing->lst_owner_name,
+                                        'municipality' => $listing->lst_municipality,
+                                        'barangay' => $listing->lst_barangay,
+                                        'lat' => $listing->lst_lat,
+                                        'lng' => $listing->lst_lng,
+                                        'description' => $listing->lst_description,
+                                        'contact_office' => $listing->lst_contact_office,
+                                        'contact_phone' => $listing->lst_contact_phone,
+                                        'email' => $listing->lst_email,
+                                        'website' => $listing->lst_website,
+                                        'hours' => $listing->lst_hours,
+                                        'license_number' => $listing->lst_license_number,
+                                        'accreditation_status' => $listing->lst_accreditation_status,
+                                        'category_note' => $listing->lst_category_note,
                                     ];
                                 @endphp
                                 <tr
                                     data-row
-                                    data-municipality="{{ $listing->municipality }}"
+                                    data-municipality="{{ $listing->lst_municipality }}"
                                     data-category="{{ $listing->cat_id }}"
-                                    data-status="{{ $listing->status }}"
-                                    data-search-text="{{ strtolower($listing->name.' '.$listing->municipality.' '.$listing->owner_name) }}"
+                                    data-status="{{ $listing->lst_status }}"
+                                    data-search-text="{{ strtolower($listing->lst_name.' '.$listing->lst_municipality.' '.$listing->lst_owner_name) }}"
                                     class="hover:bg-sand-50"
                                 >
-                                    <td class="px-4 py-3 font-medium text-sand-900">{{ $listing->name }}</td>
+                                    <td class="px-4 py-3 font-medium text-sand-900">{{ $listing->lst_name }}</td>
                                     <td class="px-4 py-3 text-sand-700">
                                         {{ $listing->categoryRecord?->cat_name }}
-                                        @if ($listing->type)
-                                            <span class="ml-1 rounded-sm bg-sand-100 px-1.5 py-0.5 text-[11px] text-sand-600">{{ $listing->type }}</span>
+                                        @if ($listing->lst_type)
+                                            <span class="ml-1 rounded-sm bg-sand-100 px-1.5 py-0.5 text-[11px] text-sand-600">{{ $listing->lst_type }}</span>
                                         @endif
                                     </td>
-                                    <td class="px-4 py-3 text-sand-700">{{ $isGuide ? $listing->license_number : $listing->owner_name }}</td>
-                                    <td class="px-4 py-3 text-sand-700">{{ $listing->municipality }}</td>
-                                    <td class="px-4 py-3 text-sand-700">{{ $listing->contact_phone }}</td>
-                                    <td class="px-4 py-3"><x-dashboard.status-badge :tone="$statusTone($listing->status)">{{ $listing->status }}</x-dashboard.status-badge></td>
+                                    <td class="px-4 py-3 text-sand-700">{{ $isGuide ? $listing->lst_license_number : $listing->lst_owner_name }}</td>
+                                    <td class="px-4 py-3 text-sand-700">{{ $listing->lst_municipality }}</td>
+                                    <td class="px-4 py-3 text-sand-700">{{ $listing->lst_contact_phone }}</td>
+                                    <td class="px-4 py-3"><x-dashboard.status-badge :tone="$statusTone($listing->lst_status)">{{ $listing->lst_status }}</x-dashboard.status-badge></td>
                                     <td class="px-4 py-3">
                                         <x-dashboard.qr-cell :listing="$listing" />
                                     </td>
@@ -190,13 +197,13 @@
                                                 <i class="ti ti-dots-vertical" aria-hidden="true"></i>
                                             </button>
                                             <div data-dropdown-menu class="absolute right-0 z-10 mt-1 hidden w-44 rounded-md border border-sand-200 bg-sand-0 py-1 shadow-md">
-                                                <button type="button" data-modal-open="listing-view-{{ $listing->id }}" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-sand-700 hover:bg-sand-50">
+                                                <button type="button" data-modal-open="listing-view-{{ $listing->lst_id }}" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-sand-700 hover:bg-sand-50">
                                                     <i class="ti ti-eye" aria-hidden="true"></i> View Details
                                                 </button>
                                                 <a href="{{ route('pto.images.manage', $listing) }}" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-sand-700 hover:bg-sand-50">
                                                     <i class="ti ti-photo" aria-hidden="true"></i> Manage Photos
                                                 </a>
-                                                @unless ($listing->category === 'destinations')
+                                                @unless ($listing->lst_category === 'destinations')
                                                     <a href="{{ route('listings.show', $listing) }}" target="_blank" rel="noopener" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-sand-700 hover:bg-sand-50">
                                                         <i class="ti ti-external-link" aria-hidden="true"></i> Preview as Public
                                                     </a>
@@ -205,14 +212,14 @@
                                                             <i class="ti ti-clipboard-check" aria-hidden="true"></i> Review Listing
                                                         </a>
                                                     @endif
-                                                    @if ($listing->status === 'FOR_PTO_REVIEW')
+                                                    @if ($listing->lst_status === 'FOR_PTO_REVIEW')
                                                         <form method="POST" action="{{ route('pto.directory.publish', $listing) }}">
                                                             @csrf
                                                             @method('PATCH')
                                                             <button
                                                                 type="button"
                                                                 data-confirm-trigger
-                                                                data-confirm-title="Publish {{ $listing->name }}?"
+                                                                data-confirm-title="Publish {{ $listing->lst_name }}?"
                                                                 data-confirm-message="This makes the listing publicly visible immediately."
                                                                 data-confirm-label="Publish"
                                                                 data-confirm-tone="success"
@@ -221,11 +228,11 @@
                                                                 <i class="ti ti-circle-check" aria-hidden="true"></i> Publish
                                                             </button>
                                                         </form>
-                                                        <button type="button" data-modal-open="return-to-lgu-{{ $listing->id }}" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-danger hover:bg-danger-bg">
+                                                        <button type="button" data-modal-open="return-to-lgu-{{ $listing->lst_id }}" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-danger hover:bg-danger-bg">
                                                             <i class="ti ti-arrow-back-up" aria-hidden="true"></i> Return to LGU
                                                         </button>
-                                                    @elseif ($listing->status === 'PUBLISHED')
-                                                        <button type="button" data-modal-open="unpublish-{{ $listing->id }}" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-danger hover:bg-danger-bg">
+                                                    @elseif ($listing->lst_status === 'PUBLISHED')
+                                                        <button type="button" data-modal-open="unpublish-{{ $listing->lst_id }}" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-danger hover:bg-danger-bg">
                                                             <i class="ti ti-eye-off" aria-hidden="true"></i> Unpublish
                                                         </button>
                                                     @endif
@@ -244,7 +251,7 @@
                                                     type="button"
                                                     data-modal-open="status-form-modal"
                                                     data-edit-trigger="status-form-modal"
-                                                    data-edit-values="{{ json_encode(['status' => $listing->status]) }}"
+                                                    data-edit-values="{{ json_encode(['status' => $listing->lst_status]) }}"
                                                     data-edit-action="{{ route('pto.directory.updateStatus', $listing) }}"
                                                     class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-sand-700 hover:bg-sand-50"
                                                 >
@@ -260,29 +267,29 @@
                 </div>
 
                 @foreach ($listings as $listing)
-                    <x-dashboard.modal id="listing-view-{{ $listing->id }}" :title="$listing->name">
+                    <x-dashboard.modal id="listing-view-{{ $listing->lst_id }}" :title="$listing->lst_name">
                         <dl class="flex flex-col gap-3 text-sm">
-                            <div><dt class="text-xs font-semibold text-sand-500 uppercase">Category</dt><dd class="text-sand-800">{{ $listing->categoryRecord?->cat_name }} @if ($listing->type) · {{ $listing->type }} @endif</dd></div>
-                            @if ($listing->category_note)
-                                <div><dt class="text-xs font-semibold text-sand-500 uppercase">Category Note</dt><dd class="text-sand-800">{{ $listing->category_note }}</dd></div>
+                            <div><dt class="text-xs font-semibold text-sand-500 uppercase">Category</dt><dd class="text-sand-800">{{ $listing->categoryRecord?->cat_name }} @if ($listing->lst_type) · {{ $listing->lst_type }} @endif</dd></div>
+                            @if ($listing->lst_category_note)
+                                <div><dt class="text-xs font-semibold text-sand-500 uppercase">Category Note</dt><dd class="text-sand-800">{{ $listing->lst_category_note }}</dd></div>
                             @endif
                             @if ($listing->isTourGuide())
-                                <div><dt class="text-xs font-semibold text-sand-500 uppercase">License No.</dt><dd class="text-sand-800">{{ $listing->license_number }}</dd></div>
-                                <div><dt class="text-xs font-semibold text-sand-500 uppercase">Accreditation Status</dt><dd class="text-sand-800">{{ $listing->accreditation_status }}</dd></div>
+                                <div><dt class="text-xs font-semibold text-sand-500 uppercase">License No.</dt><dd class="text-sand-800">{{ $listing->lst_license_number }}</dd></div>
+                                <div><dt class="text-xs font-semibold text-sand-500 uppercase">Accreditation Status</dt><dd class="text-sand-800">{{ $listing->lst_accreditation_status }}</dd></div>
                             @else
-                                <div><dt class="text-xs font-semibold text-sand-500 uppercase">Owner</dt><dd class="text-sand-800">{{ $listing->owner_name }}</dd></div>
-                                <div><dt class="text-xs font-semibold text-sand-500 uppercase">Location</dt><dd class="text-sand-800">{{ $listing->barangay }}, {{ $listing->municipality }}</dd></div>
+                                <div><dt class="text-xs font-semibold text-sand-500 uppercase">Owner</dt><dd class="text-sand-800">{{ $listing->lst_owner_name }}</dd></div>
+                                <div><dt class="text-xs font-semibold text-sand-500 uppercase">Location</dt><dd class="text-sand-800">{{ $listing->lst_barangay }}, {{ $listing->lst_municipality }}</dd></div>
                             @endif
-                            <div><dt class="text-xs font-semibold text-sand-500 uppercase">Contact</dt><dd class="text-sand-800">{{ $listing->contact_office }} · {{ $listing->contact_phone }}</dd></div>
-                            <div><dt class="text-xs font-semibold text-sand-500 uppercase">Status</dt><dd><x-dashboard.status-badge :tone="$statusTone($listing->status)">{{ $statusLabel($listing->status) }}</x-dashboard.status-badge></dd></div>
+                            <div><dt class="text-xs font-semibold text-sand-500 uppercase">Contact</dt><dd class="text-sand-800">{{ $listing->lst_contact_office }} · {{ $listing->lst_contact_phone }}</dd></div>
+                            <div><dt class="text-xs font-semibold text-sand-500 uppercase">Status</dt><dd><x-dashboard.status-badge :tone="$statusTone($listing->lst_status)">{{ $statusLabel($listing->lst_status) }}</x-dashboard.status-badge></dd></div>
                             <div><dt class="text-xs font-semibold text-sand-500 uppercase">Photo Last Updated</dt><dd class="text-sand-800">{{ $listing->publishedPhotoLastUpdatedAt()?->format('M j, Y') ?? '—' }}</dd></div>
-                            <div><dt class="text-xs font-semibold text-sand-500 uppercase">Description</dt><dd class="text-sand-800">{{ $listing->description }}</dd></div>
+                            <div><dt class="text-xs font-semibold text-sand-500 uppercase">Description</dt><dd class="text-sand-800">{{ $listing->lst_description }}</dd></div>
                         </dl>
                     </x-dashboard.modal>
 
-                    @if ($listing->category !== 'destinations' && $listing->status === 'FOR_PTO_REVIEW')
-                        <x-dashboard.modal id="return-to-lgu-{{ $listing->id }}" title="Return to LGU">
-                            <form id="return-to-lgu-form-{{ $listing->id }}" method="POST" action="{{ route('pto.directory.returnToLgu', $listing) }}" class="flex flex-col gap-3">
+                    @if ($listing->lst_category !== 'destinations' && $listing->lst_status === 'FOR_PTO_REVIEW')
+                        <x-dashboard.modal id="return-to-lgu-{{ $listing->lst_id }}" title="Return to LGU">
+                            <form id="return-to-lgu-form-{{ $listing->lst_id }}" method="POST" action="{{ route('pto.directory.returnToLgu', $listing) }}" class="flex flex-col gap-3">
                                 @csrf
                                 @method('PATCH')
                                 <label class="text-xs font-semibold text-sand-700">Reason <span class="text-danger" aria-hidden="true">*</span></label>
@@ -290,14 +297,14 @@
                             </form>
                             <x-slot:footer>
                                 <button type="button" data-modal-close class="rounded-sm border border-sand-300 bg-sand-0 px-4 py-2.5 text-sm font-semibold text-sand-800 hover:border-primary-300">Cancel</button>
-                                <button type="submit" form="return-to-lgu-form-{{ $listing->id }}" class="rounded-sm bg-danger px-4 py-2 text-sm font-semibold text-sand-0 hover:opacity-90">Return to LGU</button>
+                                <button type="submit" form="return-to-lgu-form-{{ $listing->lst_id }}" class="rounded-sm bg-danger px-4 py-2 text-sm font-semibold text-sand-0 hover:opacity-90">Return to LGU</button>
                             </x-slot:footer>
                         </x-dashboard.modal>
                     @endif
 
-                    @if ($listing->category !== 'destinations' && $listing->status === 'PUBLISHED')
-                        <x-dashboard.modal id="unpublish-{{ $listing->id }}" title="Unpublish Listing">
-                            <form id="unpublish-form-{{ $listing->id }}" method="POST" action="{{ route('pto.directory.unpublish', $listing) }}" class="flex flex-col gap-3">
+                    @if ($listing->lst_category !== 'destinations' && $listing->lst_status === 'PUBLISHED')
+                        <x-dashboard.modal id="unpublish-{{ $listing->lst_id }}" title="Unpublish Listing">
+                            <form id="unpublish-form-{{ $listing->lst_id }}" method="POST" action="{{ route('pto.directory.unpublish', $listing) }}" class="flex flex-col gap-3">
                                 @csrf
                                 @method('PATCH')
                                 <p class="text-sm text-sand-700">This takes the listing off the public site immediately. It stays unpublished until resubmitted and published again.</p>
@@ -306,7 +313,7 @@
                             </form>
                             <x-slot:footer>
                                 <button type="button" data-modal-close class="rounded-sm border border-sand-300 bg-sand-0 px-4 py-2.5 text-sm font-semibold text-sand-800 hover:border-primary-300">Cancel</button>
-                                <button type="submit" form="unpublish-form-{{ $listing->id }}" class="rounded-sm bg-danger px-4 py-2 text-sm font-semibold text-sand-0 hover:opacity-90">Unpublish</button>
+                                <button type="submit" form="unpublish-form-{{ $listing->lst_id }}" class="rounded-sm bg-danger px-4 py-2 text-sm font-semibold text-sand-0 hover:opacity-90">Unpublish</button>
                             </x-slot:footer>
                         </x-dashboard.modal>
                     @endif
@@ -427,7 +434,7 @@
                 <label class="mb-1 block text-xs font-semibold text-sand-700">Municipality <span class="text-danger" aria-hidden="true">*</span></label>
                 <select name="municipality" required class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
                     @foreach ($municipalities as $m)
-                        <option value="{{ $m->name }}">{{ $m->name }}</option>
+                        <option value="{{ $m->mun_name }}">{{ $m->mun_name }}</option>
                     @endforeach
                 </select>
             </div>

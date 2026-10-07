@@ -1,3 +1,10 @@
+{{--
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: Public official-report verification page.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+--}}
 <x-layouts.public title="Verify Report">
     <div class="mx-auto max-w-lg px-4 py-10 sm:px-6 lg:px-8">
         <h1 class="text-2xl sm:text-3xl">Verify an Official Report</h1>

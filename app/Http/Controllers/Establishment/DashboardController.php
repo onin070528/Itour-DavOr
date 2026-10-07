@@ -20,16 +20,16 @@ class DashboardController extends EstablishmentController
     /**
      * The Establishment landing page: how this establishment is performing.
      */
-    public function index(Request $request): View
+    public function index(Request $objRequest): View
     {
-        $name = $request->user()->organization_name;
+        $strName = $objRequest->user()->usr_organization_name;
 
-        return $this->renderEstablishment($request, 'establishment.dashboard', 'dashboard', 'Dashboard', [
-            'summary' => EstablishmentMockData::dashboardSummary($name),
-            'arrivalTrend' => EstablishmentMockData::arrivalTrend($name),
-            'classificationBreakdown' => EstablishmentMockData::classificationBreakdown($name),
-            'sentiment' => EstablishmentMockData::sentimentBreakdown($name),
-            'recentActivity' => array_slice(EstablishmentMockData::recentActivity($name), 0, 6),
+        return $this->renderEstablishment($objRequest, 'establishment.dashboard', 'dashboard', 'Dashboard', [
+            'summary' => EstablishmentMockData::dashboardSummary($strName),
+            'arrivalTrend' => EstablishmentMockData::arrivalTrend($strName),
+            'classificationBreakdown' => EstablishmentMockData::classificationBreakdown($strName),
+            'sentiment' => EstablishmentMockData::sentimentBreakdown($strName),
+            'recentActivity' => array_slice(EstablishmentMockData::recentActivity($strName), 0, 6),
         ]);
     }
 }

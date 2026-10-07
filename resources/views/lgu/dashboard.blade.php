@@ -1,3 +1,10 @@
+{{--
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: LGU dashboard for the account's municipality.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+--}}
 @php
     $trendLabels = ['week' => 'This Week', 'month' => 'This Month', 'year' => 'This Year'];
     $sentimentTotal = array_sum($sentiment);

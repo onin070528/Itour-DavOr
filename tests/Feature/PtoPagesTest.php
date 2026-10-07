@@ -1,13 +1,21 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Tests — pto pages.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 use App\Enums\UserRole;
 use App\Models\User;
 
 test('every PTO page renders for an authenticated PTO administrator', function (string $routeName) {
     $user = User::factory()->create([
-        'role' => UserRole::PtoAdministrator,
-        'organization_name' => 'Provincial Tourism Office',
-        'organization_subtitle' => 'Province of Davao Oriental',
+        'usr_role' => UserRole::PtoAdministrator,
+        'usr_organization_name' => 'Provincial Tourism Office',
+        'usr_organization_subtitle' => 'Province of Davao Oriental',
     ]);
 
     $this->actingAs($user)->get(route($routeName))->assertOk();
@@ -27,9 +35,9 @@ test('every PTO page renders for an authenticated PTO administrator', function (
 
 test('the Provincial Reports page hides the redundant role/page breadcrumb', function () {
     $user = User::factory()->create([
-        'role' => UserRole::PtoAdministrator,
-        'organization_name' => 'Provincial Tourism Office',
-        'organization_subtitle' => 'Province of Davao Oriental',
+        'usr_role' => UserRole::PtoAdministrator,
+        'usr_organization_name' => 'Provincial Tourism Office',
+        'usr_organization_subtitle' => 'Province of Davao Oriental',
     ]);
 
     $this->actingAs($user)->get(route('pto.monthlyReports.index'))
@@ -39,9 +47,9 @@ test('the Provincial Reports page hides the redundant role/page breadcrumb', fun
 
 test('other PTO pages still show the role/page breadcrumb', function (string $routeName) {
     $user = User::factory()->create([
-        'role' => UserRole::PtoAdministrator,
-        'organization_name' => 'Provincial Tourism Office',
-        'organization_subtitle' => 'Province of Davao Oriental',
+        'usr_role' => UserRole::PtoAdministrator,
+        'usr_organization_name' => 'Provincial Tourism Office',
+        'usr_organization_subtitle' => 'Province of Davao Oriental',
     ]);
 
     $this->actingAs($user)->get(route($routeName))
@@ -53,14 +61,14 @@ test('other PTO pages still show the role/page breadcrumb', function (string $ro
 ]);
 
 test('the old Photo Approvals URL redirects to the Photos page\'s approval tab', function () {
-    $user = User::factory()->create(['role' => UserRole::PtoAdministrator]);
+    $user = User::factory()->create(['usr_role' => UserRole::PtoAdministrator]);
 
     $this->actingAs($user)->get(route('pto.images.queue'))
         ->assertRedirect(route('pto.images.index', ['tab' => 'approval']));
 });
 
 test('a non-PTO user gets a 403 on every PTO page', function (string $routeName) {
-    $lgu = User::factory()->create(['role' => UserRole::Lgu]);
+    $lgu = User::factory()->create(['usr_role' => UserRole::Lgu]);
 
     $this->actingAs($lgu)->get(route($routeName))->assertForbidden();
 })->with([

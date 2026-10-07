@@ -22,10 +22,10 @@ class SettingsController extends LguController
     /**
      * Settings: profile, account information, assigned municipality, and preferences.
      */
-    public function index(Request $request): View
+    public function index(Request $objRequest): View
     {
-        return $this->renderLgu($request, 'lgu.settings', 'settings', 'Settings', [
-            'preferences' => $this->notificationPreferencesFor($request->user()->id),
+        return $this->renderLgu($objRequest, 'lgu.settings', 'settings', 'Settings', [
+            'preferences' => $this->notificationPreferencesFor($objRequest->user()->usr_id),
         ]);
     }
 

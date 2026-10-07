@@ -6,20 +6,20 @@
 --}}
 @php
     $arrDetails = [
-        'Barangay / Address' => $listing->barangay,
-        'Municipality / City' => $listing->municipality,
-        'Coordinates' => $listing->lat !== null && $listing->lng !== null ? $listing->lat.', '.$listing->lng : null,
-        'Contact office' => $listing->contact_office,
-        'Contact number' => $listing->contact_phone,
-        'Visiting hours' => $listing->hours,
-        'Website or social page' => $listing->website,
+        'Barangay / Address' => $listing->lst_barangay,
+        'Municipality / City' => $listing->lst_municipality,
+        'Coordinates' => $listing->lst_lat !== null && $listing->lst_lng !== null ? $listing->lst_lat.', '.$listing->lst_lng : null,
+        'Contact office' => $listing->lst_contact_office,
+        'Contact number' => $listing->lst_contact_phone,
+        'Visiting hours' => $listing->lst_hours,
+        'Website or social page' => $listing->lst_website,
     ];
 @endphp
 
 <x-layouts.dashboard :user="$user" :nav-sections="$navSections" :page-title="$pageTitle" account-heading="System" :settings-href="route('lgu.settings')">
     <x-dashboard.page-header
-        :title="$listing->name"
-        description="Tourist attraction · {{ $listing->barangay ? $listing->barangay.', ' : '' }}{{ $listing->municipality }}"
+        :title="$listing->lst_name"
+        description="Tourist attraction · {{ $listing->lst_barangay ? $listing->lst_barangay.', ' : '' }}{{ $listing->lst_municipality }}"
     >
         <x-slot:actions>
             <a href="{{ route('lgu.directory.establishments', ['view' => 'attractions']) }}" class="btn-secondary">
@@ -47,7 +47,7 @@
                     @endforeach
                     <div class="sm:col-span-2">
                         <dt class="detail-term">Description</dt>
-                        <dd class="detail-value whitespace-pre-line">{{ $listing->description ?: 'No description yet.' }}</dd>
+                        <dd class="detail-value whitespace-pre-line">{{ $listing->lst_description ?: 'No description yet.' }}</dd>
                     </div>
                 </dl>
             </section>
@@ -61,14 +61,14 @@
             <section class="dashboard-panel">
                 <h2 class="dashboard-panel-title">Destination only</h2>
                 <p class="mt-2 text-xs text-sand-500">Tourist attractions have no establishment account, QR code, or monthly reporting. Arrivals are reported by the establishments around them.</p>
-                @unless ($listing->status === 'Archived')
+                @unless ($listing->lst_status === 'Archived')
                     <form method="POST" action="{{ route('lgu.directory.destinations.archive', $listing) }}" class="mt-4">
                         @csrf
                         @method('PATCH')
                         <button
                             type="button"
                             data-confirm-trigger
-                            data-confirm-title="Archive {{ $listing->name }}?"
+                            data-confirm-title="Archive {{ $listing->lst_name }}?"
                             data-confirm-message="It is taken off the public site. The record, its photos, and its history are kept."
                             data-confirm-label="Archive"
                             data-confirm-tone="danger"

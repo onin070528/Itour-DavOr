@@ -42,10 +42,10 @@ class DestinationListingSubmittedForReview extends Notification
         $strSubject = $this->blnIsChangeRequest ? 'Changes to a Published Listing for Review' : 'New Destination Listing for Review';
 
         return [
-            'listing_id' => $this->objListing->id,
-            'listing_name' => $this->objListing->name,
-            'municipality_id' => $this->objListing->municipality_id,
-            'message' => "{$strSubject}: {$this->objListing->name} submitted by {$this->objListing->municipality} LGU",
+            'listing_id' => $this->objListing->lst_id,
+            'listing_name' => $this->objListing->lst_name,
+            'municipality_id' => $this->objListing->mun_id,
+            'message' => "{$strSubject}: {$this->objListing->lst_name} submitted by {$this->objListing->lst_municipality} LGU",
             // Relative, so the bell only ever redirects within iTOUR.
             'url' => route('pto.destinationReviews.show', $this->objListing, false),
         ];

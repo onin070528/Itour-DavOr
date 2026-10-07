@@ -40,11 +40,11 @@ class UsersController extends PtoController
     /**
      * User Management: PTO, LGU, and Establishment accounts, province-wide.
      */
-    public function index(Request $request): View
+    public function index(Request $objRequest): View
     {
-        return $this->renderPto($request, 'pto.users', 'users', 'User Management', [
+        return $this->renderPto($objRequest, 'pto.users', 'users', 'User Management', [
             'users' => PtoMockData::users(),
-            'municipalities' => Municipality::query()->orderBy('name')->get(['id', 'name']),
+            'municipalities' => Municipality::query()->orderBy('mun_name')->get(['mun_id', 'mun_name']),
         ]);
     }
 
@@ -55,97 +55,97 @@ class UsersController extends PtoController
      * account's temporary passphrase is flashed once — read by the view
      * on this one redirect only, never persisted anywhere.
      */
-    public function store(StoreUserRequest $request, UserAccountProvisioner $objProvisioner): RedirectResponse
+    public function store(StoreUserRequest $objRequest, UserAccountProvisioner $objProvisioner): RedirectResponse
     {
-        $objRole = UserRole::from($request->validated('role'));
+        $objRole = UserRole::from($objRequest->validated('role'));
 
         [$strOrganizationName, $strOrganizationSubtitle, $intMunicipalityId, $intEstablishmentId] = match ($objRole) {
-            UserRole::Establishment => $this->_resolveEstablishmentById((int) $request->validated('establishment_id')),
-            UserRole::Lgu => $this->_resolveMunicipalityById((int) $request->validated('municipality_id')),
-            UserRole::PtoAdministrator => [$request->validated('name'), $request->validated('name'), null, null],
+            UserRole::Establishment => $this->_resolveEstablishmentById((int) $objRequest->validated('establishment_id')),
+            UserRole::Lgu => $this->_resolveMunicipalityById((int) $objRequest->validated('municipality_id')),
+            UserRole::PtoAdministrator => [$objRequest->validated('name'), $objRequest->validated('name'), null, null],
         };
 
         try {
-            $arrResult = $objProvisioner->provision($request->user(), [
-                'name' => $request->validated('name'),
-                'email' => $request->validated('email'),
-                'email_verified_at' => now(),
-                'role' => $objRole,
-                'organization_name' => $strOrganizationName,
-                'organization_subtitle' => $strOrganizationSubtitle,
-                'municipality_id' => $intMunicipalityId,
-                'establishment_id' => $intEstablishmentId,
-                'status' => 'Active',
-                'created_by' => $request->user()->id,
+            $arrResult = $objProvisioner->provision($objRequest->user(), [
+                'usr_name' => $objRequest->validated('name'),
+                'usr_email' => $objRequest->validated('email'),
+                'usr_email_verified_at' => now(),
+                'usr_role' => $objRole,
+                'usr_organization_name' => $strOrganizationName,
+                'usr_organization_subtitle' => $strOrganizationSubtitle,
+                'mun_id' => $intMunicipalityId,
+                'lst_id' => $intEstablishmentId,
+                'usr_status' => 'Active',
+                'usr_created_by' => $objRequest->user()->usr_id,
             ]);
-        } catch (\Throwable $e) {
-            Log::error('Failed to create user account.', ['exception' => $e]);
+        } catch (\Throwable $objException) {
+            Log::error('Failed to create user account.', ['exception' => $objException]);
 
             return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
 
         return back()->with('accountCreated', [
-            'userId' => $arrResult['user']->id,
-            'name' => $arrResult['user']->name,
+            'userId' => $arrResult['user']->usr_id,
+            'name' => $arrResult['user']->usr_name,
             'role' => $objRole->title(),
-            'municipality' => $arrResult['user']->municipality?->name,
+            'municipality' => $arrResult['user']->municipality?->mun_name,
             'passphrase' => $arrResult['passphrase'],
             'emailSent' => $arrResult['emailSent'],
         ]);
     }
 
-    public function update(Request $request, User $user): RedirectResponse
+    public function update(Request $objRequest, User $user): RedirectResponse
     {
-        abort_unless($request->user()->can('update', $user), 403);
+        abort_unless($objRequest->user()->can('update', $user), 403);
 
-        $data = $this->_validatedForUpdate($request, $user);
+        $arrData = $this->_validatedForUpdate($objRequest, $user);
 
-        $fromRole = $user->role;
+        $objFromRole = $user->usr_role;
 
         try {
             $user->update([
-                'name' => $data['name'],
-                'email' => $data['email'],
-                'role' => $data['role'],
-                'organization_name' => $data['organization_name'],
-                'organization_subtitle' => $data['organization_subtitle'],
-                'municipality_id' => $data['municipality_id'],
-                'establishment_id' => $data['establishment_id'],
-                'usr_phone' => $data['phone'],
+                'usr_name' => $arrData['name'],
+                'usr_email' => $arrData['email'],
+                'usr_role' => $arrData['role'],
+                'usr_organization_name' => $arrData['organization_name'],
+                'usr_organization_subtitle' => $arrData['organization_subtitle'],
+                'mun_id' => $arrData['municipality_id'],
+                'lst_id' => $arrData['establishment_id'],
+                'usr_phone' => $arrData['phone'],
             ]);
-        } catch (\Throwable $e) {
-            Log::error('Failed to update user account.', ['exception' => $e, 'user_id' => $user->id]);
+        } catch (\Throwable $objException) {
+            Log::error('Failed to update user account.', ['exception' => $objException, 'user_id' => $user->usr_id]);
 
             return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
 
-        if ($fromRole !== $user->role) {
-            event(new UserRoleChanged($request->user(), $user, $fromRole, $user->role));
+        if ($objFromRole !== $user->usr_role) {
+            event(new UserRoleChanged($objRequest->user(), $user, $objFromRole, $user->usr_role));
         }
 
         return back()->with('toast', 'User account saved.');
     }
 
-    public function toggleStatus(Request $request, User $user): RedirectResponse
+    public function toggleStatus(Request $objRequest, User $user): RedirectResponse
     {
         // UserPolicy::deactivate() also covers "nobody can change their own status".
-        abort_unless($request->user()->can('deactivate', $user), 403);
+        abort_unless($objRequest->user()->can('deactivate', $user), 403);
 
-        $next = $user->status === 'Active' ? 'Inactive' : 'Active';
+        $strNext = $user->usr_status === 'Active' ? 'Inactive' : 'Active';
 
         try {
-            $user->update(['status' => $next]);
-        } catch (\Throwable $e) {
-            Log::error('Failed to toggle user account status.', ['exception' => $e, 'user_id' => $user->id]);
+            $user->update(['usr_status' => $strNext]);
+        } catch (\Throwable $objException) {
+            Log::error('Failed to toggle user account status.', ['exception' => $objException, 'user_id' => $user->usr_id]);
 
             return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
 
-        event(new UserAccountStatusChanged($request->user(), $user, $next));
+        event(new UserAccountStatusChanged($objRequest->user(), $user, $strNext));
 
-        $verb = $next === 'Active' ? 'enabled' : 'disabled';
+        $strVerb = $strNext === 'Active' ? 'enabled' : 'disabled';
 
-        return back()->with('toast', "{$user->name}'s account was {$verb}.");
+        return back()->with('toast', "{$user->usr_name}'s account was {$strVerb}.");
     }
 
     /**
@@ -155,21 +155,21 @@ class UsersController extends PtoController
      * request it travels through, same-origin and CSRF-protected, to
      * reach Mail once more.
      */
-    public function resendWelcomeEmail(Request $request): JsonResponse
+    public function resendWelcomeEmail(Request $objRequest): JsonResponse
     {
-        $data = $request->validate([
-            'user_id' => ['required', 'integer', 'exists:users,id'],
+        $arrData = $objRequest->validate([
+            'user_id' => ['required', 'integer', 'exists:tbl_users,usr_id'],
             'passphrase' => ['required', 'string'],
         ]);
 
-        $user = User::query()->findOrFail($data['user_id']);
+        $objUser = User::query()->findOrFail($arrData['user_id']);
 
         try {
-            Mail::to($user->email)->send(new WelcomeAccountCreated($user, $data['passphrase']));
+            Mail::to($objUser->usr_email)->send(new WelcomeAccountCreated($objUser, $arrData['passphrase']));
 
             return response()->json(['sent' => true]);
-        } catch (\Throwable $e) {
-            Log::error('Failed to resend the welcome email.', ['exception' => $e, 'user_id' => $user->id]);
+        } catch (\Throwable $objException) {
+            Log::error('Failed to resend the welcome email.', ['exception' => $objException, 'user_id' => $objUser->usr_id]);
 
             return response()->json(['sent' => false], 500);
         }
@@ -179,18 +179,18 @@ class UsersController extends PtoController
      * AJAX: establishments in the given municipality with no linked user
      * account yet — feeds the Add User modal's Establishment dropdown.
      */
-    public function availableEstablishments(Request $request): JsonResponse
+    public function availableEstablishments(Request $objRequest): JsonResponse
     {
-        $data = $request->validate(['municipality_id' => ['required', 'integer', 'exists:municipalities,id']]);
+        $arrData = $objRequest->validate(['municipality_id' => ['required', 'integer', 'exists:tbl_municipalities,mun_id']]);
 
-        $establishments = Listing::query()
-            ->where('municipality_id', $data['municipality_id'])
-            ->where('category', '!=', 'destinations')
+        $objEstablishments = Listing::query()
+            ->where('mun_id', $arrData['municipality_id'])
+            ->where('lst_category', '!=', 'destinations')
             ->whereDoesntHave('establishmentUser')
-            ->orderBy('name')
-            ->get(['id', 'name']);
+            ->orderBy('lst_name')
+            ->get(['lst_id as id', 'lst_name as name']);
 
-        return response()->json(['establishments' => $establishments]);
+        return response()->json(['establishments' => $objEstablishments]);
     }
 
     /**
@@ -200,77 +200,77 @@ class UsersController extends PtoController
      *
      * @return array{name: string, email: string, role: UserRole, organization_name: string, organization_subtitle: string, municipality_id: ?int, establishment_id: ?int, phone: ?string}
      */
-    private function _validatedForUpdate(Request $request, User $user): array
+    private function _validatedForUpdate(Request $objRequest, User $objUser): array
     {
-        $data = $request->validate([
+        $arrData = $objRequest->validate([
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user)],
+            'email' => ['required', 'email', 'max:255', Rule::unique('tbl_users', 'usr_email')->ignore($objUser)],
             'role' => ['required', Rule::in(array_column(UserRole::cases(), 'value'))],
-            'municipality_id' => ['required_unless:role,'.UserRole::PtoAdministrator->value, 'nullable', 'integer', 'exists:municipalities,id'],
+            'municipality_id' => ['required_unless:role,'.UserRole::PtoAdministrator->value, 'nullable', 'integer', 'exists:tbl_municipalities,mun_id'],
             'establishment_id' => ['required_if:role,'.UserRole::Establishment->value, 'nullable', 'integer'],
             'phone' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $role = UserRole::from($data['role']);
+        $objRole = UserRole::from($arrData['role']);
 
-        if ($role === UserRole::PtoAdministrator && $user->role !== UserRole::PtoAdministrator) {
+        if ($objRole === UserRole::PtoAdministrator && $objUser->usr_role !== UserRole::PtoAdministrator) {
             throw ValidationException::withMessages([
                 'role' => 'PTO Administrator accounts cannot be granted from this page.',
             ]);
         }
 
-        [$organizationName, $organizationSubtitle, $municipalityId, $establishmentId] = match ($role) {
-            UserRole::Establishment => $this->_resolveEstablishmentById((int) $data['establishment_id'], $user),
-            UserRole::Lgu => $this->_resolveMunicipalityById((int) $data['municipality_id']),
-            UserRole::PtoAdministrator => [$data['name'], $data['name'], null, null],
+        [$strOrganizationName, $strOrganizationSubtitle, $intMunicipalityId, $intEstablishmentId] = match ($objRole) {
+            UserRole::Establishment => $this->_resolveEstablishmentById((int) $arrData['establishment_id'], $objUser),
+            UserRole::Lgu => $this->_resolveMunicipalityById((int) $arrData['municipality_id']),
+            UserRole::PtoAdministrator => [$arrData['name'], $arrData['name'], null, null],
         };
 
         return [
-            'name' => $data['name'],
-            'email' => $data['email'],
-            'role' => $role,
-            'organization_name' => $organizationName,
-            'organization_subtitle' => $organizationSubtitle,
-            'municipality_id' => $municipalityId,
-            'establishment_id' => $establishmentId,
-            'phone' => $data['phone'] ?? null,
+            'name' => $arrData['name'],
+            'email' => $arrData['email'],
+            'role' => $objRole,
+            'organization_name' => $strOrganizationName,
+            'organization_subtitle' => $strOrganizationSubtitle,
+            'municipality_id' => $intMunicipalityId,
+            'establishment_id' => $intEstablishmentId,
+            'phone' => $arrData['phone'] ?? null,
         ];
     }
 
     /**
      * @return array{0: string, 1: string, 2: ?int, 3: int}
      */
-    private function _resolveEstablishmentById(int $establishmentId, ?User $user = null): array
+    private function _resolveEstablishmentById(int $intEstablishmentId, ?User $objUser = null): array
     {
-        $listing = Listing::query()->where('id', $establishmentId)->where('category', '!=', 'destinations')->first();
+        $objListing = Listing::query()->where('lst_id', $intEstablishmentId)->where('lst_category', '!=', 'destinations')->first();
 
-        if (! $listing) {
+        if (! $objListing) {
             throw ValidationException::withMessages(['establishment_id' => 'That establishment could not be found.']);
         }
 
-        $linkedToAnotherUser = User::query()
-            ->where('establishment_id', $listing->id)
-            ->when($user, fn ($q) => $q->whereKeyNot($user->id))
+        $blnLinkedToAnotherUser = User::query()
+            ->where('lst_id', $objListing->lst_id)
+            ->when($objUser, fn ($objQuery) => $objQuery->whereKeyNot($objUser->usr_id))
             ->exists();
 
-        if ($linkedToAnotherUser) {
-            throw ValidationException::withMessages(['establishment_id' => "\"{$listing->name}\" already has an account linked to it."]);
+        if ($blnLinkedToAnotherUser) {
+            throw ValidationException::withMessages(['establishment_id' => "\"{$objListing->lst_name}\" already has an account linked to it."]);
         }
 
-        return [$listing->name, "{$listing->barangay}, {$listing->municipality}", $listing->municipality_id, $listing->id];
+        return [$objListing->lst_name, "{$objListing->lst_barangay}, {$objListing->lst_municipality}", $objListing->mun_id, $objListing->lst_id];
     }
 
     /**
      * @return array{0: string, 1: string, 2: int, 3: null}
      */
-    private function _resolveMunicipalityById(int $municipalityId): array
+    private function _resolveMunicipalityById(int $intMunicipalityId): array
     {
-        $municipality = Municipality::query()->find($municipalityId);
+        $objMunicipality = Municipality::query()->find($intMunicipalityId);
 
-        if (! $municipality) {
+        if (! $objMunicipality) {
             throw ValidationException::withMessages(['municipality_id' => 'That municipality could not be found.']);
         }
 
-        return [$municipality->name, $municipality->name, $municipality->id, null];
+        return [$objMunicipality->mun_name, $objMunicipality->mun_name, $objMunicipality->mun_id, null];
     }
 }

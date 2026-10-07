@@ -1,5 +1,13 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Tests — establishment image minimum.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 use Illuminate\Http\UploadedFile;
 
 test('uploading 1 to 5 files succeeds', function () {
@@ -7,14 +15,14 @@ test('uploading 1 to 5 files succeeds', function () {
     $user = establishmentImageUserFixture($listing);
 
     test()->actingAs($user)->post(route('establishment.images.store'), [
-        'listing_id' => $listing->id,
+        'listing_id' => $listing->lst_id,
         'photos' => [UploadedFile::fake()->image('one.jpg', 1600, 1200)],
         'ownership_declared' => '1',
     ])->assertSessionHasNoErrors();
     expect($listing->fresh()->liveImageCount())->toBe(1);
 
     test()->actingAs($user)->post(route('establishment.images.store'), [
-        'listing_id' => $listing->id,
+        'listing_id' => $listing->lst_id,
         'photos' => [
             UploadedFile::fake()->image('two.jpg', 1601, 1200),
             UploadedFile::fake()->image('three.jpg', 1602, 1200),
@@ -31,7 +39,7 @@ test('uploading 0 files is rejected with the plain minimum message', function ()
     $user = establishmentImageUserFixture($listing);
 
     $response = test()->actingAs($user)->post(route('establishment.images.store'), [
-        'listing_id' => $listing->id,
+        'listing_id' => $listing->lst_id,
         'photos' => [],
         'ownership_declared' => '1',
     ]);
@@ -45,7 +53,7 @@ test('uploading 6 files is still rejected (the maximum is unchanged)', function 
     $user = establishmentImageUserFixture($listing);
 
     $response = test()->actingAs($user)->post(route('establishment.images.store'), [
-        'listing_id' => $listing->id,
+        'listing_id' => $listing->lst_id,
         'photos' => collect(range(1, 6))->map(fn ($i) => UploadedFile::fake()->image("photo-{$i}.jpg", 1600 + $i, 1200))->all(),
         'ownership_declared' => '1',
     ]);
@@ -55,7 +63,7 @@ test('uploading 6 files is still rejected (the maximum is unchanged)', function 
 });
 
 test('removing the last image succeeds, needs no approval, and the category placeholder shows on /explore', function () {
-    $listing = establishmentImageListingFixture(['image' => null]);
+    $listing = establishmentImageListingFixture(['lst_image' => null]);
     $user = establishmentImageUserFixture($listing);
     $image = establishmentImageRowFixture($listing, $user, ['img_is_cover' => true]);
 
@@ -117,7 +125,7 @@ test('the "more photos" suggestion appears below 3 photos and disappears at 3 or
 });
 
 test('the suggestion never appears on a public page', function () {
-    $listing = establishmentImageListingFixture(['status' => 'PUBLISHED']);
+    $listing = establishmentImageListingFixture(['lst_status' => 'PUBLISHED']);
     $user = establishmentImageUserFixture($listing);
     establishmentImageRowFixture($listing, $user, ['img_is_cover' => true]);
 

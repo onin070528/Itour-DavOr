@@ -15,6 +15,7 @@ use App\Models\Hotline;
 use App\Support\OperationLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
@@ -23,55 +24,55 @@ class HotlinesController extends PtoController
 {
     private const AGENCY_TYPES = ['Police', 'Fire', 'Hospital/Medical', 'Disaster Office', 'Coast Guard', 'Other'];
 
-    public function index(Request $request): View
+    public function index(Request $objRequest): View
     {
-        $hotlines = Hotline::query()->orderBy('hot_sort_order')->get();
+        $objHotlines = Hotline::query()->orderBy('hot_sort_order')->get();
 
-        return $this->renderPto($request, 'pto.hotlines.index', 'hotlines', 'Hotlines', [
-            'hotlines' => $hotlines,
+        return $this->renderPto($objRequest, 'pto.hotlines.index', 'hotlines', 'Hotlines', [
+            'hotlines' => $objHotlines,
             'agencyTypes' => self::AGENCY_TYPES,
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $objRequest): RedirectResponse
     {
-        abort_unless($request->user()->can('create', Hotline::class), 403);
+        abort_unless($objRequest->user()->can('create', Hotline::class), 403);
 
-        $data = $this->validatedFields($request);
+        $arrData = $this->validatedFields($objRequest);
 
         try {
-            $hotline = Hotline::query()->create([
-                ...$data,
+            $objHotline = Hotline::query()->create([
+                ...$arrData,
                 'hot_sort_order' => ((int) Hotline::query()->max('hot_sort_order')) + 1,
-                'hot_created_by' => $request->user()->id,
+                'hot_created_by' => $objRequest->user()->usr_id,
             ]);
-        } catch (\Throwable $e) {
-            Log::error('Failed to create hotline.', ['exception' => $e]);
+        } catch (\Throwable $objException) {
+            Log::error('Failed to create hotline.', ['exception' => $objException]);
 
             return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
 
-        OperationLogger::created($request->user(), 'hotline', $hotline->hot_id, null, null, $data);
+        OperationLogger::created($objRequest->user(), 'hotline', $objHotline->hot_id, null, null, $arrData);
 
-        return back()->with('toast', "{$hotline->hot_agency_name} was added.");
+        return back()->with('toast', "{$objHotline->hot_agency_name} was added.");
     }
 
-    public function update(Request $request, Hotline $hotline): RedirectResponse
+    public function update(Request $objRequest, Hotline $hotline): RedirectResponse
     {
-        abort_unless($request->user()->can('update', $hotline), 403);
+        abort_unless($objRequest->user()->can('update', $hotline), 403);
 
-        $data = $this->validatedFields($request);
-        $before = $hotline->getOriginal();
+        $arrData = $this->validatedFields($objRequest);
+        $arrBefore = $hotline->getOriginal();
 
         try {
-            $hotline->update([...$data, 'hot_updated_by' => $request->user()->id]);
-        } catch (\Throwable $e) {
-            Log::error('Failed to update hotline.', ['exception' => $e, 'hotline_id' => $hotline->hot_id]);
+            $hotline->update([...$arrData, 'hot_updated_by' => $objRequest->user()->usr_id]);
+        } catch (\Throwable $objException) {
+            Log::error('Failed to update hotline.', ['exception' => $objException, 'hotline_id' => $hotline->hot_id]);
 
             return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
 
-        OperationLogger::updated($request->user(), 'hotline', $hotline->hot_id, null, null, OperationLogger::diff($before, $hotline));
+        OperationLogger::updated($objRequest->user(), 'hotline', $hotline->hot_id, null, null, OperationLogger::diff($arrBefore, $hotline));
 
         return back()->with('toast', 'Hotline saved.');
     }
@@ -80,15 +81,21 @@ class HotlinesController extends PtoController
      * Deactivate only — hotlines are never hard-deleted (A3-style audit
      * trail requirement: PTO actions always leave a record).
      */
-    public function deactivate(Request $request, Hotline $hotline): RedirectResponse
+    public function deactivate(Request $objRequest, Hotline $hotline): RedirectResponse
     {
-        abort_unless($request->user()->can('deactivate', $hotline), 403);
+        abort_unless($objRequest->user()->can('deactivate', $hotline), 403);
 
-        $before = $hotline->getOriginal();
+        $arrBefore = $hotline->getOriginal();
 
-        $hotline->update(['hot_is_active' => ! $hotline->hot_is_active, 'hot_updated_by' => $request->user()->id]);
+        try {
+            $hotline->update(['hot_is_active' => ! $hotline->hot_is_active, 'hot_updated_by' => $objRequest->user()->usr_id]);
+        } catch (\Throwable $objException) {
+            Log::error('Failed to toggle hotline activation.', ['exception' => $objException, 'hot_id' => $hotline->hot_id]);
 
-        OperationLogger::updated($request->user(), 'hotline', $hotline->hot_id, null, null, OperationLogger::diff($before, $hotline));
+            return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
+        }
+
+        OperationLogger::updated($objRequest->user(), 'hotline', $hotline->hot_id, null, null, OperationLogger::diff($arrBefore, $hotline));
 
         return back()->with('toast', $hotline->hot_is_active ? "{$hotline->hot_agency_name} reactivated." : "{$hotline->hot_agency_name} deactivated.");
     }
@@ -97,23 +104,32 @@ class HotlinesController extends PtoController
      * Swaps this hotline's sort order with its immediate neighbor in the
      * requested direction — simple, no drag-and-drop JS required.
      */
-    public function reorder(Request $request, Hotline $hotline): RedirectResponse
+    public function reorder(Request $objRequest, Hotline $hotline): RedirectResponse
     {
-        abort_unless($request->user()->can('reorder', $hotline), 403);
+        abort_unless($objRequest->user()->can('reorder', $hotline), 403);
 
-        $data = $request->validate([
+        $arrData = $objRequest->validate([
             'direction' => ['required', Rule::in(['up', 'down'])],
         ]);
 
-        $neighbor = Hotline::query()
-            ->when($data['direction'] === 'up', fn ($q) => $q->where('hot_sort_order', '<', $hotline->hot_sort_order)->orderByDesc('hot_sort_order'))
-            ->when($data['direction'] === 'down', fn ($q) => $q->where('hot_sort_order', '>', $hotline->hot_sort_order)->orderBy('hot_sort_order'))
+        $objNeighbor = Hotline::query()
+            ->when($arrData['direction'] === 'up', fn ($objQuery) => $objQuery->where('hot_sort_order', '<', $hotline->hot_sort_order)->orderByDesc('hot_sort_order'))
+            ->when($arrData['direction'] === 'down', fn ($objQuery) => $objQuery->where('hot_sort_order', '>', $hotline->hot_sort_order)->orderBy('hot_sort_order'))
             ->first();
 
-        if ($neighbor) {
-            [$hotlineOrder, $neighborOrder] = [$hotline->hot_sort_order, $neighbor->hot_sort_order];
-            $hotline->update(['hot_sort_order' => $neighborOrder]);
-            $neighbor->update(['hot_sort_order' => $hotlineOrder]);
+        if ($objNeighbor) {
+            [$hotlineOrder, $neighborOrder] = [$hotline->hot_sort_order, $objNeighbor->hot_sort_order];
+
+            try {
+                DB::transaction(function () use ($hotline, $objNeighbor, $hotlineOrder, $neighborOrder) {
+                    $hotline->update(['hot_sort_order' => $neighborOrder]);
+                    $objNeighbor->update(['hot_sort_order' => $hotlineOrder]);
+                });
+            } catch (\Throwable $objException) {
+                Log::error('Failed to reorder hotlines.', ['exception' => $objException, 'hot_id' => $hotline->hot_id]);
+
+                return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
+            }
         }
 
         return back();
@@ -122,18 +138,18 @@ class HotlinesController extends PtoController
     /**
      * @return array<string, mixed>
      */
-    private function validatedFields(Request $request): array
+    private function validatedFields(Request $objRequest): array
     {
-        $data = $request->validate([
+        $arrData = $objRequest->validate([
             'hot_agency_name' => ['required', 'string', 'max:255'],
             'hot_agency_type' => ['required', 'string', Rule::in(self::AGENCY_TYPES)],
             'hot_contact_number' => ['required', 'string', 'max:255'],
             'hot_scope' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $data['hot_scope'] = $request->input('hot_scope') ?: 'Province-wide';
-        $data['hot_is_24_7'] = $request->boolean('hot_is_24_7');
+        $arrData['hot_scope'] = $objRequest->input('hot_scope') ?: 'Province-wide';
+        $arrData['hot_is_24_7'] = $objRequest->boolean('hot_is_24_7');
 
-        return $data;
+        return $arrData;
     }
 }

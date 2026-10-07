@@ -16,6 +16,7 @@ use App\Models\Category;
 use App\Support\OperationLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 
 class SettingsController extends PtoController
@@ -26,10 +27,10 @@ class SettingsController extends PtoController
      * Settings: profile, account information, basic preferences, and the
      * Categories panel (QR switches).
      */
-    public function index(Request $request): View
+    public function index(Request $objRequest): View
     {
-        return $this->renderPto($request, 'pto.settings', 'settings', 'Settings', [
-            'preferences' => $this->notificationPreferencesFor($request->user()->id),
+        return $this->renderPto($objRequest, 'pto.settings', 'settings', 'Settings', [
+            'preferences' => $this->notificationPreferencesFor($objRequest->user()->usr_id),
             'categories' => Category::query()->orderBy('cat_sort_order')->get(),
         ]);
     }
@@ -42,15 +43,21 @@ class SettingsController extends PtoController
      * filters, report breakdowns, the public scan). Turning it back on
      * re-activates the exact same QR codes, since nothing was ever deleted.
      */
-    public function toggleCategoryQr(Request $request, Category $category): RedirectResponse
+    public function toggleCategoryQr(Request $objRequest, Category $category): RedirectResponse
     {
-        abort_unless($request->user()->can('update', $category), 403);
+        abort_unless($objRequest->user()->can('update', $category), 403);
 
-        $before = $category->getOriginal();
+        $arrBefore = $category->getOriginal();
 
-        $category->update(['cat_is_qr_enabled' => ! $category->cat_is_qr_enabled]);
+        try {
+            $category->update(['cat_is_qr_enabled' => ! $category->cat_is_qr_enabled]);
+        } catch (\Throwable $objException) {
+            Log::error('Failed to toggle the category QR switch.', ['exception' => $objException, 'cat_id' => $category->cat_id]);
 
-        OperationLogger::updated($request->user(), 'category', $category->cat_id, null, null, OperationLogger::diff($before, $category));
+            return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
+        }
+
+        OperationLogger::updated($objRequest->user(), 'category', $category->cat_id, null, null, OperationLogger::diff($arrBefore, $category));
 
         return back()->with('toast', $category->cat_is_qr_enabled
             ? "{$category->cat_name} can collect QR arrivals again."

@@ -21,8 +21,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('listings', function (Blueprint $table) {
-            $table->string('reporting_mode')
+        Schema::table('tbl_listings', function (Blueprint $table) {
+            $table->string('lst_reporting_mode')
                 ->nullable()
                 ->default(ReportingMethod::ManualPaper->value)
                 ->change();
@@ -35,12 +35,12 @@ return new class extends Migration
      */
     public function down(): void
     {
-        DB::table('listings')
-            ->whereNull('reporting_mode')
-            ->update(['reporting_mode' => ReportingMethod::ManualPaper->value]);
+        DB::table('tbl_listings')
+            ->whereNull('lst_reporting_mode')
+            ->update(['lst_reporting_mode' => ReportingMethod::ManualPaper->value]);
 
-        Schema::table('listings', function (Blueprint $table) {
-            $table->string('reporting_mode')
+        Schema::table('tbl_listings', function (Blueprint $table) {
+            $table->string('lst_reporting_mode')
                 ->nullable(false)
                 ->default(ReportingMethod::ManualPaper->value)
                 ->change();

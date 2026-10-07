@@ -1,4 +1,11 @@
 {{--
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: Blade view — establishment / profile.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+--}}
+{{--
     System     : iTOUR - Integrated Tourism Information and Monitoring System
     Purpose    : Merged Establishment Profile & Photos page — status banner, details form,
                  and the reviewed photo manager, in that order, on one scroll.
@@ -41,7 +48,7 @@
         <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div data-field class="sm:col-span-2">
                 <label class="mb-1 block text-xs font-semibold text-sand-700">Establishment Name <span class="text-danger" aria-hidden="true">*</span></label>
-                <input name="name" type="text" value="{{ $listing->name }}" @disabled($blnIsReadOnly) class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                <input name="name" type="text" value="{{ $listing->lst_name }}" @disabled($blnIsReadOnly) class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
             </div>
 
             <div data-field>
@@ -58,45 +65,45 @@
             {{-- Same Category -> Type list and server-side check as the LGU establishment form (config/establishment_categories.php). --}}
             <div data-field>
                 <label for="profile-type" class="mb-1 block text-xs font-semibold text-sand-700">Establishment Type <span class="text-danger" aria-hidden="true">*</span></label>
-                <x-dashboard.establishment-type-select id="profile-type" :categories="$categories" :selected="old('type', $listing->type)" :disabled="$blnIsReadOnly" :data-locked="$blnIsReadOnly ? 'true' : null" />
+                <x-dashboard.establishment-type-select id="profile-type" :categories="$categories" :selected="old('type', $listing->lst_type)" :disabled="$blnIsReadOnly" :data-locked="$blnIsReadOnly ? 'true' : null" />
                 @error('type') <p class="mt-1 text-xs text-danger">{{ $message }}</p> @enderror
             </div>
 
             <div data-field>
                 <label class="mb-1 block text-xs font-semibold text-sand-700">Municipality</label>
-                <input type="text" value="{{ $listing->municipality }}" disabled class="w-full rounded-sm border border-sand-200 bg-sand-100 px-3 py-2 text-sm text-sand-500">
+                <input type="text" value="{{ $listing->lst_municipality }}" disabled class="w-full rounded-sm border border-sand-200 bg-sand-100 px-3 py-2 text-sm text-sand-500">
                 <p class="mt-1 text-[11px] text-sand-500">Municipality changes go through your LGU tourism office.</p>
             </div>
 
             <div data-field class="sm:col-span-2">
                 <label class="mb-1 block text-xs font-semibold text-sand-700">Address / Barangay <span class="text-danger" aria-hidden="true">*</span></label>
-                <input name="address" type="text" value="{{ $listing->barangay }}" @disabled($blnIsReadOnly) class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                <input name="address" type="text" value="{{ $listing->lst_barangay }}" @disabled($blnIsReadOnly) class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
             </div>
 
             <div data-field class="sm:col-span-2">
                 <label class="mb-1 block text-xs font-semibold text-sand-700">Description <span class="text-danger" aria-hidden="true">*</span></label>
-                <textarea name="description" rows="3" @disabled($blnIsReadOnly) class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">{{ $listing->description }}</textarea>
+                <textarea name="description" rows="3" @disabled($blnIsReadOnly) class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">{{ $listing->lst_description }}</textarea>
             </div>
 
             <div data-field>
                 <label class="mb-1 block text-xs font-semibold text-sand-700">Contact Number</label>
-                <input name="phone" type="text" value="{{ $listing->contact_phone }}" @disabled($blnIsReadOnly) class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                <input name="phone" type="text" value="{{ $listing->lst_contact_phone }}" @disabled($blnIsReadOnly) class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
             </div>
 
             <div data-field>
                 <label class="mb-1 block text-xs font-semibold text-sand-700">Operating Hours</label>
-                <input name="hours" type="text" value="{{ $listing->hours }}" @disabled($blnIsReadOnly) class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                <input name="hours" type="text" value="{{ $listing->lst_hours }}" @disabled($blnIsReadOnly) class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
             </div>
 
             <div data-field>
                 <label class="mb-1 block text-xs font-semibold text-sand-700">Email</label>
-                <input name="email" type="email" value="{{ $listing->email }}" placeholder="you@example.com" @disabled($blnIsReadOnly) class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                <input name="email" type="email" value="{{ $listing->lst_email }}" placeholder="you@example.com" @disabled($blnIsReadOnly) class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
                 <p class="mt-1 text-[11px] text-sand-500">A public phone number or email is required before submitting.</p>
             </div>
 
             <div data-field>
                 <label class="mb-1 block text-xs font-semibold text-sand-700">Website / Social Media</label>
-                <input name="website" type="text" value="{{ $listing->website }}" placeholder="Optional" @disabled($blnIsReadOnly) class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                <input name="website" type="text" value="{{ $listing->lst_website }}" placeholder="Optional" @disabled($blnIsReadOnly) class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
             </div>
         </div>
     </form>

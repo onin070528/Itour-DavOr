@@ -39,9 +39,9 @@ class EstablishmentAdoptionService
      * account (reactivating it when suspended) or, when it has none,
      * creates exactly one through UserAccountProvisioner (temporary
      * password shown once, forced change at first login, welcome email).
-     * $arrNewAccount (name, email) is only used when no account exists.
+     * $arrNewAccount (usr_name, usr_email) is only used when no account exists.
      *
-     * @param  array{name: string, email: string}|null  $arrNewAccount
+     * @param  array{usr_name: string, usr_email: string}|null  $arrNewAccount
      * @return array{user: User, passphrase: ?string, emailSent: ?bool, blnIsNewAccount: bool}
      *
      * @throws ValidationException When the switch no longer applies or a new account's details are missing.
@@ -54,7 +54,7 @@ class EstablishmentAdoptionService
             }
 
             $arrBefore = $objLocked->getOriginal();
-            $objAccount = User::query()->where('establishment_id', $objLocked->id)->lockForUpdate()->first();
+            $objAccount = User::query()->where('lst_id', $objLocked->lst_id)->lockForUpdate()->first();
             $strPassphrase = null;
             $blnIsReactivated = false;
 
@@ -65,29 +65,29 @@ class EstablishmentAdoptionService
                 }
 
                 $arrCreated = $this->objProvisioner->createWithPassphrase([
-                    'name' => $arrNewAccount['name'],
-                    'email' => $arrNewAccount['email'],
-                    'email_verified_at' => now(),
-                    'role' => UserRole::Establishment,
-                    'organization_name' => $objLocked->name,
-                    'organization_subtitle' => trim("{$objLocked->barangay}, {$objLocked->municipality}", ', '),
+                    'usr_name' => $arrNewAccount['usr_name'],
+                    'usr_email' => $arrNewAccount['usr_email'],
+                    'usr_email_verified_at' => now(),
+                    'usr_role' => UserRole::Establishment,
+                    'usr_organization_name' => $objLocked->lst_name,
+                    'usr_organization_subtitle' => trim("{$objLocked->lst_barangay}, {$objLocked->lst_municipality}", ', '),
                     // Inherited from the establishment — never from the request.
-                    'municipality_id' => $objLocked->municipality_id,
-                    'establishment_id' => $objLocked->id,
-                    'status' => Listing::ACCOUNT_STATUS_ACTIVE,
-                    'created_by' => $objLgu->id,
+                    'mun_id' => $objLocked->mun_id,
+                    'lst_id' => $objLocked->lst_id,
+                    'usr_status' => Listing::ACCOUNT_STATUS_ACTIVE,
+                    'usr_created_by' => $objLgu->usr_id,
                 ]);
                 $objAccount = $arrCreated['user'];
                 $strPassphrase = $arrCreated['passphrase'];
-            } elseif ($objAccount->status !== Listing::ACCOUNT_STATUS_ACTIVE) {
-                $objAccount->update(['status' => Listing::ACCOUNT_STATUS_ACTIVE]);
+            } elseif ($objAccount->usr_status !== Listing::ACCOUNT_STATUS_ACTIVE) {
+                $objAccount->update(['usr_status' => Listing::ACCOUNT_STATUS_ACTIVE]);
                 $blnIsReactivated = true;
             }
 
-            $objLocked->reporting_mode = ReportingMethod::OnlineItour;
+            $objLocked->lst_reporting_mode = ReportingMethod::OnlineItour;
             $objLocked->save();
 
-            OperationLogger::updated($objLgu, 'establishment', $objLocked->id, $objLocked->municipality_id, $objLocked->id, OperationLogger::diff($arrBefore, $objLocked), 'Switched to Online iTOUR reporting.');
+            OperationLogger::updated($objLgu, 'establishment', $objLocked->lst_id, $objLocked->mun_id, $objLocked->lst_id, OperationLogger::diff($arrBefore, $objLocked), 'Switched to Online iTOUR reporting.');
 
             return ['user' => $objAccount, 'passphrase' => $strPassphrase, 'blnIsReactivated' => $blnIsReactivated];
         });
@@ -129,18 +129,18 @@ class EstablishmentAdoptionService
             }
 
             $arrBefore = $objLocked->getOriginal();
-            $objAccount = User::query()->where('establishment_id', $objLocked->id)->lockForUpdate()->first();
+            $objAccount = User::query()->where('lst_id', $objLocked->lst_id)->lockForUpdate()->first();
             $objSuspended = null;
 
-            if ($objAccount !== null && $objAccount->status === Listing::ACCOUNT_STATUS_ACTIVE) {
-                $objAccount->update(['status' => self::ACCOUNT_STATUS_INACTIVE]);
+            if ($objAccount !== null && $objAccount->usr_status === Listing::ACCOUNT_STATUS_ACTIVE) {
+                $objAccount->update(['usr_status' => self::ACCOUNT_STATUS_INACTIVE]);
                 $objSuspended = $objAccount;
             }
 
-            $objLocked->reporting_mode = ReportingMethod::ManualPaper;
+            $objLocked->lst_reporting_mode = ReportingMethod::ManualPaper;
             $objLocked->save();
 
-            OperationLogger::updated($objLgu, 'establishment', $objLocked->id, $objLocked->municipality_id, $objLocked->id, OperationLogger::diff($arrBefore, $objLocked), 'Switched to Manual/Paper reporting; account suspended and QR check-in stopped.');
+            OperationLogger::updated($objLgu, 'establishment', $objLocked->lst_id, $objLocked->mun_id, $objLocked->lst_id, OperationLogger::diff($arrBefore, $objLocked), 'Switched to Manual/Paper reporting; account suspended and QR check-in stopped.');
 
             return $objSuspended;
         });
@@ -166,14 +166,14 @@ class EstablishmentAdoptionService
     {
         try {
             return DB::transaction(function () use ($objListing, $fnMutate) {
-                $objLocked = Listing::query()->lockForUpdate()->findOrFail($objListing->id);
+                $objLocked = Listing::query()->lockForUpdate()->findOrFail($objListing->lst_id);
 
                 return $fnMutate($objLocked);
             });
         } catch (ValidationException $objValidationException) {
             throw $objValidationException;
         } catch (\Throwable $objException) {
-            Log::error('Failed to switch an establishment\'s reporting method.', ['exception' => $objException, 'listing_id' => $objListing->id]);
+            Log::error('Failed to switch an establishment\'s reporting method.', ['exception' => $objException, 'listing_id' => $objListing->lst_id]);
 
             throw ValidationException::withMessages(['reporting_mode' => 'Something went wrong while saving. Please try again.']);
         }

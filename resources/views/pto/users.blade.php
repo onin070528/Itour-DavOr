@@ -1,3 +1,10 @@
+{{--
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: PTO User Management page.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+--}}
 @php
     $roles = collect($users)->pluck('role')->unique()->sort()->values();
     $statusTone = fn ($status) => $status === 'Active' ? 'success' : 'danger';
@@ -188,7 +195,7 @@
                 <select name="municipality_id" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
                     <option value="">Select a municipality</option>
                     @foreach ($municipalities as $m)
-                        <option value="{{ $m->id }}">{{ $m->name }}</option>
+                        <option value="{{ $m->mun_id }}">{{ $m->mun_name }}</option>
                     @endforeach
                 </select>
             </div>

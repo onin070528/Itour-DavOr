@@ -57,7 +57,7 @@ class AttractionsController extends LguController
 
         if ($arrPhotos === []) {
             return redirect()->route('lgu.directory.attractions.show', $objListing)
-                ->with('toast', "{$objListing->name} was added. Request PTO review when it is ready to be featured.");
+                ->with('toast', "{$objListing->lst_name} was added. Request PTO review when it is ready to be featured.");
         }
 
         // Summary comment: photos go through the unchanged photo workflow.
@@ -66,19 +66,19 @@ class AttractionsController extends LguController
         } catch (ValidationException $e) {
             return redirect()->route('lgu.directory.attractions.edit', $objListing)
                 ->withFragment('photos')
-                ->with('toast', "{$objListing->name} was added, but the photos were not: {$e->validator->errors()->first()}")
+                ->with('toast', "{$objListing->lst_name} was added, but the photos were not: {$e->validator->errors()->first()}")
                 ->with('toast_tone', 'danger');
         } catch (\Throwable $e) {
-            Log::error('Failed to upload photos for a new LGU attraction.', ['exception' => $e, 'listing_id' => $objListing->id]);
+            Log::error('Failed to upload photos for a new LGU attraction.', ['exception' => $e, 'listing_id' => $objListing->lst_id]);
 
             return redirect()->route('lgu.directory.attractions.edit', $objListing)
                 ->withFragment('photos')
-                ->with('toast', "{$objListing->name} was added, but the photos could not be uploaded. Please try again below.")
+                ->with('toast', "{$objListing->lst_name} was added, but the photos could not be uploaded. Please try again below.")
                 ->with('toast_tone', 'danger');
         }
 
         return redirect()->route('lgu.directory.attractions.show', $objListing)
-            ->with('toast', "{$objListing->name} was added. Its photos were sent to the PTO for approval.");
+            ->with('toast', "{$objListing->lst_name} was added. Its photos were sent to the PTO for approval.");
     }
 
     /**
@@ -90,7 +90,7 @@ class AttractionsController extends LguController
 
         $listing->load('establishmentImages');
 
-        return $this->renderLgu($request, 'lgu.directory.attractions.show', 'directory.establishments', $listing->name, [
+        return $this->renderLgu($request, 'lgu.directory.attractions.show', 'directory.establishments', $listing->lst_name, [
             'listing' => $listing,
         ]);
     }
@@ -101,7 +101,7 @@ class AttractionsController extends LguController
 
         $listing->load('establishmentImages');
 
-        return $this->renderLgu($request, 'lgu.directory.attractions.edit', 'directory.establishments', "Edit {$listing->name}", [
+        return $this->renderLgu($request, 'lgu.directory.attractions.edit', 'directory.establishments', "Edit {$listing->lst_name}", [
             'listing' => $listing,
             // A live attraction's held changes are what the LGU is editing.
             'formListing' => $listing->withPendingChanges(),
@@ -121,7 +121,7 @@ class AttractionsController extends LguController
             return redirect()->route('lgu.directory.attractions.show', $listing)
                 ->with('toast', $e->validator->errors()->first())->with('toast_tone', 'danger');
         } catch (\Throwable $e) {
-            Log::error('Failed to update LGU attraction.', ['exception' => $e, 'listing_id' => $listing->id]);
+            Log::error('Failed to update LGU attraction.', ['exception' => $e, 'listing_id' => $listing->lst_id]);
 
             return back()->withInput()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }

@@ -26,16 +26,16 @@ use Illuminate\Support\Str;
 
 function adoptionMunicipality(string $strName, string $strCode): Municipality
 {
-    return Municipality::query()->firstOrCreate(['code' => $strCode], ['name' => $strName]);
+    return Municipality::query()->firstOrCreate(['mun_code' => $strCode], ['mun_name' => $strName]);
 }
 
 function adoptionLgu(Municipality $objMunicipality): User
 {
     return User::factory()->create([
-        'role' => UserRole::Lgu,
-        'organization_name' => "{$objMunicipality->name} LGU",
-        'organization_subtitle' => $objMunicipality->name,
-        'municipality_id' => $objMunicipality->id,
+        'usr_role' => UserRole::Lgu,
+        'usr_organization_name' => "{$objMunicipality->mun_name} LGU",
+        'usr_organization_subtitle' => $objMunicipality->mun_name,
+        'mun_id' => $objMunicipality->mun_id,
     ]);
 }
 
@@ -58,17 +58,17 @@ function adoptionEstablishment(Municipality $objMunicipality, array $arrOverride
     $objCategory = adoptionCategory();
 
     return Listing::query()->create(array_merge([
-        'slug' => Str::slug("{$objMunicipality->name}-adoption-inn-".Str::random(6)),
-        'name' => "{$objMunicipality->name} Adoption Inn",
-        'category' => $objCategory->legacySlug(),
+        'lst_slug' => Str::slug("{$objMunicipality->mun_name}-adoption-inn-".Str::random(6)),
+        'lst_name' => "{$objMunicipality->mun_name} Adoption Inn",
+        'lst_category' => $objCategory->legacySlug(),
         'cat_id' => $objCategory->cat_id,
-        'type' => 'Hotel',
-        'municipality' => $objMunicipality->name,
-        'municipality_id' => $objMunicipality->id,
-        'barangay' => 'Poblacion',
-        'owner_name' => 'Juan Dela Cruz',
-        'email' => 'owner@adoption-inn.test',
-        'status' => 'DRAFT',
+        'lst_type' => 'Hotel',
+        'lst_municipality' => $objMunicipality->mun_name,
+        'mun_id' => $objMunicipality->mun_id,
+        'lst_barangay' => 'Poblacion',
+        'lst_owner_name' => 'Juan Dela Cruz',
+        'lst_email' => 'owner@adoption-inn.test',
+        'lst_status' => 'DRAFT',
     ], $arrOverrides));
 }
 
@@ -81,13 +81,13 @@ function adoptionEstablishment(Municipality $objMunicipality, array $arrOverride
 function adoptionOnlineEstablishment(Municipality $objMunicipality, array $arrOverrides = []): array
 {
     $objListing = adoptionEstablishment($objMunicipality, $arrOverrides);
-    $objListing->forceFill(['reporting_mode' => ReportingMethod::OnlineItour])->save();
+    $objListing->forceFill(['lst_reporting_mode' => ReportingMethod::OnlineItour])->save();
     $objAccount = User::factory()->create([
-        'role' => UserRole::Establishment,
-        'organization_name' => $objListing->name,
-        'organization_subtitle' => "{$objListing->barangay}, {$objListing->municipality}",
-        'municipality_id' => $objMunicipality->id,
-        'establishment_id' => $objListing->id,
+        'usr_role' => UserRole::Establishment,
+        'usr_organization_name' => $objListing->lst_name,
+        'usr_organization_subtitle' => "{$objListing->lst_barangay}, {$objListing->lst_municipality}",
+        'mun_id' => $objMunicipality->mun_id,
+        'lst_id' => $objListing->lst_id,
     ]);
 
     return [$objListing->fresh(), $objAccount];
@@ -118,11 +118,11 @@ test('registering an establishment creates no account and no QR — it starts on
         'email' => 'brand-new-inn@example.test',
     ])->assertSessionHasNoErrors();
 
-    $objListing = Listing::query()->where('name', 'Brand New Inn')->sole();
+    $objListing = Listing::query()->where('lst_name', 'Brand New Inn')->sole();
 
-    expect($objListing->reporting_mode)->toBe(ReportingMethod::ManualPaper);
+    expect($objListing->lst_reporting_mode)->toBe(ReportingMethod::ManualPaper);
     expect($objListing->establishmentUser)->toBeNull();
-    expect(User::query()->where('email', 'brand-new-inn@example.test')->exists())->toBeFalse();
+    expect(User::query()->where('usr_email', 'brand-new-inn@example.test')->exists())->toBeFalse();
     expect($objListing->isAcceptingRegistrations())->toBeFalse();
     expect($objListing->getQrStatus())->toBe(Listing::QR_STATUS_MANUAL_REPORTING);
 });
@@ -154,29 +154,29 @@ test('activating creates exactly one linked account with a one-time temporary pa
         ->assertSessionHas('accountCreated');
     $strPassphrase = session('accountCreated')['passphrase'];
 
-    $objAccount = User::query()->where('establishment_id', $objListing->id)->sole();
-    expect($objAccount->email)->toBe('frontdesk@adoption-inn.test');
-    expect($objAccount->role)->toBe(UserRole::Establishment);
-    expect($objAccount->municipality_id)->toBe($objMati->id);
-    expect($objAccount->status)->toBe('Active');
+    $objAccount = User::query()->where('lst_id', $objListing->lst_id)->sole();
+    expect($objAccount->usr_email)->toBe('frontdesk@adoption-inn.test');
+    expect($objAccount->usr_role)->toBe(UserRole::Establishment);
+    expect($objAccount->mun_id)->toBe($objMati->mun_id);
+    expect($objAccount->usr_status)->toBe('Active');
     expect($objAccount->usr_must_change_password)->toBeTrue();
-    expect($objAccount->created_by)->toBe($objLgu->id);
-    expect(session('accountCreated')['userId'])->toBe($objAccount->id);
+    expect($objAccount->usr_created_by)->toBe($objLgu->usr_id);
+    expect(session('accountCreated')['userId'])->toBe($objAccount->usr_id);
 
     // Never stored or logged in plaintext.
     expect($strPassphrase)->not->toBeEmpty();
-    expect(Hash::check($strPassphrase, $objAccount->password))->toBeTrue();
-    expect(DB::table('users')->where('password', $strPassphrase)->exists())->toBeFalse();
+    expect(Hash::check($strPassphrase, $objAccount->usr_password))->toBeTrue();
+    expect(DB::table('tbl_users')->where('usr_password', $strPassphrase)->exists())->toBeFalse();
     expect(json_encode(OperationLog::query()->get()->toArray()))->not->toContain($strPassphrase);
     expect(json_encode(SecurityLog::query()->get()->toArray()))->not->toContain($strPassphrase);
 
     Mail::assertSent(WelcomeAccountCreated::class, fn (WelcomeAccountCreated $objMail) => $objMail->hasTo('frontdesk@adoption-inn.test') && $objMail->strPassphrase === $strPassphrase);
 
-    expect($objListing->fresh()->reporting_mode)->toBe(ReportingMethod::OnlineItour);
-    $objLog = OperationLog::query()->where('entity_type', 'establishment')->where('entity_id', $objListing->id)->latest('id')->first();
-    expect($objLog->action)->toBe('update');
-    expect($objLog->reason)->toBe('Switched to Online iTOUR reporting.');
-    expect($objLog->new_values)->toBe(['reporting_mode' => 'DIGITAL']);
+    expect($objListing->fresh()->lst_reporting_mode)->toBe(ReportingMethod::OnlineItour);
+    $objLog = OperationLog::query()->where('opl_entity_type', 'establishment')->where('opl_entity_id', $objListing->lst_id)->latest('opl_id')->first();
+    expect($objLog->opl_action)->toBe('update');
+    expect($objLog->opl_reason)->toBe('Switched to Online iTOUR reporting.');
+    expect($objLog->opl_new_values)->toBe(['lst_reporting_mode' => 'DIGITAL']);
 });
 
 test('the temporary password is shown once on the details page right after activation', function () {
@@ -209,17 +209,17 @@ test('activation ignores forged municipality, establishment, role, and status fi
     $objOtherListing = adoptionEstablishment($objBaganga);
 
     test()->actingAs(adoptionLgu($objMati))->post(route('lgu.directory.establishments.switchToOnline', $objListing), adoptionAccountPayload([
-        'municipality_id' => $objBaganga->id,
-        'establishment_id' => $objOtherListing->id,
+        'municipality_id' => $objBaganga->mun_id,
+        'establishment_id' => $objOtherListing->lst_id,
         'role' => UserRole::PtoAdministrator->value,
         'status' => 'Inactive',
     ]))->assertSessionHasNoErrors();
 
-    $objAccount = User::query()->where('email', 'frontdesk@adoption-inn.test')->sole();
-    expect($objAccount->municipality_id)->toBe($objMati->id);
-    expect($objAccount->establishment_id)->toBe($objListing->id);
-    expect($objAccount->role)->toBe(UserRole::Establishment);
-    expect($objAccount->status)->toBe('Active');
+    $objAccount = User::query()->where('usr_email', 'frontdesk@adoption-inn.test')->sole();
+    expect($objAccount->mun_id)->toBe($objMati->mun_id);
+    expect($objAccount->lst_id)->toBe($objListing->lst_id);
+    expect($objAccount->usr_role)->toBe(UserRole::Establishment);
+    expect($objAccount->usr_status)->toBe('Active');
     expect($objOtherListing->fresh()->establishmentUser)->toBeNull();
 });
 
@@ -227,7 +227,7 @@ test('activation rejects an email already used by another account and changes no
     Mail::fake();
     $objMati = adoptionMunicipality('City of Mati', 'MATI');
     $objListing = adoptionEstablishment($objMati);
-    User::factory()->create(['email' => 'taken@example.test']);
+    User::factory()->create(['usr_email' => 'taken@example.test']);
 
     test()->actingAs(adoptionLgu($objMati))
         ->from(route('lgu.directory.establishments.show', $objListing))
@@ -235,7 +235,7 @@ test('activation rejects an email already used by another account and changes no
         ->assertRedirect(route('lgu.directory.establishments.show', $objListing))
         ->assertSessionHasErrors('account_email');
 
-    expect($objListing->fresh()->reporting_mode)->toBe(ReportingMethod::ManualPaper);
+    expect($objListing->fresh()->lst_reporting_mode)->toBe(ReportingMethod::ManualPaper);
     expect($objListing->fresh()->establishmentUser)->toBeNull();
     Mail::assertNothingSent();
 });
@@ -245,16 +245,16 @@ test('an LGU cannot switch another municipality\'s establishment either way (403
     $objBaganga = adoptionMunicipality('Baganga', 'BAG');
     $objMatiLgu = adoptionLgu($objMati);
     $objPaperListing = adoptionEstablishment($objBaganga);
-    [$objOnlineListing, $objAccount] = adoptionOnlineEstablishment($objBaganga, ['name' => 'Baganga Online Inn']);
+    [$objOnlineListing, $objAccount] = adoptionOnlineEstablishment($objBaganga, ['lst_name' => 'Baganga Online Inn']);
 
     test()->actingAs($objMatiLgu)->post(route('lgu.directory.establishments.switchToOnline', $objPaperListing), adoptionAccountPayload())->assertForbidden();
     test()->actingAs($objMatiLgu)->patch(route('lgu.directory.establishments.switchToManual', $objOnlineListing))->assertForbidden();
 
-    expect($objPaperListing->fresh()->reporting_mode)->toBe(ReportingMethod::ManualPaper);
+    expect($objPaperListing->fresh()->lst_reporting_mode)->toBe(ReportingMethod::ManualPaper);
     expect($objPaperListing->fresh()->establishmentUser)->toBeNull();
-    expect($objOnlineListing->fresh()->reporting_mode)->toBe(ReportingMethod::OnlineItour);
-    expect($objAccount->fresh()->status)->toBe('Active');
-    expect(SecurityLog::query()->where('user_id', $objMatiLgu->id)->where('event_type', 'access_denied')->count())->toBe(2);
+    expect($objOnlineListing->fresh()->lst_reporting_mode)->toBe(ReportingMethod::OnlineItour);
+    expect($objAccount->fresh()->usr_status)->toBe('Active');
+    expect(SecurityLog::query()->where('usr_id', $objMatiLgu->usr_id)->where('sec_event_type', 'access_denied')->count())->toBe(2);
 });
 
 test('only the LGU role can switch reporting methods', function () {
@@ -262,19 +262,19 @@ test('only the LGU role can switch reporting methods', function () {
     [$objListing, $objAccount] = adoptionOnlineEstablishment($objMati);
 
     test()->actingAs($objAccount)->patch(route('lgu.directory.establishments.switchToManual', $objListing))->assertForbidden();
-    test()->actingAs(User::factory()->create(['role' => UserRole::PtoAdministrator]))
+    test()->actingAs(User::factory()->create(['usr_role' => UserRole::PtoAdministrator]))
         ->patch(route('lgu.directory.establishments.switchToManual', $objListing))->assertForbidden();
 
-    expect($objListing->fresh()->reporting_mode)->toBe(ReportingMethod::OnlineItour);
+    expect($objListing->fresh()->lst_reporting_mode)->toBe(ReportingMethod::OnlineItour);
 });
 
 test('a destination cannot be switched (404)', function () {
     $objMati = adoptionMunicipality('City of Mati', 'MATI');
-    $objDestination = adoptionEstablishment($objMati, ['name' => 'Adoption Falls', 'category' => 'destinations', 'cat_id' => adoptionCategory('Tourist Destinations')->cat_id, 'type' => null, 'status' => 'Active']);
+    $objDestination = adoptionEstablishment($objMati, ['lst_name' => 'Adoption Falls', 'lst_category' => 'destinations', 'cat_id' => adoptionCategory('Tourist Destinations')->cat_id, 'lst_type' => null, 'lst_status' => 'Active']);
 
     test()->actingAs(adoptionLgu($objMati))->post(route('lgu.directory.establishments.switchToOnline', $objDestination), adoptionAccountPayload())->assertNotFound();
 
-    expect(User::query()->where('email', 'frontdesk@adoption-inn.test')->exists())->toBeFalse();
+    expect(User::query()->where('usr_email', 'frontdesk@adoption-inn.test')->exists())->toBeFalse();
 });
 
 // --- QR eligibility ---
@@ -284,24 +284,24 @@ test('QR works once the account is active — the destination listing does not n
     $objMati = adoptionMunicipality('City of Mati', 'MATI');
     $objListing = adoptionEstablishment($objMati);
 
-    test()->get(route('lgu.establishmentQr', $objListing->uuid))->assertSee('This establishment is not accepting registrations');
+    test()->get(route('lgu.establishmentQr', $objListing->lst_uuid))->assertSee('This establishment is not accepting registrations');
 
     test()->actingAs(adoptionLgu($objMati))->post(route('lgu.directory.establishments.switchToOnline', $objListing), adoptionAccountPayload());
     auth()->logout();
 
     $objFresh = $objListing->fresh();
-    expect($objFresh->status)->toBe('DRAFT');
+    expect($objFresh->lst_status)->toBe('DRAFT');
     expect($objFresh->isAcceptingRegistrations())->toBeTrue();
-    test()->get(route('lgu.establishmentQr', $objListing->uuid))->assertOk()->assertSee('establishment-qr-form', false);
+    test()->get(route('lgu.establishmentQr', $objListing->lst_uuid))->assertOk()->assertSee('establishment-qr-form', false);
 });
 
 test('QR stays off for an Online establishment that is Suspended or Archived, in a non-QR category, or with QR switched off', function () {
     $objMati = adoptionMunicipality('City of Mati', 'MATI');
-    [$objSuspended] = adoptionOnlineEstablishment($objMati, ['name' => 'Suspended Inn', 'status' => 'Suspended']);
-    [$objArchived] = adoptionOnlineEstablishment($objMati, ['name' => 'Archived Inn', 'status' => 'Archived']);
-    [$objSwitchedOff] = adoptionOnlineEstablishment($objMati, ['name' => 'Switched Off Inn']);
+    [$objSuspended] = adoptionOnlineEstablishment($objMati, ['lst_name' => 'Suspended Inn', 'lst_status' => 'Suspended']);
+    [$objArchived] = adoptionOnlineEstablishment($objMati, ['lst_name' => 'Archived Inn', 'lst_status' => 'Archived']);
+    [$objSwitchedOff] = adoptionOnlineEstablishment($objMati, ['lst_name' => 'Switched Off Inn']);
     $objSwitchedOff->forceFill(['lst_is_qr_enabled' => false])->save();
-    [$objNonQr] = adoptionOnlineEstablishment($objMati, ['name' => 'Non-QR Inn']);
+    [$objNonQr] = adoptionOnlineEstablishment($objMati, ['lst_name' => 'Non-QR Inn']);
     $objNonQr->categoryRecord->update(['cat_is_qr_enabled' => false]);
 
     expect($objSuspended->isAcceptingRegistrations())->toBeFalse();
@@ -317,8 +317,8 @@ test('switching to Manual/Paper suspends the account (never deletes it), stops Q
     $objLgu = adoptionLgu($objMati);
     [$objListing, $objAccount] = adoptionOnlineEstablishment($objMati);
     $objListing->arrivals()->create([
-        'source' => 'self_checkin', 'date' => now()->toDateString(), 'visitor_name' => 'Earlier Guest',
-        'visitor_contact' => '0900', 'party_size' => 1, 'status' => 'Recorded',
+        'arr_source' => 'self_checkin', 'arr_date' => now()->toDateString(), 'arr_visitor_name' => 'Earlier Guest',
+        'arr_visitor_contact' => '0900', 'arr_party_size' => 1, 'arr_status' => 'Recorded',
     ]);
     expect($objListing->isAcceptingRegistrations())->toBeTrue();
 
@@ -327,23 +327,23 @@ test('switching to Manual/Paper suspends the account (never deletes it), stops Q
         ->assertSessionHasNoErrors();
 
     $objFresh = $objListing->fresh();
-    expect($objFresh->reporting_mode)->toBe(ReportingMethod::ManualPaper);
+    expect($objFresh->lst_reporting_mode)->toBe(ReportingMethod::ManualPaper);
     expect($objFresh->isAcceptingRegistrations())->toBeFalse();
     expect($objFresh->getQrStatus())->toBe(Listing::QR_STATUS_MANUAL_REPORTING);
     expect($objAccount->fresh())->not->toBeNull();
-    expect($objAccount->fresh()->status)->toBe('Inactive');
-    expect($objAccount->fresh()->establishment_id)->toBe($objListing->id);
+    expect($objAccount->fresh()->usr_status)->toBe('Inactive');
+    expect($objAccount->fresh()->lst_id)->toBe($objListing->lst_id);
     expect($objFresh->arrivals()->count())->toBe(1);
 
-    $objLog = OperationLog::query()->where('entity_type', 'establishment')->where('entity_id', $objListing->id)->latest('id')->first();
-    expect($objLog->user_id)->toBe($objLgu->id);
-    expect($objLog->old_values)->toBe(['reporting_mode' => 'DIGITAL']);
-    expect($objLog->new_values)->toBe(['reporting_mode' => 'PAPER_LGU']);
-    expect($objLog->reason)->toContain('account suspended');
-    expect(SecurityLog::query()->where('event_type', 'account_suspended')->where('target_user_id', $objAccount->id)->exists())->toBeTrue();
+    $objLog = OperationLog::query()->where('opl_entity_type', 'establishment')->where('opl_entity_id', $objListing->lst_id)->latest('opl_id')->first();
+    expect($objLog->usr_id)->toBe($objLgu->usr_id);
+    expect($objLog->opl_old_values)->toBe(['lst_reporting_mode' => 'DIGITAL']);
+    expect($objLog->opl_new_values)->toBe(['lst_reporting_mode' => 'PAPER_LGU']);
+    expect($objLog->opl_reason)->toContain('account suspended');
+    expect(SecurityLog::query()->where('sec_event_type', 'account_suspended')->where('sec_target_user_id', $objAccount->usr_id)->exists())->toBeTrue();
 
     auth()->logout();
-    test()->get(route('lgu.establishmentQr', $objListing->uuid))->assertSee('This establishment is not accepting registrations');
+    test()->get(route('lgu.establishmentQr', $objListing->lst_uuid))->assertSee('This establishment is not accepting registrations');
 });
 
 test('switching back to Online iTOUR reuses and reactivates the same account — no duplicate, no new password', function () {
@@ -351,10 +351,10 @@ test('switching back to Online iTOUR reuses and reactivates the same account —
     $objMati = adoptionMunicipality('City of Mati', 'MATI');
     $objLgu = adoptionLgu($objMati);
     [$objListing, $objAccount] = adoptionOnlineEstablishment($objMati);
-    $strPasswordHash = $objAccount->password;
+    $strPasswordHash = $objAccount->usr_password;
 
     test()->actingAs($objLgu)->patch(route('lgu.directory.establishments.switchToManual', $objListing));
-    expect($objAccount->fresh()->status)->toBe('Inactive');
+    expect($objAccount->fresh()->usr_status)->toBe('Inactive');
 
     test()->actingAs($objLgu)->get(route('lgu.directory.establishments.show', $objListing))
         ->assertSee('Switch to Online iTOUR')
@@ -366,14 +366,14 @@ test('switching back to Online iTOUR reuses and reactivates the same account —
         ->assertSessionHasNoErrors()
         ->assertSessionMissing('accountCreated');
 
-    expect(User::query()->where('establishment_id', $objListing->id)->count())->toBe(1);
-    expect(User::query()->where('email', 'second-account@example.test')->exists())->toBeFalse();
+    expect(User::query()->where('lst_id', $objListing->lst_id)->count())->toBe(1);
+    expect(User::query()->where('usr_email', 'second-account@example.test')->exists())->toBeFalse();
     $objFresh = $objAccount->fresh();
-    expect($objFresh->id)->toBe($objAccount->id);
-    expect($objFresh->status)->toBe('Active');
-    expect($objFresh->password)->toBe($strPasswordHash);
+    expect($objFresh->usr_id)->toBe($objAccount->usr_id);
+    expect($objFresh->usr_status)->toBe('Active');
+    expect($objFresh->usr_password)->toBe($strPasswordHash);
     expect($objListing->fresh()->isAcceptingRegistrations())->toBeTrue();
-    expect(SecurityLog::query()->where('event_type', 'account_reactivated')->where('target_user_id', $objAccount->id)->exists())->toBeTrue();
+    expect(SecurityLog::query()->where('sec_event_type', 'account_reactivated')->where('sec_target_user_id', $objAccount->usr_id)->exists())->toBeTrue();
     Mail::assertNothingSent();
 });
 
@@ -381,14 +381,14 @@ test('repeating a switch that already applies changes nothing', function () {
     $objMati = adoptionMunicipality('City of Mati', 'MATI');
     $objLgu = adoptionLgu($objMati);
     $objPaper = adoptionEstablishment($objMati);
-    [$objOnline] = adoptionOnlineEstablishment($objMati, ['name' => 'Already Online Inn']);
+    [$objOnline] = adoptionOnlineEstablishment($objMati, ['lst_name' => 'Already Online Inn']);
 
     test()->actingAs($objLgu)->patch(route('lgu.directory.establishments.switchToManual', $objPaper))->assertSessionHas('toast_tone', 'danger');
     test()->actingAs($objLgu)->post(route('lgu.directory.establishments.switchToOnline', $objOnline))->assertSessionHas('toast_tone', 'danger');
 
-    expect($objPaper->fresh()->reporting_mode)->toBe(ReportingMethod::ManualPaper);
-    expect($objOnline->fresh()->reporting_mode)->toBe(ReportingMethod::OnlineItour);
-    expect(OperationLog::query()->whereIn('entity_id', [$objPaper->id, $objOnline->id])->where('entity_type', 'establishment')->count())->toBe(0);
+    expect($objPaper->fresh()->lst_reporting_mode)->toBe(ReportingMethod::ManualPaper);
+    expect($objOnline->fresh()->lst_reporting_mode)->toBe(ReportingMethod::OnlineItour);
+    expect(OperationLog::query()->whereIn('opl_entity_id', [$objPaper->lst_id, $objOnline->lst_id])->where('opl_entity_type', 'establishment')->count())->toBe(0);
 });
 
 // --- Establishment Accounts page ---
@@ -416,7 +416,7 @@ test('an account on a Manual/Paper establishment cannot be re-enabled from Estab
 
     test()->actingAs($objLgu)->patch(route('lgu.users.toggleStatus', $objAccount))->assertSessionHas('toast_tone', 'danger');
 
-    expect($objAccount->fresh()->status)->toBe('Inactive');
+    expect($objAccount->fresh()->usr_status)->toBe('Inactive');
     expect($objListing->fresh()->isAcceptingRegistrations())->toBeFalse();
 });
 
@@ -426,7 +426,7 @@ test('disabling an Online establishment\'s account from Establishment Accounts s
 
     test()->actingAs(adoptionLgu($objMati))->patch(route('lgu.users.toggleStatus', $objAccount))->assertSessionHasNoErrors();
 
-    expect($objAccount->fresh()->status)->toBe('Inactive');
+    expect($objAccount->fresh()->usr_status)->toBe('Inactive');
     expect($objListing->fresh()->getQrStatus())->toBe(Listing::QR_STATUS_NO_ACCOUNT);
 });
 
@@ -437,20 +437,20 @@ test('a signed-in non-PTO user cannot relink an establishment account, even thro
     $objBaganga = adoptionMunicipality('Baganga', 'BAG');
     $objLgu = adoptionLgu($objMati);
     [$objListing, $objAccount] = adoptionOnlineEstablishment($objMati);
-    $objOtherListing = adoptionEstablishment($objMati, ['name' => 'Other Inn']);
+    $objOtherListing = adoptionEstablishment($objMati, ['lst_name' => 'Other Inn']);
 
     test()->actingAs($objLgu);
 
-    expect(fn () => $objAccount->update(['establishment_id' => $objOtherListing->id]))->toThrow(AuthorizationException::class);
-    expect(fn () => $objAccount->fresh()->update(['municipality_id' => $objBaganga->id]))->toThrow(AuthorizationException::class);
-    expect($objAccount->fresh()->establishment_id)->toBe($objListing->id);
-    expect($objAccount->fresh()->municipality_id)->toBe($objMati->id);
-    expect(SecurityLog::query()->where('user_id', $objLgu->id)->where('event_type', 'access_denied')->count())->toBe(2);
+    expect(fn () => $objAccount->update(['lst_id' => $objOtherListing->lst_id]))->toThrow(AuthorizationException::class);
+    expect(fn () => $objAccount->fresh()->update(['mun_id' => $objBaganga->mun_id]))->toThrow(AuthorizationException::class);
+    expect($objAccount->fresh()->lst_id)->toBe($objListing->lst_id);
+    expect($objAccount->fresh()->mun_id)->toBe($objMati->mun_id);
+    expect(SecurityLog::query()->where('usr_id', $objLgu->usr_id)->where('sec_event_type', 'access_denied')->count())->toBe(2);
 
     // The PTO keeps province-wide control.
-    test()->actingAs(User::factory()->create(['role' => UserRole::PtoAdministrator]));
-    $objAccount->fresh()->update(['municipality_id' => $objBaganga->id]);
-    expect($objAccount->fresh()->municipality_id)->toBe($objBaganga->id);
+    test()->actingAs(User::factory()->create(['usr_role' => UserRole::PtoAdministrator]));
+    $objAccount->fresh()->update(['mun_id' => $objBaganga->mun_id]);
+    expect($objAccount->fresh()->mun_id)->toBe($objBaganga->mun_id);
 });
 
 // --- Establishment Profile uses the same Category -> Type source ---
@@ -466,19 +466,19 @@ test('the establishment Profile validates the type against the chosen category a
         ->assertSee('Food &amp; Dining', false)
         ->assertSee('Restobar');
 
-    test()->actingAs($objAccount)->put(route('establishment.profile.update'), ['name' => $objListing->name, 'cat_id' => $objFood->cat_id, 'type' => 'Hotel'])
+    test()->actingAs($objAccount)->put(route('establishment.profile.update'), ['name' => $objListing->lst_name, 'cat_id' => $objFood->cat_id, 'type' => 'Hotel'])
         ->assertSessionHasErrors('type');
-    test()->actingAs($objAccount)->put(route('establishment.profile.update'), ['name' => $objListing->name, 'cat_id' => $objFood->cat_id])
+    test()->actingAs($objAccount)->put(route('establishment.profile.update'), ['name' => $objListing->lst_name, 'cat_id' => $objFood->cat_id])
         ->assertSessionHasErrors('type');
-    test()->actingAs($objAccount)->put(route('establishment.profile.update'), ['name' => $objListing->name, 'cat_id' => adoptionCategory('Tourist Destinations')->cat_id, 'type' => 'Hotel'])
+    test()->actingAs($objAccount)->put(route('establishment.profile.update'), ['name' => $objListing->lst_name, 'cat_id' => adoptionCategory('Tourist Destinations')->cat_id, 'type' => 'Hotel'])
         ->assertSessionHasErrors('cat_id');
     expect($objListing->fresh()->cat_id)->toBe(adoptionCategory()->cat_id);
 
-    test()->actingAs($objAccount)->put(route('establishment.profile.update'), ['name' => $objListing->name, 'cat_id' => $objFood->cat_id, 'type' => 'Restobar'])
+    test()->actingAs($objAccount)->put(route('establishment.profile.update'), ['name' => $objListing->lst_name, 'cat_id' => $objFood->cat_id, 'type' => 'Restobar'])
         ->assertSessionHasNoErrors();
 
     $objFresh = $objListing->fresh();
     expect($objFresh->cat_id)->toBe($objFood->cat_id);
-    expect($objFresh->category)->toBe('restaurants');
-    expect($objFresh->type)->toBe('Restobar');
+    expect($objFresh->lst_category)->toBe('restaurants');
+    expect($objFresh->lst_type)->toBe('Restobar');
 });

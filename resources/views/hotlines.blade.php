@@ -1,3 +1,10 @@
+{{--
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: Public emergency hotlines page.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+--}}
 <x-layouts.public title="Hotlines">
     <div class="mx-auto max-w-4xl px-4 py-10 sm:px-6 lg:px-8">
         <h1 class="text-2xl sm:text-3xl">Province-Wide Hotlines</h1>

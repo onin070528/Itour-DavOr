@@ -7,7 +7,7 @@
 --}}
 <x-layouts.dashboard :user="$user" :nav-sections="$navSections" :page-title="$pageTitle" account-heading="System" :settings-href="route('lgu.settings')">
     <x-dashboard.page-header
-        title="Manual Entry — {{ $listing->name }}"
+        title="Manual Entry — {{ $listing->lst_name }}"
         description="Encode {{ $month->format('F Y') }}'s paper monthly report into iTOUR."
     >
         <x-slot:actions>
@@ -25,7 +25,7 @@
         <dl class="grid grid-cols-1 gap-3 rounded-sm border border-sand-200 bg-sand-50 p-3 text-sm sm:grid-cols-4">
             <div>
                 <dt class="detail-term">Establishment</dt>
-                <dd class="detail-value">{{ $listing->name }}</dd>
+                <dd class="detail-value">{{ $listing->lst_name }}</dd>
             </div>
             <div>
                 <dt class="detail-term">Reporting month</dt>
@@ -37,7 +37,7 @@
             </div>
             <div>
                 <dt class="detail-term">Status</dt>
-                <dd class="detail-value">{{ $report ? $report->status->label() : 'Not encoded yet' }}</dd>
+                <dd class="detail-value">{{ $report ? $report->mar_status->label() : 'Not encoded yet' }}</dd>
             </div>
         </dl>
 
@@ -65,7 +65,7 @@
                                     min="0"
                                     step="1"
                                     inputmode="numeric"
-                                    value="{{ old($strField, $report?->{$strField} ?? 0) }}"
+                                    value="{{ old($strField, $report?->{'mar_'.$strField} ?? 0) }}"
                                     required
                                     class="form-input"
                                 >

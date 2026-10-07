@@ -1,20 +1,27 @@
+{{--
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: PTO municipal report detail with verify and return actions.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+--}}
 @php
     // PTO verifies (or returns) an LGU's already-consolidated report — it
     // never re-encodes establishment-level data itself.
-    $statusTone = match ($report->status) {
+    $statusTone = match ($report->mrp_status) {
         'APPROVED' => 'success',
         'SUBMITTED', 'REVIEWED' => 'warning',
         'RETURNED' => 'danger',
         default => 'neutral',
     };
-    $statusLabel = \App\Http\Controllers\Pto\MunicipalReportsController::statusLabel($report->status);
-    $isVerified = $report->status === 'APPROVED';
+    $statusLabel = \App\Http\Controllers\Pto\MunicipalReportsController::statusLabel($report->mrp_status);
+    $isVerified = $report->mrp_status === 'APPROVED';
 @endphp
 
 <x-layouts.dashboard :user="$user" :nav-sections="$navSections" :page-title="$pageTitle" account-heading="System" :settings-href="route('pto.settings')">
     <x-dashboard.page-header
-        :title="$report->municipality.' — LGU Consolidated Report'"
-        :description="$report->period_start->format('F j, Y').' to '.$report->period_end->format('F j, Y')"
+        :title="$report->mrp_municipality.' — LGU Consolidated Report'"
+        :description="$report->mrp_period_start->format('F j, Y').' to '.$report->mrp_period_end->format('F j, Y')"
     >
         <x-slot:actions>
             <a href="{{ route('pto.municipalReports.officialReport', $report) }}" target="_blank" class="inline-flex items-center gap-2 rounded-sm bg-primary-700 px-4 py-2.5 text-sm font-semibold text-sand-0 hover:bg-primary-900">
@@ -35,15 +42,15 @@
     <div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <x-dashboard.kpi-card
             label="Total Arrivals"
-            :value="number_format($report->total_arrivals)"
-            :delta="$comparison ? (($comparison['difference'] >= 0 ? '+' : '').number_format($comparison['difference']).' vs '.$comparison['report']->period_start->format('M Y')) : null"
+            :value="number_format($report->mrp_total_arrivals)"
+            :delta="$comparison ? (($comparison['difference'] >= 0 ? '+' : '').number_format($comparison['difference']).' vs '.$comparison['report']->mrp_period_start->format('M Y')) : null"
             :tone="$comparison ? ($comparison['difference'] > 0 ? 'success' : ($comparison['difference'] < 0 ? 'danger' : 'neutral')) : 'neutral'"
         />
         <div class="rounded-md border border-sand-200 bg-sand-0 p-4">
             <p class="text-xs font-medium text-sand-500">Status</p>
             <p class="mt-1.5"><x-dashboard.status-badge :tone="$statusTone">{{ $statusLabel }}</x-dashboard.status-badge></p>
         </div>
-        <x-dashboard.kpi-card label="Submitted By" :value="$report->submitter->name ?? '—'" :delta="$report->created_at->format('M j, Y')" tone="neutral" />
+        <x-dashboard.kpi-card label="Submitted By" :value="$report->submitter->usr_name ?? '—'" :delta="$report->mrp_created_at->format('M j, Y')" tone="neutral" />
     </div>
 
     <div class="mt-6 rounded-md border border-sand-200 bg-sand-0 p-5">
@@ -51,41 +58,41 @@
         <dl class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
                 <dt class="text-xs font-semibold text-sand-500 uppercase">Municipality</dt>
-                <dd class="mt-1 text-sm text-sand-800">{{ $report->municipality }}</dd>
+                <dd class="mt-1 text-sm text-sand-800">{{ $report->mrp_municipality }}</dd>
             </div>
             <div>
                 <dt class="text-xs font-semibold text-sand-500 uppercase">Reporting Period</dt>
-                <dd class="mt-1 text-sm text-sand-800">{{ $report->period_start->format('M j, Y') }} – {{ $report->period_end->format('M j, Y') }}</dd>
+                <dd class="mt-1 text-sm text-sand-800">{{ $report->mrp_period_start->format('M j, Y') }} – {{ $report->mrp_period_end->format('M j, Y') }}</dd>
             </div>
             <div>
                 <dt class="text-xs font-semibold text-sand-500 uppercase">Total Arrivals</dt>
-                <dd class="mt-1 text-sm text-sand-800">{{ number_format($report->total_arrivals) }}</dd>
+                <dd class="mt-1 text-sm text-sand-800">{{ number_format($report->mrp_total_arrivals) }}</dd>
             </div>
             <div>
                 <dt class="text-xs font-semibold text-sand-500 uppercase">Submitted</dt>
-                <dd class="mt-1 text-sm text-sand-800">{{ $report->submitter->name ?? '—' }} · {{ $report->created_at->format('M j, Y g:i A') }}</dd>
+                <dd class="mt-1 text-sm text-sand-800">{{ $report->submitter->usr_name ?? '—' }} · {{ $report->mrp_created_at->format('M j, Y g:i A') }}</dd>
             </div>
-            @if ($report->reviewed_at)
+            @if ($report->mrp_reviewed_at)
                 <div>
                     <dt class="text-xs font-semibold text-sand-500 uppercase">Reviewed</dt>
-                    <dd class="mt-1 text-sm text-sand-800">{{ $report->reviewer->name ?? '—' }} · {{ $report->reviewed_at->format('M j, Y g:i A') }}</dd>
+                    <dd class="mt-1 text-sm text-sand-800">{{ $report->reviewer->usr_name ?? '—' }} · {{ $report->mrp_reviewed_at->format('M j, Y g:i A') }}</dd>
                 </div>
             @endif
             @if ($comparison)
                 <div>
-                    <dt class="text-xs font-semibold text-sand-500 uppercase">vs Previous Period ({{ $comparison['report']->period_start->format('M Y') }})</dt>
+                    <dt class="text-xs font-semibold text-sand-500 uppercase">vs Previous Period ({{ $comparison['report']->mrp_period_start->format('M Y') }})</dt>
                     <dd class="mt-1 text-sm text-sand-800">
-                        {{ number_format($comparison['report']->total_arrivals) }} arrivals
+                        {{ number_format($comparison['report']->mrp_total_arrivals) }} arrivals
                         ({{ $comparison['percentageChange'] !== null ? ($comparison['difference'] >= 0 ? '+' : '').number_format($comparison['percentageChange'], 1).'%' : 'n/a' }})
                     </dd>
                 </div>
             @endif
         </dl>
 
-        @if ($report->remarks)
+        @if ($report->mrp_remarks)
             <div class="mt-5 rounded-md border border-sand-200 bg-sand-50 p-4">
                 <p class="text-xs font-semibold text-sand-500 uppercase">PTO Remarks</p>
-                <p class="mt-1.5 text-sm leading-relaxed text-sand-800">{{ $report->remarks }}</p>
+                <p class="mt-1.5 text-sm leading-relaxed text-sand-800">{{ $report->mrp_remarks }}</p>
             </div>
         @endif
     </div>
@@ -113,16 +120,16 @@
                 <tbody class="divide-y divide-sand-100">
                     @foreach ($breakdown as $monthlyReport)
                         <tr>
-                            <td class="px-4 py-3 font-medium text-sand-900">{{ $monthlyReport->listing->name ?? '—' }}</td>
-                            <td class="px-4 py-3 text-sand-700">{{ $monthlyReport->period_month->format('M Y') }}</td>
-                            <td class="px-4 py-3"><x-dashboard.status-badge :tone="$monthlyReport->submission_source->badgeTone()">{{ $monthlyReport->submission_source->label() }}</x-dashboard.status-badge></td>
-                            <td class="px-4 py-3 text-sand-700">{{ $monthlyReport->submitter->name ?? '—' }} · {{ $monthlyReport->submitted_at->format('M j, Y') }}</td>
-                            <td class="px-4 py-3 text-sand-700">{{ $monthlyReport->verifier->name ?? '—' }} · {{ $monthlyReport->verified_at?->format('M j, Y') ?? '—' }}</td>
+                            <td class="px-4 py-3 font-medium text-sand-900">{{ $monthlyReport->listing->lst_name ?? '—' }}</td>
+                            <td class="px-4 py-3 text-sand-700">{{ $monthlyReport->mar_period_month->format('M Y') }}</td>
+                            <td class="px-4 py-3"><x-dashboard.status-badge :tone="$monthlyReport->mar_submission_source->badgeTone()">{{ $monthlyReport->mar_submission_source->label() }}</x-dashboard.status-badge></td>
+                            <td class="px-4 py-3 text-sand-700">{{ $monthlyReport->submitter->usr_name ?? '—' }} · {{ $monthlyReport->mar_submitted_at->format('M j, Y') }}</td>
+                            <td class="px-4 py-3 text-sand-700">{{ $monthlyReport->verifier->usr_name ?? '—' }} · {{ $monthlyReport->mar_verified_at?->format('M j, Y') ?? '—' }}</td>
                             <td class="px-4 py-3 text-right font-semibold text-sand-800">
-                                @if ($monthlyReport->total_visitors === 0)
+                                @if ($monthlyReport->mar_total_visitors === 0)
                                     <span class="text-xs font-semibold text-sand-500">No arrivals</span>
                                 @else
-                                    {{ number_format($monthlyReport->total_visitors) }}
+                                    {{ number_format($monthlyReport->mar_total_visitors) }}
                                 @endif
                             </td>
                         </tr>
@@ -141,7 +148,7 @@
             <div class="mt-2 flex flex-wrap gap-2">
                 @foreach ($missingEstablishments as $establishment)
                     <span class="inline-flex items-center rounded-full border border-warning/30 bg-sand-0 px-3 py-1.5 text-xs font-semibold text-warning">
-                        {{ $establishment->name }}
+                        {{ $establishment->lst_name }}
                     </span>
                 @endforeach
             </div>
@@ -162,7 +169,7 @@
                     type="button"
                     data-confirm-trigger
                     data-confirm-title="Verify this report?"
-                    data-confirm-message="{{ $report->municipality }}'s report for {{ $report->period_start->format('M j') }} – {{ $report->period_end->format('M j, Y') }} will be marked Verified and accepted into the official provincial totals."
+                    data-confirm-message="{{ $report->mrp_municipality }}'s report for {{ $report->mrp_period_start->format('M j') }} – {{ $report->mrp_period_end->format('M j, Y') }} will be marked Verified and accepted into the official provincial totals."
                     data-confirm-label="Verify"
                     class="inline-flex items-center gap-2 rounded-sm bg-primary-700 px-4 py-2.5 text-sm font-semibold text-sand-0 hover:bg-primary-900"
                 >
@@ -206,12 +213,12 @@
                 @foreach ($history as $log)
                     <li class="rounded-md border border-sand-200 p-3">
                         <div class="flex items-center justify-between gap-2">
-                            <span class="text-sm font-semibold text-sand-900">{{ ucfirst($log->action) }}</span>
-                            <span class="text-xs text-sand-500">{{ $log->created_at->format('M j, Y g:i A') }}</span>
+                            <span class="text-sm font-semibold text-sand-900">{{ ucfirst($log->opl_action) }}</span>
+                            <span class="text-xs text-sand-500">{{ $log->opl_created_at->format('M j, Y g:i A') }}</span>
                         </div>
-                        <p class="mt-1 text-xs text-sand-600">{{ $log->user->name ?? 'Unknown user' }}</p>
-                        @if ($log->reason)
-                            <p class="mt-1.5 text-xs text-sand-700">"{{ $log->reason }}"</p>
+                        <p class="mt-1 text-xs text-sand-600">{{ $log->user->usr_name ?? 'Unknown user' }}</p>
+                        @if ($log->opl_reason)
+                            <p class="mt-1.5 text-xs text-sand-700">"{{ $log->opl_reason }}"</p>
                         @endif
                     </li>
                 @endforeach

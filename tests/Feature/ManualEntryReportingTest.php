@@ -25,16 +25,16 @@ use Illuminate\Support\Str;
 
 function manualEntryMunicipality(string $strName, string $strCode): Municipality
 {
-    return Municipality::query()->firstOrCreate(['code' => $strCode], ['name' => $strName]);
+    return Municipality::query()->firstOrCreate(['mun_code' => $strCode], ['mun_name' => $strName]);
 }
 
 function manualEntryLgu(Municipality $objMunicipality): User
 {
     return User::factory()->create([
-        'role' => UserRole::Lgu,
-        'organization_name' => "{$objMunicipality->name} LGU",
-        'organization_subtitle' => $objMunicipality->name,
-        'municipality_id' => $objMunicipality->id,
+        'usr_role' => UserRole::Lgu,
+        'usr_organization_name' => "{$objMunicipality->mun_name} LGU",
+        'usr_organization_subtitle' => $objMunicipality->mun_name,
+        'mun_id' => $objMunicipality->mun_id,
     ]);
 }
 
@@ -46,20 +46,20 @@ function manualEntryLgu(Municipality $objMunicipality): User
 function manualEntryEstablishment(Municipality $objMunicipality, string $strName, array $arrOverrides = []): Listing
 {
     return Listing::query()->create(array_merge([
-        'slug' => Str::slug("{$strName}-".Str::random(6)),
-        'name' => $strName,
-        'category' => 'accommodation',
-        'municipality' => $objMunicipality->name,
-        'municipality_id' => $objMunicipality->id,
-        'barangay' => 'Poblacion',
-        'status' => 'PUBLISHED',
+        'lst_slug' => Str::slug("{$strName}-".Str::random(6)),
+        'lst_name' => $strName,
+        'lst_category' => 'accommodation',
+        'lst_municipality' => $objMunicipality->mun_name,
+        'mun_id' => $objMunicipality->mun_id,
+        'lst_barangay' => 'Poblacion',
+        'lst_status' => 'PUBLISHED',
     ], $arrOverrides));
 }
 
 function manualEntryOnlineEstablishment(Municipality $objMunicipality, string $strName): Listing
 {
     $objListing = manualEntryEstablishment($objMunicipality, $strName);
-    $objListing->forceFill(['reporting_mode' => ReportingMethod::OnlineItour])->save();
+    $objListing->forceFill(['lst_reporting_mode' => ReportingMethod::OnlineItour])->save();
 
     return $objListing->fresh();
 }
@@ -72,16 +72,16 @@ function manualEntryReport(Listing $objListing, MonthlyReportStatus $enmStatus, 
     $blnIsSubmitted = $enmStatus !== MonthlyReportStatus::Draft;
 
     return MonthlyArrivalReport::query()->create([
-        'listing_id' => $objListing->id,
-        'municipality_id' => $objListing->municipality_id,
-        'period_month' => '2026-09-01',
-        'submission_source' => $enmSource,
-        'status' => $enmStatus,
-        'party_male' => $intTotal, 'party_female' => 0, 'party_adults' => $intTotal,
-        'party_local' => $intTotal, 'total_visitors' => $intTotal,
-        'submitted_by' => $blnIsSubmitted ? ($objSubmitter ?? User::factory()->create())->id : null,
-        'submitted_at' => $blnIsSubmitted ? now() : null,
-        'verified_at' => $enmStatus === MonthlyReportStatus::Verified ? now() : null,
+        'lst_id' => $objListing->lst_id,
+        'mun_id' => $objListing->mun_id,
+        'mar_period_month' => '2026-09-01',
+        'mar_submission_source' => $enmSource,
+        'mar_status' => $enmStatus,
+        'mar_party_male' => $intTotal, 'mar_party_female' => 0, 'mar_party_adults' => $intTotal,
+        'mar_party_local' => $intTotal, 'mar_total_visitors' => $intTotal,
+        'mar_submitted_by' => $blnIsSubmitted ? ($objSubmitter ?? User::factory()->create())->usr_id : null,
+        'mar_submitted_at' => $blnIsSubmitted ? now() : null,
+        'mar_verified_at' => $enmStatus === MonthlyReportStatus::Verified ? now() : null,
     ]);
 }
 
@@ -105,7 +105,7 @@ test('the Manual Entry page lists only the LGU\'s own Manual/Paper establishment
     $objBaganga = manualEntryMunicipality('Baganga', 'BAG');
     manualEntryEstablishment($objMati, 'Paper Inn');
     manualEntryOnlineEstablishment($objMati, 'Online Resort');
-    manualEntryEstablishment($objMati, 'Mati Falls', ['category' => 'destinations', 'status' => 'Active']);
+    manualEntryEstablishment($objMati, 'Mati Falls', ['lst_category' => 'destinations', 'lst_status' => 'Active']);
     manualEntryEstablishment($objBaganga, 'Baganga Paper Lodge');
 
     test()->actingAs(manualEntryLgu($objMati))->get(route('lgu.monthlyReports.manualEntry.index', ['period' => '2026-09']))
@@ -131,7 +131,7 @@ test('an Online iTOUR establishment cannot use Manual Entry — no second source
         ->assertRedirect(route('lgu.monthlyReports.manualEntry.index', ['period' => '2026-09']))
         ->assertSessionHas('toast_tone', 'danger');
 
-    expect(MonthlyArrivalReport::query()->where('listing_id', $objListing->id)->exists())->toBeFalse();
+    expect(MonthlyArrivalReport::query()->where('lst_id', $objListing->lst_id)->exists())->toBeFalse();
 });
 
 test('the Monthly Reports table offers Manual Entry only for Manual/Paper establishments', function () {
@@ -165,20 +165,20 @@ test('a paper report is saved as a Draft, previewed, submitted, then verified th
         ->assertRedirect(route('lgu.monthlyReports.manualEntry', ['listing' => $objListing, 'period' => '2026-09']))
         ->assertSessionHasNoErrors();
 
-    $objReport = MonthlyArrivalReport::query()->where('listing_id', $objListing->id)->sole();
-    expect($objReport->status)->toBe(MonthlyReportStatus::Draft);
-    expect($objReport->submission_source)->toBe(ReportSubmissionSource::ManualPaper);
-    expect($objReport->total_visitors)->toBe(100);
-    expect($objReport->submitted_by)->toBeNull();
-    expect($objReport->submitted_at)->toBeNull();
-    expect(OperationLog::query()->where('entity_type', 'monthly_arrival_report')->where('entity_id', $objReport->id)->where('action', 'create')->value('user_id'))->toBe($objLgu->id);
+    $objReport = MonthlyArrivalReport::query()->where('lst_id', $objListing->lst_id)->sole();
+    expect($objReport->mar_status)->toBe(MonthlyReportStatus::Draft);
+    expect($objReport->mar_submission_source)->toBe(ReportSubmissionSource::ManualPaper);
+    expect($objReport->mar_total_visitors)->toBe(100);
+    expect($objReport->mar_submitted_by)->toBeNull();
+    expect($objReport->mar_submitted_at)->toBeNull();
+    expect(OperationLog::query()->where('opl_entity_type', 'monthly_arrival_report')->where('opl_entity_id', $objReport->mar_id)->where('opl_action', 'create')->value('usr_id'))->toBe($objLgu->usr_id);
 
     // Editing the draft updates the same report; Save & Preview opens the A4 preview.
     test()->actingAs($objLgu)->post(route('lgu.monthlyReports.manualEntry.store', $objListing), [...manualEntryPayload(['party_male' => 50]), 'intent' => 'preview'])
         ->assertRedirect(route('lgu.monthlyReports.show', ['monthlyArrivalReport' => $objReport, 'view' => 'a4']));
-    expect(MonthlyArrivalReport::query()->where('listing_id', $objListing->id)->count())->toBe(1);
-    expect($objReport->fresh()->total_visitors)->toBe(110);
-    expect($objReport->fresh()->status)->toBe(MonthlyReportStatus::Draft);
+    expect(MonthlyArrivalReport::query()->where('lst_id', $objListing->lst_id)->count())->toBe(1);
+    expect($objReport->fresh()->mar_total_visitors)->toBe(110);
+    expect($objReport->fresh()->mar_status)->toBe(MonthlyReportStatus::Draft);
 
     test()->actingAs($objLgu)->get(route('lgu.monthlyReports.show', ['monthlyArrivalReport' => $objReport, 'view' => 'a4']))
         ->assertOk()
@@ -193,17 +193,17 @@ test('a paper report is saved as a Draft, previewed, submitted, then verified th
     // Submit — stamps the LGU encoder and time.
     test()->actingAs($objLgu)->patch(route('lgu.monthlyReports.submit', $objReport))->assertRedirect(route('lgu.monthlyReports.show', $objReport));
     $objReport->refresh();
-    expect($objReport->status)->toBe(MonthlyReportStatus::Submitted);
-    expect($objReport->submitted_by)->toBe($objLgu->id);
-    expect($objReport->submitted_at)->not->toBeNull();
-    expect($objReport->submission_source)->toBe(ReportSubmissionSource::ManualPaper);
+    expect($objReport->mar_status)->toBe(MonthlyReportStatus::Submitted);
+    expect($objReport->mar_submitted_by)->toBe($objLgu->usr_id);
+    expect($objReport->mar_submitted_at)->not->toBeNull();
+    expect($objReport->mar_submission_source)->toBe(ReportSubmissionSource::ManualPaper);
 
     // The same Review -> Verify path as an online report.
     test()->actingAs($objLgu)->patch(route('lgu.monthlyReports.review', $objReport))->assertRedirect();
     test()->actingAs($objLgu)->patch(route('lgu.monthlyReports.verify', $objReport))->assertRedirect();
     $objReport->refresh();
-    expect($objReport->status)->toBe(MonthlyReportStatus::Verified);
-    expect($objReport->verified_by)->toBe($objLgu->id);
+    expect($objReport->mar_status)->toBe(MonthlyReportStatus::Verified);
+    expect($objReport->mar_verified_by)->toBe($objLgu->usr_id);
 
     // A paper submission is a monthly report, never individual arrival records.
     expect($objListing->arrivals()->count())->toBe(0);
@@ -221,7 +221,7 @@ test('Manual Entry validates every paper-report field on the server', function (
     unset($arrMissing['party_seniors']);
     test()->actingAs($objLgu)->post(route('lgu.monthlyReports.manualEntry.store', $objListing), $arrMissing)->assertSessionHasErrors('party_seniors');
 
-    expect(MonthlyArrivalReport::query()->where('listing_id', $objListing->id)->exists())->toBeFalse();
+    expect(MonthlyArrivalReport::query()->where('lst_id', $objListing->lst_id)->exists())->toBeFalse();
     expect(array_keys(ManualReportForm::rules()))->toBe(array_keys(ManualReportForm::fields()));
 });
 
@@ -230,11 +230,11 @@ test('a paper draft cannot be submitted once its establishment has switched to O
     $objLgu = manualEntryLgu($objMati);
     $objListing = manualEntryEstablishment($objMati, 'Switching Inn');
     $objReport = manualEntryReport($objListing, MonthlyReportStatus::Draft, 25);
-    $objListing->forceFill(['reporting_mode' => ReportingMethod::OnlineItour])->save();
+    $objListing->forceFill(['lst_reporting_mode' => ReportingMethod::OnlineItour])->save();
 
     test()->actingAs($objLgu)->patch(route('lgu.monthlyReports.submit', $objReport))->assertSessionHas('toast_tone', 'danger');
 
-    expect($objReport->fresh()->status)->toBe(MonthlyReportStatus::Draft);
+    expect($objReport->fresh()->mar_status)->toBe(MonthlyReportStatus::Draft);
 });
 
 // --- One report per establishment per month ---
@@ -248,8 +248,8 @@ test('an establishment keeps one report per month — a submitted month cannot b
     test()->actingAs($objLgu)->get(route('lgu.monthlyReports.manualEntry', ['listing' => $objListing, 'period' => '2026-09']))->assertStatus(422);
     test()->actingAs($objLgu)->post(route('lgu.monthlyReports.manualEntry.store', $objListing), manualEntryPayload())->assertSessionHas('toast_tone', 'danger');
 
-    expect(MonthlyArrivalReport::query()->where('listing_id', $objListing->id)->count())->toBe(1);
-    expect($objReport->fresh()->total_visitors)->toBe(30);
+    expect(MonthlyArrivalReport::query()->where('lst_id', $objListing->lst_id)->count())->toBe(1);
+    expect($objReport->fresh()->mar_total_visitors)->toBe(30);
 
     // The database itself refuses a second row for the same establishment and month.
     expect(fn () => manualEntryReport($objListing, MonthlyReportStatus::Draft, 1))->toThrow(UniqueConstraintViolationException::class);
@@ -264,9 +264,9 @@ test('a month already reported online is not re-encoded on paper after the estab
     test()->actingAs($objLgu)->get(route('lgu.monthlyReports.manualEntry', ['listing' => $objListing, 'period' => '2026-09']))->assertStatus(422);
     test()->actingAs($objLgu)->post(route('lgu.monthlyReports.manualEntry.store', $objListing), manualEntryPayload())->assertSessionHas('toast_tone', 'danger');
 
-    $objOnly = MonthlyArrivalReport::query()->where('listing_id', $objListing->id)->sole();
-    expect($objOnly->submission_source)->toBe(ReportSubmissionSource::Digital);
-    expect($objOnly->total_visitors)->toBe(12);
+    $objOnly = MonthlyArrivalReport::query()->where('lst_id', $objListing->lst_id)->sole();
+    expect($objOnly->mar_submission_source)->toBe(ReportSubmissionSource::Digital);
+    expect($objOnly->mar_total_visitors)->toBe(12);
 });
 
 // --- Municipality scoping and forged IDs ---
@@ -283,9 +283,9 @@ test('an LGU cannot encode, view, or submit paper reports for another municipali
     test()->actingAs($objMatiLgu)->get(route('lgu.monthlyReports.show', $objBagangaDraft))->assertForbidden();
     test()->actingAs($objMatiLgu)->patch(route('lgu.monthlyReports.submit', $objBagangaDraft))->assertForbidden();
 
-    expect(MonthlyArrivalReport::query()->where('listing_id', $objBagangaListing->id)->exists())->toBeFalse();
-    expect($objBagangaDraft->fresh()->status)->toBe(MonthlyReportStatus::Draft);
-    expect(SecurityLog::query()->where('user_id', $objMatiLgu->id)->where('event_type', 'access_denied')->count())->toBeGreaterThanOrEqual(2);
+    expect(MonthlyArrivalReport::query()->where('lst_id', $objBagangaListing->lst_id)->exists())->toBeFalse();
+    expect($objBagangaDraft->fresh()->mar_status)->toBe(MonthlyReportStatus::Draft);
+    expect(SecurityLog::query()->where('usr_id', $objMatiLgu->usr_id)->where('sec_event_type', 'access_denied')->count())->toBeGreaterThanOrEqual(2);
 });
 
 test('forged establishment, municipality, source, status, and submitter fields are ignored', function () {
@@ -297,28 +297,28 @@ test('forged establishment, municipality, source, status, and submitter fields a
     $objOtherUser = User::factory()->create();
 
     test()->actingAs($objLgu)->post(route('lgu.monthlyReports.manualEntry.store', $objListing), manualEntryPayload([
-        'listing_id' => $objOtherListing->id,
-        'municipality_id' => $objBaganga->id,
+        'listing_id' => $objOtherListing->lst_id,
+        'municipality_id' => $objBaganga->mun_id,
         'submission_source' => ReportSubmissionSource::Digital->value,
         'status' => MonthlyReportStatus::Verified->value,
-        'submitted_by' => $objOtherUser->id,
-        'verified_by' => $objOtherUser->id,
+        'submitted_by' => $objOtherUser->usr_id,
+        'verified_by' => $objOtherUser->usr_id,
         'total_visitors' => 999999,
     ]))->assertSessionHasNoErrors();
 
     $objReport = MonthlyArrivalReport::query()->sole();
-    expect($objReport->listing_id)->toBe($objListing->id);
-    expect($objReport->municipality_id)->toBe($objMati->id);
-    expect($objReport->submission_source)->toBe(ReportSubmissionSource::ManualPaper);
-    expect($objReport->status)->toBe(MonthlyReportStatus::Draft);
-    expect($objReport->submitted_by)->toBeNull();
-    expect($objReport->verified_by)->toBeNull();
-    expect($objReport->total_visitors)->toBe(100);
+    expect($objReport->lst_id)->toBe($objListing->lst_id);
+    expect($objReport->mun_id)->toBe($objMati->mun_id);
+    expect($objReport->mar_submission_source)->toBe(ReportSubmissionSource::ManualPaper);
+    expect($objReport->mar_status)->toBe(MonthlyReportStatus::Draft);
+    expect($objReport->mar_submitted_by)->toBeNull();
+    expect($objReport->mar_verified_by)->toBeNull();
+    expect($objReport->mar_total_visitors)->toBe(100);
 });
 
 test('destinations never have Manual Entry (404)', function () {
     $objMati = manualEntryMunicipality('City of Mati', 'MATI');
-    $objDestination = manualEntryEstablishment($objMati, 'Mati Falls', ['category' => 'destinations', 'status' => 'Active']);
+    $objDestination = manualEntryEstablishment($objMati, 'Mati Falls', ['lst_category' => 'destinations', 'lst_status' => 'Active']);
 
     test()->actingAs(manualEntryLgu($objMati))->get(route('lgu.monthlyReports.manualEntry', ['listing' => $objDestination, 'period' => '2026-09']))->assertNotFound();
 });
@@ -356,10 +356,10 @@ test('consolidating sums Verified reports only and never turns a missing report 
     test()->actingAs($objLgu)->post(route('lgu.monthlyReports.consolidate'), ['period_month' => '2026-09'])
         ->assertRedirect(route('lgu.monthlyReports.municipal.show', '2026-09'));
 
-    $objMunicipalReport = MunicipalReport::query()->where('municipality_id', $objMati->id)->sole();
-    expect($objMunicipalReport->total_arrivals)->toBe(30);
-    expect(MonthlyArrivalReport::query()->where('listing_id', $objMissing->id)->exists())->toBeFalse();
-    expect(MonthlyArrivalReport::query()->where('municipal_report_id', $objMunicipalReport->id)->count())->toBe(2);
+    $objMunicipalReport = MunicipalReport::query()->where('mun_id', $objMati->mun_id)->sole();
+    expect($objMunicipalReport->mrp_total_arrivals)->toBe(30);
+    expect(MonthlyArrivalReport::query()->where('lst_id', $objMissing->lst_id)->exists())->toBeFalse();
+    expect(MonthlyArrivalReport::query()->where('mrp_id', $objMunicipalReport->mrp_id)->count())->toBe(2);
 });
 
 test('an unsubmitted paper draft keeps the month from being sent to PTO', function () {
@@ -370,7 +370,7 @@ test('an unsubmitted paper draft keeps the month from being sent to PTO', functi
 
     test()->actingAs($objLgu)->post(route('lgu.monthlyReports.consolidate'), ['period_month' => '2026-09'])->assertSessionHas('toast_tone', 'danger');
 
-    expect(MunicipalReport::query()->where('municipality_id', $objMati->id)->exists())->toBeFalse();
+    expect(MunicipalReport::query()->where('mun_id', $objMati->mun_id)->exists())->toBeFalse();
 });
 
 // --- Navigation ---

@@ -1,5 +1,13 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Establishment photo upload for the account's own listing (sent to the LGU for approval).
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 /*
  * System     : iTOUR - Integrated Tourism Information and Monitoring System
  * Purpose    : Establishment photo upload — for the account's own establishment only. The
@@ -37,8 +45,8 @@ class ImagesController extends EstablishmentController
 
     private function _ownListing(Request $objRequest): Listing
     {
-        abort_if($objRequest->user()->establishment_id === null, 403, 'Your account is not linked to an establishment yet.');
+        abort_if($objRequest->user()->lst_id === null, 403, 'Your account is not linked to an establishment yet.');
 
-        return Listing::query()->findOrFail($objRequest->user()->establishment_id);
+        return Listing::query()->findOrFail($objRequest->user()->lst_id);
     }
 }

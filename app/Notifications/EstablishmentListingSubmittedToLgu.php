@@ -1,10 +1,12 @@
 <?php
 
-/*
- * System     : iTOUR - Integrated Tourism Information and Monitoring System
- * Purpose    : In-app notification telling the LGU's users an establishment submitted its profile package for review.
- * Programmer : <name(s)>
- * Copyright  : 2026 University of Mindanao. All rights reserved.
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: In-app notification telling the LGU's users an establishment submitted its profile package
+ * for review.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
  */
 
 namespace App\Notifications;
@@ -35,9 +37,9 @@ class EstablishmentListingSubmittedToLgu extends Notification
     public function toDatabase(object $objNotifiable): array
     {
         return [
-            'listing_id' => $this->objListing->id,
-            'listing_name' => $this->objListing->name,
-            'message' => "\"{$this->objListing->name}\" was submitted for your review.",
+            'listing_id' => $this->objListing->lst_id,
+            'listing_name' => $this->objListing->lst_name,
+            'message' => "\"{$this->objListing->lst_name}\" was submitted for your review.",
         ];
     }
 }

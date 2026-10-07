@@ -62,14 +62,14 @@
                     @foreach ($users as $u)
                         @php
                             $listing = $u->establishment;
-                            $editValues = json_encode(['name' => $u->name, 'email' => $u->email]);
-                            $establishmentName = $listing?->name ?? $u->organization_name;
+                            $editValues = json_encode(['name' => $u->usr_name, 'email' => $u->usr_email]);
+                            $establishmentName = $listing?->lst_name ?? $u->usr_organization_name;
                         @endphp
                         <tr
                             data-row
-                            data-status="{{ $u->status }}"
+                            data-status="{{ $u->usr_status }}"
                             data-category-id="{{ $listing?->cat_id }}"
-                            data-search-text="{{ strtolower($establishmentName.' '.$u->name.' '.$u->email.' '.$listing?->barangay) }}"
+                            data-search-text="{{ strtolower($establishmentName.' '.$u->usr_name.' '.$u->usr_email.' '.$listing?->lst_barangay) }}"
                             class="hover:bg-sand-50"
                         >
                             <td class="px-4 py-3">
@@ -80,15 +80,15 @@
                                     <p class="font-medium text-sand-900">{{ $establishmentName }}</p>
                                 @endif
                             </td>
-                            <td class="px-4 py-3 text-sand-700">{{ $listing?->barangay ?: '—' }}</td>
-                            <td class="px-4 py-3 text-sand-700">{{ $u->name }}</td>
+                            <td class="px-4 py-3 text-sand-700">{{ $listing?->lst_barangay ?: '—' }}</td>
+                            <td class="px-4 py-3 text-sand-700">{{ $u->usr_name }}</td>
                             <td class="px-4 py-3">
-                                <p class="text-sand-700">{{ $u->email }}</p>
-                                @if ($listing?->contact_phone)
-                                    <p class="text-xs text-sand-500">{{ $listing->contact_phone }}</p>
+                                <p class="text-sand-700">{{ $u->usr_email }}</p>
+                                @if ($listing?->lst_contact_phone)
+                                    <p class="text-xs text-sand-500">{{ $listing->lst_contact_phone }}</p>
                                 @endif
                             </td>
-                            <td class="px-4 py-3"><x-dashboard.status-badge :tone="$statusTone($u->status)">{{ $u->status }}</x-dashboard.status-badge></td>
+                            <td class="px-4 py-3"><x-dashboard.status-badge :tone="$statusTone($u->usr_status)">{{ $u->usr_status }}</x-dashboard.status-badge></td>
                             <td class="px-4 py-3 text-right">
                                 <div class="relative inline-block">
                                     <button type="button" data-dropdown-toggle class="text-sand-500 hover:text-sand-800" aria-label="Account actions">
@@ -100,7 +100,7 @@
                                             data-modal-open="user-form-modal"
                                             data-edit-trigger="user-form-modal"
                                             data-edit-values="{{ $editValues }}"
-                                            data-edit-action="{{ route('lgu.users.update', $u->id) }}"
+                                            data-edit-action="{{ route('lgu.users.update', $u->usr_id) }}"
                                             class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-sand-700 hover:bg-sand-50"
                                         >
                                             <i class="ti ti-pencil" aria-hidden="true"></i> Edit Account
@@ -110,14 +110,14 @@
                                                 <i class="ti ti-building-store" aria-hidden="true"></i> Open Establishment
                                             </a>
                                         @endif
-                                        <form method="POST" action="{{ route('lgu.users.toggleStatus', $u->id) }}">
+                                        <form method="POST" action="{{ route('lgu.users.toggleStatus', $u->usr_id) }}">
                                             @csrf
                                             @method('PATCH')
-                                            @if ($u->status === 'Active')
+                                            @if ($u->usr_status === 'Active')
                                                 <button
                                                     type="button"
                                                     data-confirm-trigger
-                                                    data-confirm-title="Disable {{ $u->name }}?"
+                                                    data-confirm-title="Disable {{ $u->usr_name }}?"
                                                     data-confirm-message="They will immediately lose access to their iTOUR account, and QR check-in stops."
                                                     data-confirm-label="Disable Account"
                                                     data-confirm-tone="danger"
@@ -129,7 +129,7 @@
                                                 <button
                                                     type="button"
                                                     data-confirm-trigger
-                                                    data-confirm-title="Enable {{ $u->name }}?"
+                                                    data-confirm-title="Enable {{ $u->usr_name }}?"
                                                     data-confirm-message="They will regain access to their iTOUR account."
                                                     data-confirm-label="Enable Account"
                                                     data-confirm-tone="success"

@@ -1,10 +1,11 @@
 <?php
 
-/*
- * System     : iTOUR - Integrated Tourism Information and Monitoring System
- * Purpose    : In-app notification telling an establishment its listing was returned by the LGU, and why.
- * Programmer : <name(s)>
- * Copyright  : 2026 University of Mindanao. All rights reserved.
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: In-app notification telling an establishment its listing was returned by the LGU, and why.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
  */
 
 namespace App\Notifications;
@@ -36,10 +37,10 @@ class EstablishmentListingReturned extends Notification
     public function toDatabase(object $objNotifiable): array
     {
         return [
-            'listing_id' => $this->objListing->id,
-            'listing_name' => $this->objListing->name,
+            'listing_id' => $this->objListing->lst_id,
+            'listing_name' => $this->objListing->lst_name,
             'reason' => $this->strReason,
-            'message' => "Your listing \"{$this->objListing->name}\" was returned: {$this->strReason}",
+            'message' => "Your listing \"{$this->objListing->lst_name}\" was returned: {$this->strReason}",
         ];
     }
 }

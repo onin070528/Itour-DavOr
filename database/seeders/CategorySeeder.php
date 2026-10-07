@@ -1,5 +1,15 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Seeds the 10 fixed categories (tbl_categories) and backfills every existing listing's new
+ * `cat_id` from its legacy free-text `lst_category` slug — the slug column itself is left
+ * untouched until lat...
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 namespace Database\Seeders;
 
 use App\Models\Category;
@@ -7,8 +17,8 @@ use App\Models\Listing;
 use Illuminate\Database\Seeder;
 
 /**
- * Seeds the 10 fixed categories (tblcategories) and backfills every
- * existing listing's new `cat_id` from its legacy free-text `category`
+ * Seeds the 10 fixed categories (tbl_categories) and backfills every
+ * existing listing's new `cat_id` from its legacy free-text `lst_category`
  * slug — the slug column itself is left untouched until later stages move
  * every reader onto the relation.
  */
@@ -34,7 +44,7 @@ class CategorySeeder extends Seeder
     ];
 
     /**
-     * Maps every legacy `listings.category` slug onto a new category name
+     * Maps every legacy `tbl_listings.lst_category` slug onto a new category name
      * (A1: pasalubong/delicacy shops are businesses, filed under Food &
      * Dining — delicacies themselves are not tracked by the PTO).
      *
@@ -55,31 +65,31 @@ class CategorySeeder extends Seeder
 
     public function run(): void
     {
-        $categoriesByName = collect(self::CATEGORIES)
+        $objCategoriesByName = collect(self::CATEGORIES)
             ->values()
-            ->map(function (array $category, int $index): Category {
+            ->map(function (array $arrCategory, int $intIndex): Category {
                 return Category::query()->updateOrCreate(
-                    ['cat_name' => $category['name']],
+                    ['cat_name' => $arrCategory['name']],
                     [
-                        'cat_sort_order' => $index,
+                        'cat_sort_order' => $intIndex,
                         'cat_is_active' => true,
-                        'cat_is_qr_enabled' => $category['qr'],
+                        'cat_is_qr_enabled' => $arrCategory['qr'],
                     ]
                 );
             })
             ->keyBy('cat_name');
 
-        foreach (self::LEGACY_SLUG_MAP as $slug => $categoryName) {
-            $category = $categoriesByName->get($categoryName);
+        foreach (self::LEGACY_SLUG_MAP as $strSlug => $strCategoryName) {
+            $objCategory = $objCategoriesByName->get($strCategoryName);
 
-            if ($category === null) {
+            if ($objCategory === null) {
                 continue;
             }
 
             Listing::query()
-                ->where('category', $slug)
+                ->where('lst_category', $strSlug)
                 ->whereNull('cat_id')
-                ->update(['cat_id' => $category->cat_id]);
+                ->update(['cat_id' => $objCategory->cat_id]);
         }
     }
 }

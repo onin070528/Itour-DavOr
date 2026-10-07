@@ -1,3 +1,11 @@
+{{--
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: Tabbed report workspace — summary cards, charts and tables — shared by the role
+    dashboards.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+--}}
 @props([
     'user',
     'reportTypes',
@@ -107,18 +115,18 @@
             <div class="flex items-center gap-3">
                 <x-logo class="text-lg" />
                 <div>
-                    <p class="font-display text-sm font-bold text-sand-900">{{ $user->organization_name }}</p>
-                    <p class="text-xs text-sand-500">{{ $user->organization_subtitle }}</p>
+                    <p class="font-display text-sm font-bold text-sand-900">{{ $user->usr_organization_name }}</p>
+                    <p class="text-xs text-sand-500">{{ $user->usr_organization_subtitle }}</p>
                 </div>
             </div>
-            <p class="text-xs text-sand-500">Generated <span data-preview-generated-date></span> by <span data-preview-generated-by>{{ $user->name }}</span></p>
+            <p class="text-xs text-sand-500">Generated <span data-preview-generated-date></span> by <span data-preview-generated-by>{{ $user->usr_name }}</span></p>
         </div>
 
         <div class="mt-5">
             <p class="text-xs font-semibold tracking-widest text-sand-500 uppercase">Tourism Report</p>
             <h3 class="mt-1 font-display text-xl font-bold text-sand-900" data-preview-title></h3>
             <p class="mt-1 text-sm text-sand-600">Reporting Period: <span data-preview-period></span></p>
-            <p class="text-sm text-sand-600">Coverage: {{ $user->organization_subtitle }}</p>
+            <p class="text-sm text-sand-600">Coverage: {{ $user->usr_organization_subtitle }}</p>
         </div>
 
         @foreach ($reportTypes as $type)

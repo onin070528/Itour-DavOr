@@ -6,11 +6,11 @@
     and QR stay fully manageable whatever this state is. Expects $listing.
 --}}
 @php
-    $blnIsFirstRequest = in_array($listing->status, ['DRAFT', 'UNPUBLISHED', 'FOR_LGU_REVIEW'], true);
+    $blnIsFirstRequest = in_array($listing->lst_status, ['DRAFT', 'UNPUBLISHED', 'FOR_LGU_REVIEW'], true);
     $blnCanSubmitToPto = $blnIsFirstRequest || $listing->isForCorrection();
     $blnIsAttraction = $listing->isDestinationOnly();
     // A destination-only record has no establishment to return it to.
-    $blnCanReturn = ! $blnIsAttraction && in_array($listing->status, ['DRAFT', 'FOR_LGU_REVIEW', 'FOR_PTO_REVIEW', \App\Models\Listing::STATUS_FOR_CORRECTION], true);
+    $blnCanReturn = ! $blnIsAttraction && in_array($listing->lst_status, ['DRAFT', 'FOR_LGU_REVIEW', 'FOR_PTO_REVIEW', \App\Models\Listing::STATUS_FOR_CORRECTION], true);
     $strSubmitUrl = $blnIsAttraction ? route('lgu.directory.attractions.submit', $listing) : route('lgu.directory.establishments.submit', $listing);
     $strEditUrl = $blnIsAttraction ? route('lgu.directory.attractions.edit', $listing) : route('lgu.directory.establishments.edit', $listing);
     $strRemarks = ($listing->isForCorrection() || $listing->hasReturnedPendingChanges()) ? $listing->lst_review_remarks : null;
@@ -40,7 +40,7 @@
                 <button
                     type="button"
                     data-confirm-trigger
-                    data-confirm-title="{{ $blnIsFirstRequest ? 'Request to feature '.$listing->name.'?' : 'Resubmit '.$listing->name.' to PTO?' }}"
+                    data-confirm-title="{{ $blnIsFirstRequest ? 'Request to feature '.$listing->lst_name.'?' : 'Resubmit '.$listing->lst_name.' to PTO?' }}"
                     data-confirm-message="The Provincial Tourism Office will review it. This does not publish it — it goes live only if the PTO approves."
                     data-confirm-label="{{ $blnIsFirstRequest ? 'Send request' : 'Resubmit' }}"
                     data-confirm-tone="success"
@@ -69,7 +69,7 @@
         @endif
 
         @if ($blnCanReturn)
-            <button type="button" data-modal-open="return-establishment-{{ $listing->id }}" class="btn-secondary w-full justify-center border-danger/30 text-danger hover:bg-danger-bg">
+            <button type="button" data-modal-open="return-establishment-{{ $listing->lst_id }}" class="btn-secondary w-full justify-center border-danger/30 text-danger hover:bg-danger-bg">
                 Return to Establishment
             </button>
         @endif
@@ -77,16 +77,16 @@
 </section>
 
 @if ($blnCanReturn)
-    <x-dashboard.modal id="return-establishment-{{ $listing->id }}" title="Return to Establishment">
-        <form id="return-establishment-form-{{ $listing->id }}" method="POST" action="{{ route('lgu.directory.establishments.return', $listing) }}" class="flex flex-col gap-3">
+    <x-dashboard.modal id="return-establishment-{{ $listing->lst_id }}" title="Return to Establishment">
+        <form id="return-establishment-form-{{ $listing->lst_id }}" method="POST" action="{{ route('lgu.directory.establishments.return', $listing) }}" class="flex flex-col gap-3">
             @csrf
             @method('PATCH')
-            <label for="return-reason-{{ $listing->id }}" class="form-label">Reason <span class="text-danger" aria-hidden="true">*</span></label>
-            <textarea id="return-reason-{{ $listing->id }}" name="reason" rows="3" required maxlength="500" placeholder="What does the establishment need to fix?" class="form-input"></textarea>
+            <label for="return-reason-{{ $listing->lst_id }}" class="form-label">Reason <span class="text-danger" aria-hidden="true">*</span></label>
+            <textarea id="return-reason-{{ $listing->lst_id }}" name="reason" rows="3" required maxlength="500" placeholder="What does the establishment need to fix?" class="form-input"></textarea>
         </form>
         <x-slot:footer>
             <button type="button" data-modal-close class="btn-secondary">Cancel</button>
-            <button type="submit" form="return-establishment-form-{{ $listing->id }}" class="inline-flex items-center gap-2 rounded-sm bg-danger px-4 py-2.5 text-sm font-semibold text-sand-0 hover:opacity-90">Return to Establishment</button>
+            <button type="submit" form="return-establishment-form-{{ $listing->lst_id }}" class="inline-flex items-center gap-2 rounded-sm bg-danger px-4 py-2.5 text-sm font-semibold text-sand-0 hover:opacity-90">Return to Establishment</button>
         </x-slot:footer>
     </x-dashboard.modal>
 @endif

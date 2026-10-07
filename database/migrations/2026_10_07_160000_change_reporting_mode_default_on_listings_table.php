@@ -24,8 +24,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('listings', function (Blueprint $table) {
-            $table->string('reporting_mode')->default(ReportingMethod::ManualPaper->value)->change();
+        Schema::table('tbl_listings', function (Blueprint $table) {
+            $table->string('lst_reporting_mode')->default(ReportingMethod::ManualPaper->value)->change();
         });
     }
 
@@ -34,8 +34,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('listings', function (Blueprint $table) {
-            $table->string('reporting_mode')->default(ReportingMethod::OnlineItour->value)->change();
+        Schema::table('tbl_listings', function (Blueprint $table) {
+            $table->string('lst_reporting_mode')->default(ReportingMethod::OnlineItour->value)->change();
         });
     }
 };

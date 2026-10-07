@@ -30,7 +30,7 @@
             <dt class="detail-term">Establishment account</dt>
             <dd class="detail-value">
                 @if ($blnHasAccount)
-                    {{ $listing->accountStatusLabel() }} · {{ $objAccount->email }}
+                    {{ $listing->accountStatusLabel() }} · {{ $objAccount->lst_email }}
                 @else
                     None
                 @endif
@@ -67,9 +67,9 @@
             @method('PATCH')
         </form>
         <ul class="flex list-disc flex-col gap-1.5 pl-5 text-sm text-sand-700">
-            <li>{{ $listing->name }} will submit paper reports, and your office will encode them.</li>
-            @if ($objAccount?->status === \App\Models\Listing::ACCOUNT_STATUS_ACTIVE)
-                <li>Its account ({{ $objAccount->email }}) will be <strong>suspended</strong>, not deleted. It can be reactivated later.</li>
+            <li>{{ $listing->lst_name }} will submit paper reports, and your office will encode them.</li>
+            @if ($objAccount?->lst_status === \App\Models\Listing::ACCOUNT_STATUS_ACTIVE)
+                <li>Its account ({{ $objAccount->lst_email }}) will be <strong>suspended</strong>, not deleted. It can be reactivated later.</li>
             @endif
             <li>QR check-in stops. Recorded arrivals and reports are kept.</li>
         </ul>
@@ -84,19 +84,19 @@
             @csrf
 
             @if ($blnHasAccount)
-                <p class="text-sm text-sand-700">{{ $listing->name }} already has an account ({{ $objAccount->email }}). It will be reactivated with its current password — no new account is created.</p>
+                <p class="text-sm text-sand-700">{{ $listing->lst_name }} already has an account ({{ $objAccount->lst_email }}). It will be reactivated with its current password — no new account is created.</p>
             @else
-                <p class="text-sm text-sand-700">An establishment account will be created for {{ $listing->name }}, in {{ $listing->municipality }}. A temporary password is shown once after saving and sent by email; it must be changed at first sign-in.</p>
+                <p class="text-sm text-sand-700">An establishment account will be created for {{ $listing->lst_name }}, in {{ $listing->lst_municipality }}. A temporary password is shown once after saving and sent by email; it must be changed at first sign-in.</p>
 
                 <div>
                     <label for="account-name" class="form-label">Account holder's name <span class="text-danger" aria-hidden="true">*</span></label>
-                    <input id="account-name" name="account_name" type="text" required maxlength="255" value="{{ old('account_name', $listing->owner_name) }}" class="form-input">
+                    <input id="account-name" name="account_name" type="text" required maxlength="255" value="{{ old('account_name', $listing->lst_owner_name) }}" class="form-input">
                     @error('account_name') <p class="form-error">{{ $message }}</p> @enderror
                 </div>
 
                 <div>
                     <label for="account-email" class="form-label">Sign-in email <span class="text-danger" aria-hidden="true">*</span></label>
-                    <input id="account-email" name="account_email" type="email" required maxlength="255" value="{{ old('account_email', $listing->email) }}" class="form-input">
+                    <input id="account-email" name="account_email" type="email" required maxlength="255" value="{{ old('account_email', $listing->lst_email) }}" class="form-input">
                     <p class="form-hint">Must not already be used by another iTOUR account.</p>
                     @error('account_email') <p class="form-error">{{ $message }}</p> @enderror
                 </div>

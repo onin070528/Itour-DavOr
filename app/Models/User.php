@@ -17,29 +17,47 @@ use Database\Factories\UserFactory;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Notifications\Notification;
 use Illuminate\Support\Facades\Auth;
 
 /**
- * `municipality_id`/`establishment_id`/`created_by` stay in #[Fillable] for
- * legitimate admin-initiated create/update calls (Pto\UsersController,
+ * `mun_id`/`lst_id`/`usr_created_by` stay in #[Fillable] for legitimate
+ * admin-initiated create/update calls (Pto\UsersController,
  * Lgu\UsersController), but no controller ever mass-assigns them from raw
  * request input — every write path is an explicit, role-checked field
  * assignment. Self-service settings (Concerns\UpdatesAccountSettings)
- * validate by an allow-list that excludes role/status/municipality_id/
- * establishment_id/created_by entirely, so a user can never change their
- * own scope or forge who created them.
+ * validate by an allow-list that excludes usr_role/usr_status/mun_id/lst_id/
+ * usr_created_by entirely, so a user can never change their own scope or
+ * forge who created them.
  */
-#[Fillable(['name', 'email', 'password', 'role', 'organization_name', 'organization_subtitle', 'status', 'municipality_id', 'establishment_id', 'created_by', 'usr_must_change_password', 'usr_password_changed_at', 'usr_phone'])]
-#[Hidden(['password', 'remember_token'])]
+#[Table('tbl_users', key: 'usr_id')]
+#[Fillable(['usr_name', 'usr_email', 'usr_password', 'usr_role', 'usr_organization_name', 'usr_organization_subtitle', 'usr_status', 'mun_id', 'lst_id', 'usr_created_by', 'usr_must_change_password', 'usr_password_changed_at', 'usr_phone'])]
+#[Hidden(['usr_password', 'usr_remember_token'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
+
+    public const CREATED_AT = 'usr_created_at';
+
+    public const UPDATED_AT = 'usr_updated_at';
+
+    /**
+     * Column holding the hashed password (read by the auth guard and the
+     * `current_password` validation rule).
+     */
+    protected $authPasswordName = 'usr_password';
+
+    /**
+     * Column holding the "remember me" token.
+     */
+    protected $rememberTokenName = 'usr_remember_token';
 
     /**
      * An LGU account's municipality is fixed once assigned — only a
@@ -52,8 +70,8 @@ class User extends Authenticatable
     protected static function booted(): void
     {
         static::updating(function (User $objUser) {
-            $blnWasOrIsLgu = $objUser->isLgu() || $objUser->getOriginal('role') === UserRole::Lgu;
-            $blnIsReassigning = $objUser->isDirty('municipality_id') && $objUser->getOriginal('municipality_id') !== null;
+            $blnWasOrIsLgu = $objUser->isLgu() || $objUser->getOriginal('usr_role') === UserRole::Lgu;
+            $blnIsReassigning = $objUser->isDirty('mun_id') && $objUser->getOriginal('mun_id') !== null;
 
             if (! $blnWasOrIsLgu || ! $blnIsReassigning) {
                 return;
@@ -71,9 +89,9 @@ class User extends Authenticatable
         // linked, only a signed-in PTO Administrator may move it; contexts
         // with no signed-in user (seeders, backfills) are left alone.
         static::updating(function (User $objUser) {
-            $blnIsEstablishmentAccount = $objUser->isEstablishment() || $objUser->getOriginal('role') === UserRole::Establishment;
-            $blnIsRelinking = ($objUser->isDirty('establishment_id') && $objUser->getOriginal('establishment_id') !== null)
-                || ($objUser->isDirty('municipality_id') && $objUser->getOriginal('municipality_id') !== null);
+            $blnIsEstablishmentAccount = $objUser->isEstablishment() || $objUser->getOriginal('usr_role') === UserRole::Establishment;
+            $blnIsRelinking = ($objUser->isDirty('lst_id') && $objUser->getOriginal('lst_id') !== null)
+                || ($objUser->isDirty('mun_id') && $objUser->getOriginal('mun_id') !== null);
 
             if (! $blnIsEstablishmentAccount || ! $blnIsRelinking) {
                 return;
@@ -82,7 +100,7 @@ class User extends Authenticatable
             $objActor = Auth::user();
 
             if ($objActor !== null && ! $objActor->isPto()) {
-                SecurityLogger::accessDenied($objActor, 'establishment_account_relink', User::class, $objUser->getOriginal('municipality_id'));
+                SecurityLogger::accessDenied($objActor, 'establishment_account_relink', User::class, $objUser->getOriginal('mun_id'));
 
                 throw new AuthorizationException('Only the Provincial Tourism Office can move an establishment account.');
             }
@@ -97,13 +115,29 @@ class User extends Authenticatable
     protected function casts(): array
     {
         return [
-            'email_verified_at' => 'datetime',
-            'last_login_at' => 'datetime',
-            'password' => 'hashed',
-            'role' => UserRole::class,
+            'usr_email_verified_at' => 'datetime',
+            'usr_last_login_at' => 'datetime',
+            'usr_password' => 'hashed',
+            'usr_role' => UserRole::class,
             'usr_must_change_password' => 'boolean',
             'usr_password_changed_at' => 'datetime',
         ];
+    }
+
+    /**
+     * The address password reset links are stored against and sent to.
+     */
+    public function getEmailForPasswordReset(): string
+    {
+        return $this->usr_email;
+    }
+
+    /**
+     * Mail notifications (e.g. the password reset link) go to usr_email.
+     */
+    public function routeNotificationForMail(Notification $objNotification): string
+    {
+        return $this->usr_email;
     }
 
     /**
@@ -119,17 +153,17 @@ class User extends Authenticatable
 
     public function municipality(): BelongsTo
     {
-        return $this->belongsTo(Municipality::class);
+        return $this->belongsTo(Municipality::class, 'mun_id', 'mun_id');
     }
 
     /**
      * The single establishment (Listing) this account is linked to — only
      * ever set for role === Establishment. Establishments and destinations
-     * share the `listings` table (see Listing's `category` column).
+     * share the `tbl_listings` table (see Listing's `lst_category` column).
      */
     public function establishment(): BelongsTo
     {
-        return $this->belongsTo(Listing::class, 'establishment_id');
+        return $this->belongsTo(Listing::class, 'lst_id', 'lst_id');
     }
 
     /**
@@ -138,36 +172,36 @@ class User extends Authenticatable
      */
     public function creator(): BelongsTo
     {
-        return $this->belongsTo(self::class, 'created_by');
+        return $this->belongsTo(self::class, 'usr_created_by', 'usr_id');
     }
 
     public function isPto(): bool
     {
-        return $this->role === UserRole::PtoAdministrator;
+        return $this->usr_role === UserRole::PtoAdministrator;
     }
 
     public function isLgu(): bool
     {
-        return $this->role === UserRole::Lgu;
+        return $this->usr_role === UserRole::Lgu;
     }
 
     public function isEstablishment(): bool
     {
-        return $this->role === UserRole::Establishment;
+        return $this->usr_role === UserRole::Establishment;
     }
 
     /**
      * PTO sees every user; LGU sees only Establishment-role users in its
      * own municipality; Establishment sees only itself.
      */
-    public function scopeVisibleTo(Builder $query, self $user): Builder
+    public function scopeVisibleTo(Builder $objQuery, self $objUser): Builder
     {
-        return match ($user->role) {
-            UserRole::PtoAdministrator => $query,
-            UserRole::Lgu => $query->where('role', UserRole::Establishment)
-                ->where('municipality_id', $user->municipality_id),
-            UserRole::Establishment => $query->where('id', $user->id),
-            default => $query->whereRaw('1 = 0'),
+        return match ($objUser->usr_role) {
+            UserRole::PtoAdministrator => $objQuery,
+            UserRole::Lgu => $objQuery->where('usr_role', UserRole::Establishment)
+                ->where('mun_id', $objUser->mun_id),
+            UserRole::Establishment => $objQuery->where('usr_id', $objUser->usr_id),
+            default => $objQuery->whereRaw('1 = 0'),
         };
     }
 }

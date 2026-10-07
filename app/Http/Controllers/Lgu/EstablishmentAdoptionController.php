@@ -44,14 +44,14 @@ class EstablishmentAdoptionController extends LguController
         if ($blnNeedsNewAccount) {
             $arrData = $request->validate([
                 'account_name' => ['required', 'string', 'max:255'],
-                'account_email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')],
+                'account_email' => ['required', 'email', 'max:255', Rule::unique('tbl_users', 'usr_email')],
             ], [
                 'account_name.required' => 'Enter the name of the person who will use the account.',
                 'account_email.required' => 'Enter the email the establishment will sign in with.',
                 'account_email.unique' => 'That email is already used by another iTOUR account.',
             ]);
 
-            $arrNewAccount = ['name' => $arrData['account_name'], 'email' => $arrData['account_email']];
+            $arrNewAccount = ['usr_name' => $arrData['account_name'], 'usr_email' => $arrData['account_email']];
         }
 
         try {
@@ -64,17 +64,17 @@ class EstablishmentAdoptionController extends LguController
         $objRedirect = redirect()->route('lgu.directory.establishments.show', $listing);
 
         if (! $arrResult['blnIsNewAccount']) {
-            return $objRedirect->with('toast', "{$listing->name} now reports through Online iTOUR. Its existing account is active again.");
+            return $objRedirect->with('toast', "{$listing->lst_name} now reports through Online iTOUR. Its existing account is active again.");
         }
 
         // Summary comment: one-time confirmation panel (resources/js/user_account.js).
         return $objRedirect
-            ->with('toast', "{$listing->name} now reports through Online iTOUR.")
+            ->with('toast', "{$listing->lst_name} now reports through Online iTOUR.")
             ->with('accountCreated', [
-                'userId' => $arrResult['user']->id,
-                'name' => $arrResult['user']->name,
+                'userId' => $arrResult['user']->usr_id,
+                'name' => $arrResult['user']->usr_name,
                 'role' => UserRole::Establishment->title(),
-                'municipality' => $listing->municipality,
+                'municipality' => $listing->lst_municipality,
                 'passphrase' => $arrResult['passphrase'],
                 'emailSent' => $arrResult['emailSent'],
             ]);
@@ -97,7 +97,7 @@ class EstablishmentAdoptionController extends LguController
         $strAccountNote = $objSuspendedAccount !== null ? ' Its account is suspended and QR check-in has stopped.' : '';
 
         return redirect()->route('lgu.directory.establishments.show', $listing)
-            ->with('toast', "{$listing->name} now reports on paper.{$strAccountNote}");
+            ->with('toast', "{$listing->lst_name} now reports on paper.{$strAccountNote}");
     }
 
     /**
@@ -106,6 +106,6 @@ class EstablishmentAdoptionController extends LguController
     private function _authorizeOwnEstablishment(Request $request, Listing $objListing): void
     {
         $this->authorizeOwnMunicipality($request, $objListing);
-        abort_if($objListing->category === 'destinations', 404);
+        abort_if($objListing->lst_category === 'destinations', 404);
     }
 }

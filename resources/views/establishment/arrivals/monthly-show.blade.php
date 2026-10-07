@@ -12,17 +12,17 @@
     Copyright (c) 2026 iTOUR Development Team. All rights reserved.
 --}}
 @php
-    $isForCorrection = $report->status === \App\Enums\MonthlyReportStatus::ForCorrection;
-    $periodValue = $report->period_month->format('Y-m');
+    $isForCorrection = $report->mar_status === \App\Enums\MonthlyReportStatus::ForCorrection;
+    $periodValue = $report->mar_period_month->format('Y-m');
 @endphp
 
 <x-layouts.dashboard :user="$user" :nav-sections="$navSections" :page-title="$pageTitle" account-heading="System" :settings-href="route('establishment.settings')">
     <x-dashboard.page-header
-        :title="'Monthly Report — '.$report->period_month->format('F Y')"
+        :title="'Monthly Report — '.$report->mar_period_month->format('F Y')"
         :description="$canSubmit ? 'Check the figures below. If they are right, press Submit to LGU at the bottom of the page.' : 'Your saved report record. It can no longer be changed from your side.'"
     >
         <x-slot:actions>
-            <a href="{{ route('establishment.arrivals.monthly', ['year' => $report->period_month->year, 'tab' => 'records']) }}" class="inline-flex items-center gap-2 rounded-sm border border-sand-300 bg-sand-0 px-4 py-2.5 text-sm font-semibold text-sand-800 hover:border-primary-300">
+            <a href="{{ route('establishment.arrivals.monthly', ['year' => $report->mar_period_month->year, 'tab' => 'records']) }}" class="inline-flex items-center gap-2 rounded-sm border border-sand-300 bg-sand-0 px-4 py-2.5 text-sm font-semibold text-sand-800 hover:border-primary-300">
                 <i class="ti ti-arrow-left" aria-hidden="true"></i>
                 Back to Monthly Records
             </a>
@@ -32,7 +32,7 @@
     @if ($isForCorrection)
         <div id="correction-remarks" class="mt-6 rounded-md border border-danger/30 bg-danger-bg px-4 py-3 text-sm text-danger">
             <p class="flex items-center gap-2 font-semibold"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Returned by the LGU for correction</p>
-            <p class="mt-1">What to fix: {{ $report->remarks ?: '—' }}</p>
+            <p class="mt-1">What to fix: {{ $report->mar_remarks ?: '—' }}</p>
             <p class="mt-2 text-xs">To correct it: record any missing guests, press <span class="font-semibold">Update Totals</span>, check the report, then press <span class="font-semibold">Submit to LGU</span> again.</p>
         </div>
     @endif
@@ -55,35 +55,35 @@
             </div>
             <div>
                 <dt class="text-xs font-semibold text-sand-500 uppercase">Reporting Month</dt>
-                <dd class="mt-1 text-sm text-sand-800">{{ $report->period_month->format('F Y') }}</dd>
+                <dd class="mt-1 text-sm text-sand-800">{{ $report->mar_period_month->format('F Y') }}</dd>
             </div>
             <div>
                 <dt class="text-xs font-semibold text-sand-500 uppercase">Report Source</dt>
-                <dd class="mt-1 text-sm text-sand-800">{{ $report->submission_source->label() }}</dd>
+                <dd class="mt-1 text-sm text-sand-800">{{ $report->mar_submission_source->label() }}</dd>
             </div>
             <div>
                 <dt class="text-xs font-semibold text-sand-500 uppercase">Status</dt>
-                <dd class="mt-1"><x-dashboard.status-badge :tone="$report->status->badgeTone()">{{ $report->status->label() }}</x-dashboard.status-badge></dd>
+                <dd class="mt-1"><x-dashboard.status-badge :tone="$report->mar_status->badgeTone()">{{ $report->mar_status->label() }}</x-dashboard.status-badge></dd>
             </div>
             <div>
                 <dt class="text-xs font-semibold text-sand-500 uppercase">Submitted</dt>
                 <dd class="mt-1 text-sm text-sand-800">
-                    @if ($report->submitted_at)
-                        {{ $report->submitter->name ?? '—' }} · {{ $report->submitted_at->format('M j, Y g:i A') }}
+                    @if ($report->mar_submitted_at)
+                        {{ $report->submitter->name ?? '—' }} · {{ $report->mar_submitted_at->format('M j, Y g:i A') }}
                     @else
                         Not yet submitted
                     @endif
                 </dd>
             </div>
-            @if ($report->verified_at)
+            @if ($report->mar_verified_at)
                 <div>
                     <dt class="text-xs font-semibold text-sand-500 uppercase">Verified</dt>
-                    <dd class="mt-1 text-sm text-sand-800">{{ $report->verifier->name ?? '—' }} · {{ $report->verified_at->format('M j, Y g:i A') }}</dd>
+                    <dd class="mt-1 text-sm text-sand-800">{{ $report->verifier->name ?? '—' }} · {{ $report->mar_verified_at->format('M j, Y g:i A') }}</dd>
                 </div>
             @endif
             <div>
                 <dt class="text-xs font-semibold text-sand-500 uppercase">Last Saved</dt>
-                <dd class="mt-1 text-sm text-sand-800">{{ $report->updated_at->format('M j, Y g:i A') }}</dd>
+                <dd class="mt-1 text-sm text-sand-800">{{ $report->mar_updated_at->format('M j, Y g:i A') }}</dd>
             </div>
         </dl>
     </div>
@@ -104,14 +104,14 @@
             </thead>
             <tbody>
                 <tr class="text-right text-sand-800">
-                    <td class="px-4 py-3">{{ number_format($report->party_male) }}</td>
-                    <td class="px-4 py-3">{{ number_format($report->party_female) }}</td>
-                    <td class="px-4 py-3">{{ number_format($report->party_adults) }}</td>
-                    <td class="px-4 py-3">{{ number_format($report->party_children) }}</td>
-                    <td class="px-4 py-3">{{ number_format($report->party_seniors) }}</td>
-                    <td class="px-4 py-3">{{ number_format($report->party_local) }}</td>
-                    <td class="px-4 py-3">{{ number_format($report->party_foreign) }}</td>
-                    <td class="px-4 py-3 font-bold text-sand-900">{{ number_format($report->total_visitors) }}</td>
+                    <td class="px-4 py-3">{{ number_format($report->mar_party_male) }}</td>
+                    <td class="px-4 py-3">{{ number_format($report->mar_party_female) }}</td>
+                    <td class="px-4 py-3">{{ number_format($report->mar_party_adults) }}</td>
+                    <td class="px-4 py-3">{{ number_format($report->mar_party_children) }}</td>
+                    <td class="px-4 py-3">{{ number_format($report->mar_party_seniors) }}</td>
+                    <td class="px-4 py-3">{{ number_format($report->mar_party_local) }}</td>
+                    <td class="px-4 py-3">{{ number_format($report->mar_party_foreign) }}</td>
+                    <td class="px-4 py-3 font-bold text-sand-900">{{ number_format($report->mar_total_visitors) }}</td>
                 </tr>
             </tbody>
         </table>
@@ -145,12 +145,12 @@
         </div>
     @endif
 
-    @if ($report->status === \App\Enums\MonthlyReportStatus::Verified)
+    @if ($report->mar_status === \App\Enums\MonthlyReportStatus::Verified)
         <div class="mt-6 flex items-center gap-2 rounded-md border border-success/20 bg-success-bg px-4 py-3 text-sm font-semibold text-success">
             <i class="ti ti-circle-check" aria-hidden="true"></i>
-            Verified by {{ $report->verifier->name ?? 'the LGU' }} on {{ $report->verified_at?->format('F j, Y') }}. This report is final and part of your official record.
+            Verified by {{ $report->verifier->name ?? 'the LGU' }} on {{ $report->mar_verified_at?->format('F j, Y') }}. This report is final and part of your official record.
         </div>
-    @elseif (in_array($report->status, \App\Enums\MonthlyReportStatus::awaitingReview(), true))
+    @elseif (in_array($report->mar_status, \App\Enums\MonthlyReportStatus::awaitingReview(), true))
         <div class="mt-6 flex items-center gap-2 rounded-md border border-sand-300 bg-sand-100 px-4 py-3 text-sm font-semibold text-sand-700">
             <i class="ti ti-clock" aria-hidden="true"></i>
             Sent to the LGU. They are checking it now — you don't need to do anything.
@@ -165,7 +165,7 @@
         </div>
         @if ($arrivals->isEmpty())
             <p class="px-5 py-4 text-sm text-sand-500">
-                {{ $report->submission_source === \App\Enums\ReportSubmissionSource::ManualPaper ? 'This report was encoded by the LGU from a paper report, so it has no individual arrival records.' : 'No guest arrivals were recorded for this month — this is a zero-arrival report.' }}
+                {{ $report->mar_submission_source === \App\Enums\ReportSubmissionSource::ManualPaper ? 'This report was encoded by the LGU from a paper report, so it has no individual arrival records.' : 'No guest arrivals were recorded for this month — this is a zero-arrival report.' }}
             </p>
         @else
             <table class="w-full min-w-[560px] border-collapse text-sm">
@@ -180,10 +180,10 @@
                 <tbody class="divide-y divide-sand-100">
                     @foreach ($arrivals as $arrival)
                         <tr>
-                            <td class="px-4 py-2.5 text-sand-700">{{ $arrival->date->format('M j, Y') }}</td>
-                            <td class="px-4 py-2.5 text-sand-700">{{ $arrival->visit_type ?? '—' }}</td>
-                            <td class="px-4 py-2.5 text-right font-semibold text-sand-800">{{ number_format($arrival->party_size) }}</td>
-                            <td class="px-4 py-2.5 text-sand-700">{{ $arrival->source?->label() ?? '—' }}</td>
+                            <td class="px-4 py-2.5 text-sand-700">{{ $arrival->arr_date->format('M j, Y') }}</td>
+                            <td class="px-4 py-2.5 text-sand-700">{{ $arrival->arr_visit_type ?? '—' }}</td>
+                            <td class="px-4 py-2.5 text-right font-semibold text-sand-800">{{ number_format($arrival->arr_party_size) }}</td>
+                            <td class="px-4 py-2.5 text-sand-700">{{ $arrival->arr_source?->label() ?? '—' }}</td>
                         </tr>
                     @endforeach
                 </tbody>

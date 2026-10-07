@@ -1,3 +1,10 @@
+{{--
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: LGU Tourism Reports page — establishment-by-month status table.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+--}}
 @php
     $statusTone = fn (?string $status) => match ($status) {
         'Verified' => 'success',
@@ -6,7 +13,7 @@
         'Draft' => 'neutral',
         default => 'danger',
     };
-    $statusIs = fn ($report, \App\Enums\MonthlyReportStatus $status) => $report && $report->status === $status;
+    $statusIs = fn ($report, \App\Enums\MonthlyReportStatus $status) => $report && $report->mar_status === $status;
     $period = $month->format('Y-m');
 @endphp
 
@@ -103,22 +110,22 @@
                 <tbody class="divide-y divide-sand-100">
                     @forelse ($rows as $row)
                         @php($report = $row['report'])
-                        <tr data-row data-status="{{ $row['status'] }}" data-search-text="{{ strtolower($row['listing']->name) }}" @class(['hover:bg-sand-50', 'bg-danger-bg/40' => ! $report])>
+                        <tr data-row data-status="{{ $row['status'] }}" data-search-text="{{ strtolower($row['listing']->lst_name) }}" @class(['hover:bg-sand-50', 'bg-danger-bg/40' => ! $report])>
                             <td class="px-4 py-3">
-                                <p class="font-medium text-sand-900">{{ $row['listing']->name }}</p>
+                                <p class="font-medium text-sand-900">{{ $row['listing']->lst_name }}</p>
                                 <p class="text-xs text-sand-500">{{ $row['listing']->categoryName() }} · {{ $row['listing']->reportingMethod()->label() }}</p>
                             </td>
                             <td class="px-4 py-3 text-sand-700">{{ $month->format('F Y') }}</td>
                             <td class="px-4 py-3 text-sand-700">
                                 @if ($report)
-                                    <span class="inline-flex items-center gap-1.5"><i class="ti {{ $report->submission_source->icon() }}" aria-hidden="true"></i> {{ $report->submission_source->label() }}</span>
+                                    <span class="inline-flex items-center gap-1.5"><i class="ti {{ $report->mar_submission_source->icon() }}" aria-hidden="true"></i> {{ $report->mar_submission_source->label() }}</span>
                                 @else
                                     —
                                 @endif
                             </td>
-                            <td class="px-4 py-3 text-sand-700">{{ $report?->submitted_at?->format('M j, Y') ?? '—' }}</td>
+                            <td class="px-4 py-3 text-sand-700">{{ $report?->mar_submitted_at?->format('M j, Y') ?? '—' }}</td>
                             <td class="px-4 py-3"><x-dashboard.status-badge :tone="$statusTone($row['status'])">{{ $row['status'] }}</x-dashboard.status-badge></td>
-                            <td class="px-4 py-3 text-right font-semibold text-sand-800">{{ $report ? number_format($report->total_visitors) : '—' }}</td>
+                            <td class="px-4 py-3 text-right font-semibold text-sand-800">{{ $report ? number_format($report->mar_total_visitors) : '—' }}</td>
                             <td class="px-4 py-3 text-right">
                                 @if (! $report && $row['draftInProgress'])
                                     <span class="text-xs text-sand-500">Draft in progress</span>
@@ -144,7 +151,7 @@
                                         Continue Draft
                                     </a>
                                 @else
-                                    <button type="button" data-modal-open="lgu-report-modal-{{ $report->id }}" class="rounded-sm border border-sand-300 px-3 py-1.5 text-xs font-semibold text-sand-800 hover:border-primary-300">
+                                    <button type="button" data-modal-open="lgu-report-modal-{{ $report->mar_id }}" class="rounded-sm border border-sand-300 px-3 py-1.5 text-xs font-semibold text-sand-800 hover:border-primary-300">
                                         View
                                     </button>
                                 @endif
@@ -175,7 +182,7 @@
     {{-- Quick-view modals for View (Verified / For Correction rows) — the page stays put. --}}
     @foreach ($rows as $row)
         @php($report = $row['report'])
-        @if ($report && in_array($report->status, [\App\Enums\MonthlyReportStatus::Verified, \App\Enums\MonthlyReportStatus::ForCorrection], true))
+        @if ($report && in_array($report->mar_status, [\App\Enums\MonthlyReportStatus::Verified, \App\Enums\MonthlyReportStatus::ForCorrection], true))
             @include('lgu.monthly-reports.partials.report-modal', ['report' => $report, 'listing' => $row['listing']])
         @endif
     @endforeach

@@ -35,35 +35,35 @@ class OfficialReportExport implements FromCollection, WithHeadings, WithTitle
      */
     public function collection(): Collection
     {
-        $rows = collect();
+        $objRows = collect();
 
-        foreach ($this->report['groups'] as $category => $group) {
-            foreach ($group['rows'] as $row) {
-                $rows->push([
-                    $row['establishment'], $category, $row['source'] ?? '',
-                    $row['male'], $row['female'], $row['total'],
-                    $row['adults'], $row['children'], $row['seniors'],
-                    $row['local'], $row['foreign'],
+        foreach ($this->report['groups'] as $category => $arrGroup) {
+            foreach ($arrGroup['rows'] as $arrRow) {
+                $objRows->push([
+                    $arrRow['establishment'], $category, $arrRow['source'] ?? '',
+                    $arrRow['male'], $arrRow['female'], $arrRow['total'],
+                    $arrRow['adults'], $arrRow['children'], $arrRow['seniors'],
+                    $arrRow['local'], $arrRow['foreign'],
                 ]);
             }
 
-            $rows->push([
+            $objRows->push([
                 "Subtotal — {$category}", '', '',
-                $group['subtotal']['male'], $group['subtotal']['female'], $group['subtotal']['total'],
-                $group['subtotal']['adults'], $group['subtotal']['children'], $group['subtotal']['seniors'],
-                $group['subtotal']['local'], $group['subtotal']['foreign'],
+                $arrGroup['subtotal']['male'], $arrGroup['subtotal']['female'], $arrGroup['subtotal']['total'],
+                $arrGroup['subtotal']['adults'], $arrGroup['subtotal']['children'], $arrGroup['subtotal']['seniors'],
+                $arrGroup['subtotal']['local'], $arrGroup['subtotal']['foreign'],
             ]);
         }
 
-        $grandTotal = $this->report['grand_total'];
-        $rows->push([
+        $arrGrandTotal = $this->report['grand_total'];
+        $objRows->push([
             'GRAND TOTAL', '', '',
-            $grandTotal['male'], $grandTotal['female'], $grandTotal['total'],
-            $grandTotal['adults'], $grandTotal['children'], $grandTotal['seniors'],
-            $grandTotal['local'], $grandTotal['foreign'],
+            $arrGrandTotal['male'], $arrGrandTotal['female'], $arrGrandTotal['total'],
+            $arrGrandTotal['adults'], $arrGrandTotal['children'], $arrGrandTotal['seniors'],
+            $arrGrandTotal['local'], $arrGrandTotal['foreign'],
         ]);
 
-        return $rows;
+        return $objRows;
     }
 
     public function title(): string

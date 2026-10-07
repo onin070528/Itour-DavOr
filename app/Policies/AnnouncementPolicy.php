@@ -23,21 +23,21 @@ class AnnouncementPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->role === UserRole::PtoAdministrator;
+        return $user->usr_role === UserRole::PtoAdministrator;
     }
 
     public function create(User $user): bool
     {
-        return $user->role === UserRole::PtoAdministrator;
+        return $user->usr_role === UserRole::PtoAdministrator;
     }
 
     public function update(User $user, Announcement $announcement): bool
     {
-        return $user->role === UserRole::PtoAdministrator;
+        return $user->usr_role === UserRole::PtoAdministrator;
     }
 
     public function togglePublish(User $user, Announcement $announcement): bool
     {
-        return $user->role === UserRole::PtoAdministrator;
+        return $user->usr_role === UserRole::PtoAdministrator;
     }
 }

@@ -22,34 +22,34 @@ use Illuminate\Support\Str;
 
 function classificationMunicipality(string $strName, string $strCode): Municipality
 {
-    return Municipality::query()->create(['name' => $strName, 'code' => $strCode]);
+    return Municipality::query()->create(['mun_name' => $strName, 'mun_code' => $strCode]);
 }
 
 function classificationLgu(Municipality $objMunicipality): User
 {
     return User::factory()->create([
-        'role' => UserRole::Lgu,
-        'organization_name' => "{$objMunicipality->name} Tourism Office",
-        'organization_subtitle' => $objMunicipality->name,
-        'municipality_id' => $objMunicipality->id,
+        'usr_role' => UserRole::Lgu,
+        'usr_organization_name' => "{$objMunicipality->mun_name} Tourism Office",
+        'usr_organization_subtitle' => $objMunicipality->mun_name,
+        'mun_id' => $objMunicipality->mun_id,
     ]);
 }
 
 function classificationPto(): User
 {
-    return User::factory()->create(['role' => UserRole::PtoAdministrator]);
+    return User::factory()->create(['usr_role' => UserRole::PtoAdministrator]);
 }
 
 function classificationListing(Municipality $objMunicipality, string $strCategory): Listing
 {
     return Listing::query()->create([
-        'slug' => Str::slug("{$objMunicipality->name}-{$strCategory}-".Str::random(6)),
-        'name' => "{$objMunicipality->name} Test {$strCategory}",
-        'category' => $strCategory,
-        'municipality' => $objMunicipality->name,
-        'municipality_id' => $objMunicipality->id,
-        'barangay' => 'Poblacion',
-        'status' => 'DRAFT',
+        'lst_slug' => Str::slug("{$objMunicipality->mun_name}-{$strCategory}-".Str::random(6)),
+        'lst_name' => "{$objMunicipality->mun_name} Test {$strCategory}",
+        'lst_category' => $strCategory,
+        'lst_municipality' => $objMunicipality->mun_name,
+        'mun_id' => $objMunicipality->mun_id,
+        'lst_barangay' => 'Poblacion',
+        'lst_status' => 'DRAFT',
     ]);
 }
 
@@ -92,9 +92,9 @@ test('the type config covers exactly the seeded establishment categories', funct
 test('the tour guide type belongs to Travel & Tours and is recognized alongside the legacy value', function () {
     expect(classificationCategory('Travel & Tours')->establishmentTypes())->toContain(config('establishment_categories.tour_guide_type'));
 
-    expect((new Listing(['type' => 'Tour Guide Service']))->isTourGuide())->toBeTrue();
-    expect((new Listing(['type' => 'Tour Guide']))->isTourGuide())->toBeTrue();
-    expect((new Listing(['type' => 'Tour Operator']))->isTourGuide())->toBeFalse();
+    expect((new Listing(['lst_type' => 'Tour Guide Service']))->isTourGuide())->toBeTrue();
+    expect((new Listing(['lst_type' => 'Tour Guide']))->isTourGuide())->toBeTrue();
+    expect((new Listing(['lst_type' => 'Tour Operator']))->isTourGuide())->toBeFalse();
 });
 
 test('PTO saving an establishment with a type from its own category stores the type', function () {
@@ -105,7 +105,7 @@ test('PTO saving an establishment with a type from its own category stores the t
         ->post(route('pto.directory.store'), classificationPtoPayload($objAccommodation, ['type' => 'Resort']))
         ->assertSessionHasNoErrors();
 
-    expect(Listing::query()->where('name', 'Classification Test Resort')->value('type'))->toBe('Resort');
+    expect(Listing::query()->where('lst_name', 'Classification Test Resort')->value('lst_type'))->toBe('Resort');
 });
 
 test('PTO saving an establishment with a type from another category is rejected', function () {
@@ -116,7 +116,7 @@ test('PTO saving an establishment with a type from another category is rejected'
         ->post(route('pto.directory.store'), classificationPtoPayload($objAccommodation, ['type' => 'Restaurant']))
         ->assertSessionHasErrors('type');
 
-    expect(Listing::query()->where('name', 'Classification Test Resort')->exists())->toBeFalse();
+    expect(Listing::query()->where('lst_name', 'Classification Test Resort')->exists())->toBeFalse();
 });
 
 test('an establishment category requires a type, a destination prohibits one', function () {
@@ -135,14 +135,14 @@ test('an establishment category requires a type, a destination prohibits one', f
 test('a newly created establishment defaults to Manual/Paper reporting', function () {
     $objListing = classificationListing(classificationMunicipality('City of Mati', 'MATI'), 'accommodation')->refresh();
 
-    expect($objListing->reporting_mode)->toBe(ReportingMethod::ManualPaper);
+    expect($objListing->lst_reporting_mode)->toBe(ReportingMethod::ManualPaper);
     expect($objListing->reportingMethod()->label())->toBe('Manual/Paper');
 });
 
 test('reporting_mode cannot be mass-assigned', function () {
-    $objListing = new Listing(['reporting_mode' => ReportingMethod::OnlineItour->value]);
+    $objListing = new Listing(['lst_reporting_mode' => ReportingMethod::OnlineItour->value]);
 
-    expect($objListing->getAttributes())->not->toHaveKey('reporting_mode');
+    expect($objListing->getAttributes())->not->toHaveKey('lst_reporting_mode');
 });
 
 test('activating an establishment\'s account switches it to Online iTOUR', function () {
@@ -155,7 +155,7 @@ test('activating an establishment\'s account switches it to Online iTOUR', funct
         'account_email' => 'online-inn@example.test',
     ])->assertRedirect()->assertSessionHasNoErrors();
 
-    expect($objListing->fresh()->reporting_mode)->toBe(ReportingMethod::OnlineItour);
+    expect($objListing->fresh()->lst_reporting_mode)->toBe(ReportingMethod::OnlineItour);
 });
 
 test('an LGU user cannot move a listing to another municipality, even through the model', function () {
@@ -166,9 +166,9 @@ test('an LGU user cannot move a listing to another municipality, even through th
 
     test()->actingAs($objLgu);
 
-    expect(fn () => $objListing->update(['municipality_id' => $objBaganga->id]))->toThrow(AuthorizationException::class);
-    expect($objListing->fresh()->municipality_id)->toBe($objMati->id);
-    expect(SecurityLog::query()->where('user_id', $objLgu->id)->exists())->toBeTrue();
+    expect(fn () => $objListing->update(['mun_id' => $objBaganga->mun_id]))->toThrow(AuthorizationException::class);
+    expect($objListing->fresh()->mun_id)->toBe($objMati->mun_id);
+    expect(SecurityLog::query()->where('usr_id', $objLgu->usr_id)->exists())->toBeTrue();
 });
 
 test('PTO and non-request contexts can still reassign a listing municipality', function () {
@@ -177,12 +177,12 @@ test('PTO and non-request contexts can still reassign a listing municipality', f
     $objListing = classificationListing($objMati, 'accommodation');
 
     // Summary comment: no signed-in user (seeders, console commands).
-    $objListing->update(['municipality_id' => $objBaganga->id]);
-    expect($objListing->fresh()->municipality_id)->toBe($objBaganga->id);
+    $objListing->update(['mun_id' => $objBaganga->mun_id]);
+    expect($objListing->fresh()->mun_id)->toBe($objBaganga->mun_id);
 
-    test()->actingAs(User::factory()->create(['role' => UserRole::PtoAdministrator]));
-    $objListing->update(['municipality_id' => $objMati->id]);
-    expect($objListing->fresh()->municipality_id)->toBe($objMati->id);
+    test()->actingAs(User::factory()->create(['usr_role' => UserRole::PtoAdministrator]));
+    $objListing->update(['mun_id' => $objMati->mun_id]);
+    expect($objListing->fresh()->mun_id)->toBe($objMati->mun_id);
 });
 
 test('the backfill fills only the approved values and its rollback restores them', function () {
@@ -191,17 +191,17 @@ test('the backfill fills only the approved values and its rollback restores them
 
     // Summary comment: rows shaped like the pre-backfill data (old DIGITAL default, no type).
     $fnMakeRow = function (string $strSlug, string $strCategory, ?int $intCategoryId) use ($objMati): int {
-        return DB::table('listings')->insertGetId([
-            'slug' => $strSlug,
-            'uuid' => (string) Str::uuid(),
-            'name' => $strSlug,
-            'category' => $strCategory,
+        return DB::table('tbl_listings')->insertGetId([
+            'lst_slug' => $strSlug,
+            'lst_uuid' => (string) Str::uuid(),
+            'lst_name' => $strSlug,
+            'lst_category' => $strCategory,
             'cat_id' => $intCategoryId,
-            'municipality' => $objMati->name,
-            'municipality_id' => $objMati->id,
-            'barangay' => 'Poblacion',
-            'status' => 'DRAFT',
-            'reporting_mode' => ReportingMethod::OnlineItour->value,
+            'lst_municipality' => $objMati->mun_name,
+            'mun_id' => $objMati->mun_id,
+            'lst_barangay' => 'Poblacion',
+            'lst_status' => 'DRAFT',
+            'lst_reporting_mode' => ReportingMethod::OnlineItour->value,
         ]);
     };
 
@@ -215,75 +215,75 @@ test('the backfill fills only the approved values and its rollback restores them
     $objMigration = require database_path('migrations/2026_10_07_160100_backfill_establishment_classification_on_listings_table.php');
     $objMigration->up();
 
-    $fnRow = fn (int $intId) => DB::table('listings')->where('id', $intId)->first();
+    $fnRow = fn (int $intId) => DB::table('tbl_listings')->where('lst_id', $intId)->first();
 
-    expect($fnRow($intBotanikaId)->type)->toBe('Resort');
-    expect($fnRow($intBotanikaId)->reporting_mode)->toBe('DIGITAL');
-    expect($fnRow($intTerminalId)->type)->toBe('Van / Shuttle Service');
-    expect($fnRow($intTerminalId)->reporting_mode)->toBe('PAPER_LGU');
-    expect($fnRow($intSurfId)->type)->toBeNull();
+    expect($fnRow($intBotanikaId)->lst_type)->toBe('Resort');
+    expect($fnRow($intBotanikaId)->lst_reporting_mode)->toBe('DIGITAL');
+    expect($fnRow($intTerminalId)->lst_type)->toBe('Van / Shuttle Service');
+    expect($fnRow($intTerminalId)->lst_reporting_mode)->toBe('PAPER_LGU');
+    expect($fnRow($intSurfId)->lst_type)->toBeNull();
     expect($fnRow($intDemoId)->cat_id)->toBe($objAccommodation->cat_id);
-    expect($fnRow($intDemoId)->reporting_mode)->toBe('PAPER_LGU');
-    expect($fnRow($intMismatchId)->type)->toBeNull();
+    expect($fnRow($intDemoId)->lst_reporting_mode)->toBe('PAPER_LGU');
+    expect($fnRow($intMismatchId)->lst_type)->toBeNull();
 
     $objMigration->down();
 
-    expect($fnRow($intBotanikaId)->type)->toBeNull();
-    expect($fnRow($intTerminalId)->reporting_mode)->toBe('DIGITAL');
+    expect($fnRow($intBotanikaId)->lst_type)->toBeNull();
+    expect($fnRow($intTerminalId)->lst_reporting_mode)->toBe('DIGITAL');
     expect($fnRow($intDemoId)->cat_id)->toBeNull();
-    expect($fnRow($intDemoId)->reporting_mode)->toBe('DIGITAL');
+    expect($fnRow($intDemoId)->lst_reporting_mode)->toBe('DIGITAL');
 });
 
 test('the backfill never switches an establishment with a linked account to Manual/Paper', function () {
     $objMati = classificationMunicipality('City of Mati', 'MATI');
-    $intTerminalId = DB::table('listings')->insertGetId([
-        'slug' => 'tourist-transport-terminal',
-        'uuid' => (string) Str::uuid(),
-        'name' => 'Terminal',
-        'category' => 'transportation',
-        'municipality' => $objMati->name,
-        'municipality_id' => $objMati->id,
-        'barangay' => 'Poblacion',
-        'status' => 'DRAFT',
-        'reporting_mode' => ReportingMethod::OnlineItour->value,
+    $intTerminalId = DB::table('tbl_listings')->insertGetId([
+        'lst_slug' => 'tourist-transport-terminal',
+        'lst_uuid' => (string) Str::uuid(),
+        'lst_name' => 'Terminal',
+        'lst_category' => 'transportation',
+        'lst_municipality' => $objMati->mun_name,
+        'mun_id' => $objMati->mun_id,
+        'lst_barangay' => 'Poblacion',
+        'lst_status' => 'DRAFT',
+        'lst_reporting_mode' => ReportingMethod::OnlineItour->value,
     ]);
-    User::factory()->create(['role' => UserRole::Establishment, 'municipality_id' => $objMati->id, 'establishment_id' => $intTerminalId]);
+    User::factory()->create(['usr_role' => UserRole::Establishment, 'mun_id' => $objMati->mun_id, 'lst_id' => $intTerminalId]);
 
     $objMigration = require database_path('migrations/2026_10_07_160100_backfill_establishment_classification_on_listings_table.php');
     $objMigration->up();
 
-    expect(DB::table('listings')->where('id', $intTerminalId)->value('reporting_mode'))->toBe('DIGITAL');
+    expect(DB::table('tbl_listings')->where('lst_id', $intTerminalId)->value('lst_reporting_mode'))->toBe('DIGITAL');
 });
 
 test('Dahican Surf Guides & Tours is reclassified as Recreation & Activities / Diving / Water Activity, and the rollback restores it', function () {
     $objMati = classificationMunicipality('City of Mati', 'MATI');
     $objTravel = classificationCategory('Travel & Tours');
     $objRecreation = Category::query()->where('cat_name', 'Recreation & Activities')->firstOrFail();
-    $intSurfId = DB::table('listings')->insertGetId([
-        'slug' => 'dahican-surf-guides',
-        'uuid' => (string) Str::uuid(),
-        'name' => 'Dahican Surf Guides & Tours',
-        'category' => 'tour-guides',
+    $intSurfId = DB::table('tbl_listings')->insertGetId([
+        'lst_slug' => 'dahican-surf-guides',
+        'lst_uuid' => (string) Str::uuid(),
+        'lst_name' => 'Dahican Surf Guides & Tours',
+        'lst_category' => 'tour-guides',
         'cat_id' => $objTravel->cat_id,
-        'municipality' => $objMati->name,
-        'municipality_id' => $objMati->id,
-        'barangay' => 'Brgy. Dahican',
-        'status' => 'DRAFT',
+        'lst_municipality' => $objMati->mun_name,
+        'mun_id' => $objMati->mun_id,
+        'lst_barangay' => 'Brgy. Dahican',
+        'lst_status' => 'DRAFT',
     ]);
 
     $objMigration = require database_path('migrations/2026_10_07_170000_reclassify_dahican_surf_guides_listing.php');
     $objMigration->up();
 
-    $objRow = DB::table('listings')->where('id', $intSurfId)->first();
-    expect($objRow->category)->toBe('recreation-activities');
+    $objRow = DB::table('tbl_listings')->where('lst_id', $intSurfId)->first();
+    expect($objRow->lst_category)->toBe('recreation-activities');
     expect($objRow->cat_id)->toBe($objRecreation->cat_id);
-    expect($objRow->type)->toBe('Diving / Water Activity');
+    expect($objRow->lst_type)->toBe('Diving / Water Activity');
     expect(Listing::query()->find($intSurfId)->isTourGuide())->toBeFalse();
 
     $objMigration->down();
 
-    $objRow = DB::table('listings')->where('id', $intSurfId)->first();
-    expect($objRow->category)->toBe('tour-guides');
+    $objRow = DB::table('tbl_listings')->where('lst_id', $intSurfId)->first();
+    expect($objRow->lst_category)->toBe('tour-guides');
     expect($objRow->cat_id)->toBe($objTravel->cat_id);
-    expect($objRow->type)->toBeNull();
+    expect($objRow->lst_type)->toBeNull();
 });

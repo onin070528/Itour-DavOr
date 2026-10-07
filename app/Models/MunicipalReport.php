@@ -12,17 +12,23 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+#[Table('tbl_municipal_reports', key: 'mrp_id')]
 #[Fillable([
-    'municipality', 'municipality_id', 'submitted_by', 'period_start', 'period_end',
-    'total_arrivals', 'status', 'reviewed_by', 'reviewed_at', 'remarks',
-    'verification_code', 'revision_number', 'supersedes_id', 'frozen_snapshot',
+    'mrp_municipality', 'mun_id', 'mrp_submitted_by', 'mrp_period_start', 'mrp_period_end',
+    'mrp_total_arrivals', 'mrp_status', 'mrp_reviewed_by', 'mrp_reviewed_at', 'mrp_remarks',
+    'mrp_verification_code', 'mrp_revision_number', 'mrp_supersedes_id', 'mrp_frozen_snapshot',
 ])]
 class MunicipalReport extends Model
 {
+    public const CREATED_AT = 'mrp_created_at';
+
+    public const UPDATED_AT = 'mrp_updated_at';
+
     public const STATUS_DRAFT = 'DRAFT';
 
     public const STATUS_SUBMITTED = 'SUBMITTED';
@@ -36,12 +42,12 @@ class MunicipalReport extends Model
     protected function casts(): array
     {
         return [
-            'period_start' => 'date',
-            'period_end' => 'date',
-            'reviewed_at' => 'datetime',
-            'total_arrivals' => 'integer',
-            'revision_number' => 'integer',
-            'frozen_snapshot' => 'array',
+            'mrp_period_start' => 'date',
+            'mrp_period_end' => 'date',
+            'mrp_reviewed_at' => 'datetime',
+            'mrp_total_arrivals' => 'integer',
+            'mrp_revision_number' => 'integer',
+            'mrp_frozen_snapshot' => 'array',
         ];
     }
 
@@ -53,17 +59,17 @@ class MunicipalReport extends Model
      */
     public function supersedes(): BelongsTo
     {
-        return $this->belongsTo(self::class, 'supersedes_id');
+        return $this->belongsTo(self::class, 'mrp_supersedes_id', 'mrp_id');
     }
 
     public function supersededBy(): HasMany
     {
-        return $this->hasMany(self::class, 'supersedes_id');
+        return $this->hasMany(self::class, 'mrp_supersedes_id', 'mrp_id');
     }
 
     public function isFrozen(): bool
     {
-        return $this->status === self::STATUS_APPROVED;
+        return $this->mrp_status === self::STATUS_APPROVED;
     }
 
     /**
@@ -71,7 +77,7 @@ class MunicipalReport extends Model
      */
     public function submitter(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'submitted_by');
+        return $this->belongsTo(User::class, 'mrp_submitted_by', 'usr_id');
     }
 
     /**
@@ -79,12 +85,12 @@ class MunicipalReport extends Model
      */
     public function reviewer(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'reviewed_by');
+        return $this->belongsTo(User::class, 'mrp_reviewed_by', 'usr_id');
     }
 
     public function municipalityRecord(): BelongsTo
     {
-        return $this->belongsTo(Municipality::class, 'municipality_id');
+        return $this->belongsTo(Municipality::class, 'mun_id', 'mun_id');
     }
 
     /**
@@ -93,6 +99,6 @@ class MunicipalReport extends Model
      */
     public function monthlyArrivalReports(): HasMany
     {
-        return $this->hasMany(MonthlyArrivalReport::class);
+        return $this->hasMany(MonthlyArrivalReport::class, 'mrp_id', 'mrp_id');
     }
 }

@@ -25,17 +25,17 @@ abstract class PtoController extends Controller
      * Render a PTO page with the sidebar nav, active state, and shared
      * sidebar chrome (System heading, Settings link) already wired up.
      *
-     * @param  array<string, mixed>  $data
+     * @param  array<string, mixed>  $arrData
      */
-    protected function renderPto(Request $request, string $view, string $activeKey, string $pageTitle, array $data = []): View
+    protected function renderPto(Request $objRequest, string $strView, string $strActiveKey, string $strPageTitle, array $arrData = []): View
     {
-        return view($view, array_merge([
-            'user' => $request->user(),
-            'navSections' => DashboardNavigation::sections($request->user(), $activeKey, $this->_imageApprovalCount()),
-            'pageTitle' => $pageTitle,
+        return view($strView, array_merge([
+            'user' => $objRequest->user(),
+            'navSections' => DashboardNavigation::sections($objRequest->user(), $strActiveKey, $this->_imageApprovalCount()),
+            'pageTitle' => $strPageTitle,
             'accountHeading' => 'System',
             'settingsHref' => route('pto.settings'),
-        ], $data));
+        ], $arrData));
     }
 
     /**
@@ -51,6 +51,6 @@ abstract class PtoController extends Controller
             ->where('img_status', ImageStatus::Pending->value)
             ->where('img_source_role', ImageSourceRole::Lgu->value)
             ->distinct()
-            ->count('listing_id');
+            ->count('lst_id');
     }
 }

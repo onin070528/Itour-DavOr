@@ -22,26 +22,26 @@ class MunicipalReportPolicy
 {
     public function viewAny(User $user): bool
     {
-        return in_array($user->role, [UserRole::PtoAdministrator, UserRole::Lgu], true);
+        return in_array($user->usr_role, [UserRole::PtoAdministrator, UserRole::Lgu], true);
     }
 
     public function view(User $user, MunicipalReport $municipalReport): bool
     {
-        return match ($user->role) {
+        return match ($user->usr_role) {
             UserRole::PtoAdministrator => true,
-            UserRole::Lgu => $municipalReport->municipality_id !== null && $municipalReport->municipality_id === $user->municipality_id,
+            UserRole::Lgu => $municipalReport->mun_id !== null && $municipalReport->mun_id === $user->mun_id,
             default => false,
         };
     }
 
     public function approve(User $user, MunicipalReport $municipalReport): bool
     {
-        return $user->role === UserRole::PtoAdministrator;
+        return $user->usr_role === UserRole::PtoAdministrator;
     }
 
     public function return(User $user, MunicipalReport $municipalReport): bool
     {
-        return $user->role === UserRole::PtoAdministrator;
+        return $user->usr_role === UserRole::PtoAdministrator;
     }
 
     /**

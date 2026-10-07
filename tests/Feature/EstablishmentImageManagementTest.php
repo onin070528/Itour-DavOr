@@ -1,5 +1,13 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Tests — establishment image management.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 use App\Console\Commands\PurgeArchivedEstablishmentImages;
 use App\Enums\ImageSourceRole;
 use App\Enums\ImageStatus;
@@ -18,16 +26,16 @@ use Illuminate\Support\Facades\Storage;
 function publishedCoverImageFixture(Listing $listing, User $uploader): EstablishmentImage
 {
     return EstablishmentImage::query()->create([
-        'listing_id' => $listing->id,
-        'img_path' => 'establishment-images/'.$listing->id.'/cover.jpg',
-        'img_thumbnail_path' => 'establishment-images/'.$listing->id.'/cover_thumb.jpg',
-        'img_alt_text' => $listing->name,
+        'lst_id' => $listing->lst_id,
+        'img_path' => 'establishment-images/'.$listing->lst_id.'/cover.jpg',
+        'img_thumbnail_path' => 'establishment-images/'.$listing->lst_id.'/cover_thumb.jpg',
+        'img_alt_text' => $listing->lst_name,
         'img_source_role' => ImageSourceRole::Establishment,
         'img_status' => ImageStatus::Published,
         'img_is_cover' => true,
         'img_sort_order' => 1,
         'img_hash' => hash('sha256', 'cover-'.uniqid()),
-        'img_uploaded_by' => $uploader->id,
+        'img_uploaded_by' => $uploader->usr_id,
         'img_has_ownership_declared' => true,
     ]);
 }
@@ -50,12 +58,12 @@ test('a second replace request is blocked while one is already pending', functio
 });
 
 test('a rejected replacement leaves the old image live and unchanged', function () {
-    $mati = Municipality::query()->firstOrCreate(['code' => 'MATI'], ['name' => 'City of Mati']);
-    $listing = establishmentImageListingFixture(['municipality' => 'City of Mati']);
-    $listing->update(['municipality_id' => $mati->id]);
+    $mati = Municipality::query()->firstOrCreate(['mun_code' => 'MATI'], ['mun_name' => 'City of Mati']);
+    $listing = establishmentImageListingFixture(['lst_municipality' => 'City of Mati']);
+    $listing->update(['mun_id' => $mati->mun_id]);
     $uploader = establishmentImageUserFixture($listing);
     $cover = publishedCoverImageFixture($listing, $uploader);
-    $lgu = User::factory()->create(['role' => UserRole::Lgu, 'municipality_id' => $mati->id]);
+    $lgu = User::factory()->create(['usr_role' => UserRole::Lgu, 'mun_id' => $mati->mun_id]);
 
     test()->actingAs($uploader)->post(route('establishment.images.replace', $cover), [
         'photo' => UploadedFile::fake()->image('replacement.jpg', 1600, 1200),
@@ -91,11 +99,11 @@ test('removing the cover image promotes the next published image', function () {
     $uploader = establishmentImageUserFixture($listing);
     $cover = publishedCoverImageFixture($listing, $uploader);
     $second = EstablishmentImage::query()->create([
-        'listing_id' => $listing->id,
-        'img_path' => 'b.jpg', 'img_thumbnail_path' => 'b_thumb.jpg', 'img_alt_text' => $listing->name,
+        'lst_id' => $listing->lst_id,
+        'img_path' => 'b.jpg', 'img_thumbnail_path' => 'b_thumb.jpg', 'img_alt_text' => $listing->lst_name,
         'img_source_role' => ImageSourceRole::Establishment, 'img_status' => ImageStatus::Published,
         'img_is_cover' => false, 'img_sort_order' => 2, 'img_hash' => hash('sha256', uniqid()),
-        'img_uploaded_by' => $uploader->id, 'img_has_ownership_declared' => true,
+        'img_uploaded_by' => $uploader->usr_id, 'img_has_ownership_declared' => true,
     ]);
 
     test()->actingAs($uploader)->patch(route('establishment.images.remove', $cover))->assertRedirect();
@@ -108,11 +116,11 @@ test('an establishment can set cover, edit credit, and reorder its own photos', 
     $uploader = establishmentImageUserFixture($listing);
     $cover = publishedCoverImageFixture($listing, $uploader);
     $second = EstablishmentImage::query()->create([
-        'listing_id' => $listing->id,
-        'img_path' => 'b.jpg', 'img_thumbnail_path' => 'b_thumb.jpg', 'img_alt_text' => $listing->name,
+        'lst_id' => $listing->lst_id,
+        'img_path' => 'b.jpg', 'img_thumbnail_path' => 'b_thumb.jpg', 'img_alt_text' => $listing->lst_name,
         'img_source_role' => ImageSourceRole::Establishment, 'img_status' => ImageStatus::Published,
         'img_is_cover' => false, 'img_sort_order' => 2, 'img_hash' => hash('sha256', uniqid()),
-        'img_uploaded_by' => $uploader->id, 'img_has_ownership_declared' => true,
+        'img_uploaded_by' => $uploader->usr_id, 'img_has_ownership_declared' => true,
     ]);
 
     test()->actingAs($uploader)->patch(route('establishment.images.cover', $second))->assertRedirect();
@@ -129,7 +137,7 @@ test('an establishment can set cover, edit credit, and reorder its own photos', 
 
 test('an establishment cannot manage, replace, or remove another establishment\'s photos', function () {
     $listing = establishmentImageListingFixture();
-    $otherListing = establishmentImageListingFixture(['name' => 'Someone Else Resort']);
+    $otherListing = establishmentImageListingFixture(['lst_name' => 'Someone Else Resort']);
     $uploader = establishmentImageUserFixture($listing);
     $otherUploader = establishmentImageUserFixture($otherListing);
     $image = publishedCoverImageFixture($otherListing, $otherUploader);
@@ -143,13 +151,13 @@ test('an establishment cannot manage, replace, or remove another establishment\'
 });
 
 test('an LGU from another municipality cannot manage an establishment\'s photos', function () {
-    $mati = Municipality::query()->firstOrCreate(['code' => 'MATI'], ['name' => 'City of Mati']);
-    $baganga = Municipality::query()->firstOrCreate(['code' => 'BAG'], ['name' => 'Baganga']);
-    $listing = establishmentImageListingFixture(['municipality' => 'City of Mati']);
-    $listing->update(['municipality_id' => $mati->id]);
+    $mati = Municipality::query()->firstOrCreate(['mun_code' => 'MATI'], ['mun_name' => 'City of Mati']);
+    $baganga = Municipality::query()->firstOrCreate(['mun_code' => 'BAG'], ['mun_name' => 'Baganga']);
+    $listing = establishmentImageListingFixture(['lst_municipality' => 'City of Mati']);
+    $listing->update(['mun_id' => $mati->mun_id]);
     $uploader = establishmentImageUserFixture($listing);
     $image = publishedCoverImageFixture($listing, $uploader);
-    $otherLgu = User::factory()->create(['role' => UserRole::Lgu, 'municipality_id' => $baganga->id]);
+    $otherLgu = User::factory()->create(['usr_role' => UserRole::Lgu, 'mun_id' => $baganga->mun_id]);
 
     test()->actingAs($otherLgu)->patch(route('lgu.images.remove', $image))->assertForbidden();
     test()->actingAs($otherLgu)->patch(route('lgu.images.cover', $image))->assertForbidden();
@@ -157,12 +165,12 @@ test('an LGU from another municipality cannot manage an establishment\'s photos'
 });
 
 test('an LGU in the same municipality can manage an establishment\'s photos', function () {
-    $mati = Municipality::query()->firstOrCreate(['code' => 'MATI'], ['name' => 'City of Mati']);
-    $listing = establishmentImageListingFixture(['municipality' => 'City of Mati']);
-    $listing->update(['municipality_id' => $mati->id]);
+    $mati = Municipality::query()->firstOrCreate(['mun_code' => 'MATI'], ['mun_name' => 'City of Mati']);
+    $listing = establishmentImageListingFixture(['lst_municipality' => 'City of Mati']);
+    $listing->update(['mun_id' => $mati->mun_id]);
     $uploader = establishmentImageUserFixture($listing);
     $image = publishedCoverImageFixture($listing, $uploader);
-    $lgu = User::factory()->create(['role' => UserRole::Lgu, 'municipality_id' => $mati->id]);
+    $lgu = User::factory()->create(['usr_role' => UserRole::Lgu, 'mun_id' => $mati->mun_id]);
 
     test()->actingAs($lgu)->get(route('lgu.images.manage', $listing))->assertOk();
     test()->actingAs($lgu)->patch(route('lgu.images.remove', $image))->assertRedirect();
@@ -173,25 +181,25 @@ test('a PTO administrator can manage any establishment\'s photos', function () {
     $listing = establishmentImageListingFixture();
     $uploader = establishmentImageUserFixture($listing);
     $image = publishedCoverImageFixture($listing, $uploader);
-    $pto = User::factory()->create(['role' => UserRole::PtoAdministrator]);
+    $pto = User::factory()->create(['usr_role' => UserRole::PtoAdministrator]);
 
     test()->actingAs($pto)->get(route('pto.images.manage', $listing))->assertOk();
     test()->actingAs($pto)->patch(route('pto.images.cover', $image))->assertRedirect();
 });
 
 test('suspending an establishment hides its published photo from the public file route, and reactivating restores it without re-approval', function () {
-    $listing = establishmentImageListingFixture(['status' => 'PUBLISHED']);
+    $listing = establishmentImageListingFixture(['lst_status' => 'PUBLISHED']);
     $uploader = establishmentImageUserFixture($listing);
     $image = publishedCoverImageFixture($listing, $uploader);
     Storage::disk('local')->put($image->img_path, 'fake-bytes');
 
     test()->get(route('establishmentImages.file', [$image, 'full']))->assertOk();
 
-    $listing->update(['status' => 'Suspended']);
+    $listing->update(['lst_status' => 'Suspended']);
     test()->get(route('establishmentImages.file', [$image, 'full']))->assertNotFound();
     expect($image->fresh()->img_status->value)->toBe('PUBLISHED');
 
-    $listing->update(['status' => 'PUBLISHED']);
+    $listing->update(['lst_status' => 'PUBLISHED']);
     test()->get(route('establishmentImages.file', [$image, 'full']))->assertOk();
     expect($image->fresh()->img_status->value)->toBe('PUBLISHED');
     expect($image->fresh()->img_reviewed_at)->toBeNull();
@@ -203,19 +211,19 @@ test('the purge job clears file paths only for images archived longer than the r
     $retentionMonths = (int) config('establishment_images.archive_retention_months');
 
     $overdue = EstablishmentImage::query()->create([
-        'listing_id' => $listing->id,
-        'img_path' => 'overdue.jpg', 'img_thumbnail_path' => 'overdue_thumb.jpg', 'img_alt_text' => $listing->name,
+        'lst_id' => $listing->lst_id,
+        'img_path' => 'overdue.jpg', 'img_thumbnail_path' => 'overdue_thumb.jpg', 'img_alt_text' => $listing->lst_name,
         'img_source_role' => ImageSourceRole::Establishment, 'img_status' => ImageStatus::Archived,
         'img_is_cover' => false, 'img_sort_order' => 1, 'img_hash' => hash('sha256', uniqid()),
-        'img_uploaded_by' => $uploader->id, 'img_has_ownership_declared' => true,
+        'img_uploaded_by' => $uploader->usr_id, 'img_has_ownership_declared' => true,
         'img_archived_at' => now()->subMonths($retentionMonths + 1),
     ]);
     $recent = EstablishmentImage::query()->create([
-        'listing_id' => $listing->id,
-        'img_path' => 'recent.jpg', 'img_thumbnail_path' => 'recent_thumb.jpg', 'img_alt_text' => $listing->name,
+        'lst_id' => $listing->lst_id,
+        'img_path' => 'recent.jpg', 'img_thumbnail_path' => 'recent_thumb.jpg', 'img_alt_text' => $listing->lst_name,
         'img_source_role' => ImageSourceRole::Establishment, 'img_status' => ImageStatus::Archived,
         'img_is_cover' => false, 'img_sort_order' => 2, 'img_hash' => hash('sha256', uniqid()),
-        'img_uploaded_by' => $uploader->id, 'img_has_ownership_declared' => true,
+        'img_uploaded_by' => $uploader->usr_id, 'img_has_ownership_declared' => true,
         'img_archived_at' => now()->subMonths($retentionMonths - 1),
     ]);
     Storage::disk('local')->put($overdue->img_path, 'x');

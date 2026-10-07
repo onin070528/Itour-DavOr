@@ -1,3 +1,11 @@
+{{--
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: Shared Audit Logs / Activity Log page — security and operation tabs, filters, table and
+    export.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+--}}
 @props([
     'role',
     'tab',
@@ -131,7 +139,7 @@
         <select name="municipality_id" class="rounded-sm border border-sand-300 bg-sand-50 px-3 py-2.5 text-sm text-sand-700">
             <option value="">All Municipalities</option>
             @foreach ($municipalities as $municipality)
-                <option value="{{ $municipality->id }}" @selected((string) ($filters['municipality_id'] ?? '') === (string) $municipality->id)>{{ $municipality->name }}</option>
+                <option value="{{ $municipality->mun_id }}" @selected((string) ($filters['municipality_id'] ?? '') === (string) $municipality->mun_id)>{{ $municipality->mun_name }}</option>
             @endforeach
         </select>
     @endif
@@ -184,25 +192,25 @@
                     @if ($tab === 'security')
                         @php
                             $details = [
-                                'event' => Str::headline($row->event_type),
-                                'user' => $row->user?->name ?? $row->attempted_email ?? 'Unknown',
-                                'time' => $row->created_at->timezone('Asia/Manila')->format('F j, Y g:i A'),
-                                'details' => $row->details ? json_encode($row->details) : null,
+                                'event' => Str::headline($row->sec_event_type),
+                                'user' => $row->user?->usr_name ?? $row->sec_attempted_email ?? 'Unknown',
+                                'time' => $row->sec_created_at->timezone('Asia/Manila')->format('F j, Y g:i A'),
+                                'details' => $row->sec_details ? json_encode($row->sec_details) : null,
                             ];
                             if ($showIpAndBrowser) {
-                                $details['ip'] = $row->ip_address;
-                                $details['browser'] = $row->user_agent;
+                                $details['ip'] = $row->sec_ip_address;
+                                $details['browser'] = $row->sec_user_agent;
                             }
                         @endphp
                         <tr>
-                            <td class="px-4 py-3 whitespace-nowrap text-sand-700">{{ $row->created_at->timezone('Asia/Manila')->format('Y-m-d H:i') }}</td>
-                            <td class="px-4 py-3 text-sand-700">{{ $row->user?->name ?? $row->attempted_email ?? '—' }}</td>
+                            <td class="px-4 py-3 whitespace-nowrap text-sand-700">{{ $row->sec_created_at->timezone('Asia/Manila')->format('Y-m-d H:i') }}</td>
+                            <td class="px-4 py-3 text-sand-700">{{ $row->user?->usr_name ?? $row->sec_attempted_email ?? '—' }}</td>
                             <td class="px-4 py-3">
-                                <x-dashboard.status-badge :tone="SecurityLog::badgeTone($row->event_type)">{{ Str::headline($row->event_type) }}</x-dashboard.status-badge>
+                                <x-dashboard.status-badge :tone="SecurityLog::badgeTone($row->sec_event_type)">{{ Str::headline($row->sec_event_type) }}</x-dashboard.status-badge>
                             </td>
-                            <td class="px-4 py-3 text-sand-700">{{ $row->municipality?->name ?? '—' }}</td>
+                            <td class="px-4 py-3 text-sand-700">{{ $row->municipality?->mun_name ?? '—' }}</td>
                             @if ($showIpAndBrowser)
-                                <td class="px-4 py-3 text-sand-700">{{ $row->ip_address ?? '—' }}</td>
+                                <td class="px-4 py-3 text-sand-700">{{ $row->sec_ip_address ?? '—' }}</td>
                             @endif
                             <td class="px-4 py-3 text-right">
                                 <button type="button" data-details-trigger="audit-log-details-modal" data-details="{{ json_encode($details) }}" class="rounded-sm border border-sand-300 px-3 py-1.5 text-xs font-semibold text-sand-800 hover:border-primary-300">
@@ -213,23 +221,23 @@
                     @else
                         @php
                             $details = [
-                                'action' => Str::headline($row->action),
-                                'user' => $row->user ? "{$row->user->name} ({$row->user_role})" : $row->user_role,
-                                'record' => Str::headline($row->entity_type).' #'.$row->entity_id,
-                                'reason' => $row->reason,
-                                'old_values' => $row->old_values,
-                                'new_values' => $row->new_values,
+                                'action' => Str::headline($row->opl_action),
+                                'user' => $row->user ? "{$row->user->usr_name} ({$row->opl_user_role})" : $row->opl_user_role,
+                                'record' => Str::headline($row->opl_entity_type).' #'.$row->opl_entity_id,
+                                'reason' => $row->opl_reason,
+                                'old_values' => $row->opl_old_values,
+                                'new_values' => $row->opl_new_values,
                             ];
                         @endphp
                         <tr>
-                            <td class="px-4 py-3 whitespace-nowrap text-sand-700">{{ $row->created_at->timezone('Asia/Manila')->format('Y-m-d H:i') }}</td>
-                            <td class="px-4 py-3 text-sand-700">{{ $row->user?->name ?? '—' }} <span class="text-xs text-sand-500">({{ $row->user_role }})</span></td>
+                            <td class="px-4 py-3 whitespace-nowrap text-sand-700">{{ $row->opl_created_at->timezone('Asia/Manila')->format('Y-m-d H:i') }}</td>
+                            <td class="px-4 py-3 text-sand-700">{{ $row->user?->usr_name ?? '—' }} <span class="text-xs text-sand-500">({{ $row->opl_user_role }})</span></td>
                             <td class="px-4 py-3">
-                                <x-dashboard.status-badge :tone="OperationLog::badgeTone($row->action)">{{ Str::headline($row->action) }}</x-dashboard.status-badge>
+                                <x-dashboard.status-badge :tone="OperationLog::badgeTone($row->opl_action)">{{ Str::headline($row->opl_action) }}</x-dashboard.status-badge>
                             </td>
-                            <td class="px-4 py-3 text-sand-700">{{ Str::headline($row->entity_type) }} #{{ $row->entity_id ?? '—' }}</td>
-                            <td class="px-4 py-3 text-sand-700">{{ $row->municipality?->name ?? '—' }}</td>
-                            <td class="px-4 py-3 text-sand-700">{{ $row->establishment?->name ?? '—' }}</td>
+                            <td class="px-4 py-3 text-sand-700">{{ Str::headline($row->opl_entity_type) }} #{{ $row->opl_entity_id ?? '—' }}</td>
+                            <td class="px-4 py-3 text-sand-700">{{ $row->municipality?->mun_name ?? '—' }}</td>
+                            <td class="px-4 py-3 text-sand-700">{{ $row->establishment?->lst_name ?? '—' }}</td>
                             <td class="px-4 py-3 text-right">
                                 <button type="button" data-details-trigger="audit-log-details-modal" data-details="{{ json_encode($details) }}" class="rounded-sm border border-sand-300 px-3 py-1.5 text-xs font-semibold text-sand-800 hover:border-primary-300">
                                     View

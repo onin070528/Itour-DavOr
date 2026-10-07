@@ -1,5 +1,13 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Tests — listing detail page.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 use App\Enums\ImageSourceRole;
 use App\Enums\ImageStatus;
 use App\Enums\UserRole;
@@ -17,40 +25,40 @@ function listingDetailFixture(array $overrides = []): Listing
     );
 
     return Listing::query()->create(array_merge([
-        'slug' => Str::slug('detail-page-fixture-'.Str::random(6)),
-        'name' => 'Detail Page Resort',
-        'category' => 'accommodation',
+        'lst_slug' => Str::slug('detail-page-fixture-'.Str::random(6)),
+        'lst_name' => 'Detail Page Resort',
+        'lst_category' => 'accommodation',
         'cat_id' => $category->cat_id,
-        'municipality' => 'City of Mati',
-        'barangay' => 'Dahican',
-        'status' => 'PUBLISHED',
-        'image' => 'resort.jpg',
+        'lst_municipality' => 'City of Mati',
+        'lst_barangay' => 'Dahican',
+        'lst_status' => 'PUBLISHED',
+        'lst_image' => 'resort.jpg',
     ], $overrides));
 }
 
 test('the detail page shows the published cover image and a gallery of published photos only', function () {
     $listing = listingDetailFixture();
-    $uploader = User::factory()->create(['role' => UserRole::Establishment, 'establishment_id' => $listing->id]);
+    $uploader = User::factory()->create(['usr_role' => UserRole::Establishment, 'lst_id' => $listing->lst_id]);
 
     $cover = EstablishmentImage::query()->create([
-        'listing_id' => $listing->id,
+        'lst_id' => $listing->lst_id,
         'img_path' => 'cover.jpg', 'img_thumbnail_path' => 'cover_thumb.jpg', 'img_alt_text' => 'Pool view',
         'img_credit' => 'Photo by Jane', 'img_source_role' => ImageSourceRole::Establishment,
         'img_status' => ImageStatus::Published, 'img_is_cover' => true, 'img_sort_order' => 1,
-        'img_hash' => hash('sha256', uniqid()), 'img_uploaded_by' => $uploader->id, 'img_has_ownership_declared' => true,
+        'img_hash' => hash('sha256', uniqid()), 'img_uploaded_by' => $uploader->usr_id, 'img_has_ownership_declared' => true,
     ]);
     EstablishmentImage::query()->create([
-        'listing_id' => $listing->id,
+        'lst_id' => $listing->lst_id,
         'img_path' => 'pending.jpg', 'img_thumbnail_path' => 'pending_thumb.jpg', 'img_alt_text' => 'Lobby',
         'img_source_role' => ImageSourceRole::Establishment, 'img_status' => ImageStatus::Pending,
         'img_is_cover' => false, 'img_sort_order' => 2, 'img_hash' => hash('sha256', uniqid()),
-        'img_uploaded_by' => $uploader->id, 'img_has_ownership_declared' => true,
+        'img_uploaded_by' => $uploader->usr_id, 'img_has_ownership_declared' => true,
     ]);
 
     $response = $this->get(route('listings.show', $listing));
 
     $response->assertOk();
-    $response->assertSee($listing->name);
+    $response->assertSee($listing->lst_name);
     $response->assertSee(route('establishmentImages.file', [$cover, 'full']), false);
     $response->assertSee('Photo by Jane');
     $response->assertDontSee('Lobby');
@@ -66,7 +74,7 @@ test('a listing with no establishment images falls back to its legacy image, nev
 });
 
 test('a listing with no image at all shows a category placeholder icon, not a third-party photo', function () {
-    $listing = listingDetailFixture(['image' => null]);
+    $listing = listingDetailFixture(['lst_image' => null]);
 
     $response = $this->get(route('listings.show', $listing));
 
@@ -75,7 +83,7 @@ test('a listing with no image at all shows a category placeholder icon, not a th
 });
 
 test('a suspended listing has no public detail page', function () {
-    $listing = listingDetailFixture(['status' => 'Suspended']);
+    $listing = listingDetailFixture(['lst_status' => 'Suspended']);
 
     $this->get(route('listings.show', $listing))->assertNotFound();
 });

@@ -46,33 +46,33 @@ return new class extends Migration
      */
     public function up(): void
     {
-        $intAccommodationCategoryId = DB::table('tblcategories')->where('cat_name', 'Accommodation')->value('cat_id');
+        $intAccommodationCategoryId = DB::table('tbl_categories')->where('cat_name', 'Accommodation')->value('cat_id');
 
         DB::transaction(function () use ($intAccommodationCategoryId) {
             foreach (self::MAPPING as $strSlug => $arrTarget) {
-                $objRowQuery = fn () => DB::table('listings')->where('slug', $strSlug)->where('category', $arrTarget['category']);
+                $objRowQuery = fn () => DB::table('tbl_listings')->where('lst_slug', $strSlug)->where('lst_category', $arrTarget['category']);
 
                 // Summary comment: establishment type, only where still unset.
                 if ($arrTarget['type'] !== null) {
-                    $objRowQuery()->whereNull('type')->update(['type' => $arrTarget['type']]);
+                    $objRowQuery()->whereNull('lst_type')->update(['lst_type' => $arrTarget['type']]);
                 }
 
                 // Summary comment: Manual/Paper, only from the old default and only without an account.
                 if ($arrTarget['reporting'] === ReportingMethod::ManualPaper->value) {
                     $objRowQuery()
-                        ->where('reporting_mode', ReportingMethod::OnlineItour->value)
+                        ->where('lst_reporting_mode', ReportingMethod::OnlineItour->value)
                         ->whereNotExists(function ($query) {
-                            $query->selectRaw('1')->from('users')->whereColumn('users.establishment_id', 'listings.id');
+                            $query->selectRaw('1')->from('tbl_users')->whereColumn('tbl_users.lst_id', 'tbl_listings.lst_id');
                         })
-                        ->update(['reporting_mode' => ReportingMethod::ManualPaper->value]);
+                        ->update(['lst_reporting_mode' => ReportingMethod::ManualPaper->value]);
                 }
             } // end foreach mapping
 
             // Summary comment: the missing Accommodation category on the two demo rows.
             if ($intAccommodationCategoryId !== null) {
-                DB::table('listings')
-                    ->whereIn('slug', self::DEMO_SLUGS_MISSING_CATEGORY)
-                    ->where('category', 'accommodation')
+                DB::table('tbl_listings')
+                    ->whereIn('lst_slug', self::DEMO_SLUGS_MISSING_CATEGORY)
+                    ->where('lst_category', 'accommodation')
                     ->whereNull('cat_id')
                     ->update(['cat_id' => $intAccommodationCategoryId]);
             }
@@ -85,25 +85,25 @@ return new class extends Migration
      */
     public function down(): void
     {
-        $intAccommodationCategoryId = DB::table('tblcategories')->where('cat_name', 'Accommodation')->value('cat_id');
+        $intAccommodationCategoryId = DB::table('tbl_categories')->where('cat_name', 'Accommodation')->value('cat_id');
 
         DB::transaction(function () use ($intAccommodationCategoryId) {
             foreach (self::MAPPING as $strSlug => $arrTarget) {
                 if ($arrTarget['type'] !== null) {
-                    DB::table('listings')->where('slug', $strSlug)->where('type', $arrTarget['type'])->update(['type' => null]);
+                    DB::table('tbl_listings')->where('lst_slug', $strSlug)->where('lst_type', $arrTarget['type'])->update(['lst_type' => null]);
                 }
 
                 if ($arrTarget['reporting'] === ReportingMethod::ManualPaper->value) {
-                    DB::table('listings')
-                        ->where('slug', $strSlug)
-                        ->where('reporting_mode', ReportingMethod::ManualPaper->value)
-                        ->update(['reporting_mode' => ReportingMethod::OnlineItour->value]);
+                    DB::table('tbl_listings')
+                        ->where('lst_slug', $strSlug)
+                        ->where('lst_reporting_mode', ReportingMethod::ManualPaper->value)
+                        ->update(['lst_reporting_mode' => ReportingMethod::OnlineItour->value]);
                 }
             } // end foreach mapping
 
             if ($intAccommodationCategoryId !== null) {
-                DB::table('listings')
-                    ->whereIn('slug', self::DEMO_SLUGS_MISSING_CATEGORY)
+                DB::table('tbl_listings')
+                    ->whereIn('lst_slug', self::DEMO_SLUGS_MISSING_CATEGORY)
                     ->where('cat_id', $intAccommodationCategoryId)
                     ->update(['cat_id' => null]);
             }

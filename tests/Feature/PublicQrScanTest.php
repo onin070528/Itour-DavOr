@@ -1,5 +1,13 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Tests — public qr scan.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 use App\Enums\ReportingMethod;
 use App\Enums\UserRole;
 use App\Models\Arrival;
@@ -30,22 +38,22 @@ function qrScanListingFixture(array $overrides = [], bool $blnWithAccount = true
     $category = qrScanCategoryFixture('Accommodation', true);
 
     $listing = Listing::query()->create(array_merge([
-        'slug' => Str::slug('qr-scan-fixture-'.Str::random(6)),
-        'name' => 'Botanika Nature Resort',
-        'category' => 'accommodation',
+        'lst_slug' => Str::slug('qr-scan-fixture-'.Str::random(6)),
+        'lst_name' => 'Botanika Nature Resort',
+        'lst_category' => 'accommodation',
         'cat_id' => $category->cat_id,
-        'municipality' => 'City of Mati',
-        'barangay' => 'Dahican',
-        'status' => 'PUBLISHED',
+        'lst_municipality' => 'City of Mati',
+        'lst_barangay' => 'Dahican',
+        'lst_status' => 'PUBLISHED',
     ], $overrides));
 
     if ($blnWithAccount) {
-        $listing->forceFill(['reporting_mode' => ReportingMethod::OnlineItour])->save();
+        $listing->forceFill(['lst_reporting_mode' => ReportingMethod::OnlineItour])->save();
         User::factory()->create([
-            'role' => UserRole::Establishment,
-            'organization_name' => $listing->name,
-            'organization_subtitle' => 'Brgy. Dahican, City of Mati',
-            'establishment_id' => $listing->id,
+            'usr_role' => UserRole::Establishment,
+            'usr_organization_name' => $listing->lst_name,
+            'usr_organization_subtitle' => 'Brgy. Dahican, City of Mati',
+            'lst_id' => $listing->lst_id,
         ]);
     }
 
@@ -55,7 +63,7 @@ function qrScanListingFixture(array $overrides = [], bool $blnWithAccount = true
 test('scanning a QR-enabled, active establishment shows the registration form', function () {
     $listing = qrScanListingFixture();
 
-    $response = test()->get(route('lgu.establishmentQr', ['establishment' => $listing->uuid]));
+    $response = test()->get(route('lgu.establishmentQr', ['establishment' => $listing->lst_uuid]));
 
     $response->assertOk();
     $response->assertSee('establishment-qr-form', false);
@@ -64,11 +72,11 @@ test('scanning a QR-enabled, active establishment shows the registration form', 
 test('scanning a Tour Guide record is refused', function () {
     $category = qrScanCategoryFixture('Travel & Tours', true);
     $listing = qrScanListingFixture([
-        'name' => 'Dahican Surf Guides', 'cat_id' => $category->cat_id, 'type' => 'Tour Guide',
-        'lat' => null, 'lng' => null,
+        'lst_name' => 'Dahican Surf Guides', 'cat_id' => $category->cat_id, 'lst_type' => 'Tour Guide',
+        'lst_lat' => null, 'lst_lng' => null,
     ]);
 
-    $response = test()->get(route('lgu.establishmentQr', ['establishment' => $listing->uuid]));
+    $response = test()->get(route('lgu.establishmentQr', ['establishment' => $listing->lst_uuid]));
 
     $response->assertOk();
     $response->assertSee('This establishment is not accepting registrations');
@@ -77,32 +85,32 @@ test('scanning a Tour Guide record is refused', function () {
 
 test('scanning an Others-category record with QR scanning off is refused', function () {
     $category = qrScanCategoryFixture('Others', false);
-    $listing = qrScanListingFixture(['name' => 'Misc Shop', 'cat_id' => $category->cat_id]);
+    $listing = qrScanListingFixture(['lst_name' => 'Misc Shop', 'cat_id' => $category->cat_id]);
 
-    $response = test()->get(route('lgu.establishmentQr', ['establishment' => $listing->uuid]));
+    $response = test()->get(route('lgu.establishmentQr', ['establishment' => $listing->lst_uuid]));
 
     $response->assertOk();
     $response->assertSee('This establishment is not accepting registrations');
 });
 
 test('scanning a suspended establishment is refused', function () {
-    $listing = qrScanListingFixture(['status' => 'Suspended']);
+    $listing = qrScanListingFixture(['lst_status' => 'Suspended']);
 
-    $response = test()->get(route('lgu.establishmentQr', ['establishment' => $listing->uuid]));
+    $response = test()->get(route('lgu.establishmentQr', ['establishment' => $listing->lst_uuid]));
 
     $response->assertOk();
     $response->assertSee('This establishment is not accepting registrations');
 });
 
 test('submitting a check-in for a QR-disabled establishment saves nothing, even if posted directly', function () {
-    $listing = qrScanListingFixture(['status' => 'Suspended']);
+    $listing = qrScanListingFixture(['lst_status' => 'Suspended']);
 
-    $response = test()->post(route('checkin.store', $listing->uuid), [
+    $response = test()->post(route('checkin.store', $listing->lst_uuid), [
         'visitorName' => 'Jane Doe', 'visitorContact' => '0912', 'visitType' => 'Daytour',
     ]);
 
     $response->assertStatus(422);
-    expect(Arrival::query()->where('listing_id', $listing->id)->count())->toBe(0);
+    expect(Arrival::query()->where('lst_id', $listing->lst_id)->count())->toBe(0);
 });
 
 test('a legacy listing with no uuid is treated as not QR-enabled and does not crash the PTO directory', function () {
@@ -110,14 +118,14 @@ test('a legacy listing with no uuid is treated as not QR-enabled and does not cr
     // hook), so a pre-uuid-era row is simulated with a raw update, the same
     // state 16 legacy listings were found in before being backfilled.
     $listing = qrScanListingFixture();
-    DB::table('listings')->where('id', $listing->id)->update(['uuid' => null]);
+    DB::table('tbl_listings')->where('lst_id', $listing->lst_id)->update(['lst_uuid' => null]);
 
     expect($listing->fresh()->isQrEnabled())->toBeFalse();
 
     $pto = User::factory()->create([
-        'role' => UserRole::PtoAdministrator,
-        'organization_name' => 'Provincial Tourism Office',
-        'organization_subtitle' => 'Province of Davao Oriental',
+        'usr_role' => UserRole::PtoAdministrator,
+        'usr_organization_name' => 'Provincial Tourism Office',
+        'usr_organization_subtitle' => 'Province of Davao Oriental',
     ]);
     test()->actingAs($pto)->get(route('pto.directory.index'))->assertOk();
 });
@@ -125,7 +133,7 @@ test('a legacy listing with no uuid is treated as not QR-enabled and does not cr
 test('a filled honeypot field is rejected and saves no arrival', function () {
     $listing = qrScanListingFixture();
 
-    $response = test()->postJson(route('checkin.store', $listing->uuid), [
+    $response = test()->postJson(route('checkin.store', $listing->lst_uuid), [
         'visitorName' => 'Jane Doe',
         'visitorContact' => '0912',
         'visitType' => 'Daytour',
@@ -134,57 +142,57 @@ test('a filled honeypot field is rejected and saves no arrival', function () {
     ]);
 
     $response->assertStatus(422);
-    expect(Arrival::query()->where('listing_id', $listing->id)->count())->toBe(0);
+    expect(Arrival::query()->where('lst_id', $listing->lst_id)->count())->toBe(0);
 });
 
 test('forged municipality and establishment ids cannot change QR arrival ownership', function () {
-    $mati = Municipality::query()->create(['name' => 'City of Mati', 'code' => 'MATI']);
-    $baganga = Municipality::query()->create(['name' => 'Baganga', 'code' => 'BAGANGA']);
-    $matiListing = qrScanListingFixture(['municipality_id' => $mati->id]);
+    $mati = Municipality::query()->create(['mun_name' => 'City of Mati', 'mun_code' => 'MATI']);
+    $baganga = Municipality::query()->create(['mun_name' => 'Baganga', 'mun_code' => 'BAGANGA']);
+    $matiListing = qrScanListingFixture(['mun_id' => $mati->mun_id]);
     $bagangaListing = qrScanListingFixture([
-        'name' => 'Baganga Resort',
-        'municipality' => 'Baganga',
-        'municipality_id' => $baganga->id,
+        'lst_name' => 'Baganga Resort',
+        'lst_municipality' => 'Baganga',
+        'mun_id' => $baganga->mun_id,
     ]);
 
-    $response = test()->postJson(route('checkin.store', $matiListing->uuid), [
+    $response = test()->postJson(route('checkin.store', $matiListing->lst_uuid), [
         'visitorName' => 'Jane Doe',
         'visitorContact' => '0912',
         'visitType' => 'Daytour',
         'male' => 1,
         'adults' => 1,
         'local' => 1,
-        'municipality_id' => $bagangaListing->municipality_id,
-        'establishment_id' => $bagangaListing->id,
+        'municipality_id' => $bagangaListing->mun_id,
+        'establishment_id' => $bagangaListing->lst_id,
     ]);
 
     $response->assertOk();
 
     $arrival = Arrival::query()->sole();
 
-    expect($arrival->listing_id)->toBe($matiListing->id)
-        ->and($arrival->listing->municipality_id)->toBe($matiListing->municipality_id)
-        ->and($arrival->listing_id)->not->toBe($bagangaListing->id);
+    expect($arrival->lst_id)->toBe($matiListing->lst_id)
+        ->and($arrival->listing->mun_id)->toBe($matiListing->mun_id)
+        ->and($arrival->lst_id)->not->toBe($bagangaListing->lst_id);
 });
 
 test('turning a category QR switch off then on keeps old arrivals and re-enables the same QR code', function () {
     $category = qrScanCategoryFixture('Accommodation', true);
     $listing = qrScanListingFixture(['cat_id' => $category->cat_id]);
     $listing->arrivals()->create([
-        'source' => 'self_checkin', 'date' => now()->toDateString(), 'visitor_name' => 'Old Guest',
-        'visitor_contact' => '0900', 'party_size' => 1, 'status' => 'Recorded',
+        'arr_source' => 'self_checkin', 'arr_date' => now()->toDateString(), 'arr_visitor_name' => 'Old Guest',
+        'arr_visitor_contact' => '0900', 'arr_party_size' => 1, 'arr_status' => 'Recorded',
     ]);
 
     $category->update(['cat_is_qr_enabled' => false]);
-    test()->get(route('lgu.establishmentQr', ['establishment' => $listing->uuid]))
+    test()->get(route('lgu.establishmentQr', ['establishment' => $listing->lst_uuid]))
         ->assertSee('This establishment is not accepting registrations');
-    expect(Arrival::query()->where('listing_id', $listing->id)->count())->toBe(1);
+    expect(Arrival::query()->where('lst_id', $listing->lst_id)->count())->toBe(1);
 
     $category->update(['cat_is_qr_enabled' => true]);
-    test()->get(route('lgu.establishmentQr', ['establishment' => $listing->uuid]))
+    test()->get(route('lgu.establishmentQr', ['establishment' => $listing->lst_uuid]))
         ->assertSee('establishment-qr-form', false);
-    expect($listing->fresh()->uuid)->toBe($listing->uuid);
-    expect(Arrival::query()->where('listing_id', $listing->id)->count())->toBe(1);
+    expect($listing->fresh()->lst_uuid)->toBe($listing->lst_uuid);
+    expect(Arrival::query()->where('lst_id', $listing->lst_id)->count())->toBe(1);
 });
 
 test('scanning a listing with no linked establishment account is refused, and a direct post saves nothing', function () {
@@ -193,15 +201,15 @@ test('scanning a listing with no linked establishment account is refused, and a 
     expect($listing->isQrEnabled())->toBeTrue();
     expect($listing->isAcceptingRegistrations())->toBeFalse();
 
-    test()->get(route('lgu.establishmentQr', ['establishment' => $listing->uuid]))
+    test()->get(route('lgu.establishmentQr', ['establishment' => $listing->lst_uuid]))
         ->assertOk()
         ->assertSee('This establishment is not accepting registrations')
         ->assertDontSee('establishment-qr-form', false);
 
-    test()->postJson(route('checkin.store', $listing->uuid), [
+    test()->postJson(route('checkin.store', $listing->lst_uuid), [
         'visitorName' => 'Jane Doe', 'visitorContact' => '0912', 'visitType' => 'Daytour', 'male' => 1, 'adults' => 1, 'local' => 1,
     ])->assertStatus(422);
-    expect(Arrival::query()->where('listing_id', $listing->id)->count())->toBe(0);
+    expect(Arrival::query()->where('lst_id', $listing->lst_id)->count())->toBe(0);
 });
 
 test('an establishment with its own QR switch off is refused', function () {
@@ -210,7 +218,7 @@ test('an establishment with its own QR switch off is refused', function () {
 
     expect($listing->fresh()->isAcceptingRegistrations())->toBeFalse();
 
-    test()->get(route('lgu.establishmentQr', ['establishment' => $listing->uuid]))
+    test()->get(route('lgu.establishmentQr', ['establishment' => $listing->lst_uuid]))
         ->assertSee('This establishment is not accepting registrations');
 });
 
@@ -222,30 +230,30 @@ test('a new listing has its own QR switch on by default', function () {
 });
 
 test('the PTO directory offers no QR for a listing without a linked account', function () {
-    $listing = qrScanListingFixture(['name' => 'No Account Inn'], false);
+    $listing = qrScanListingFixture(['lst_name' => 'No Account Inn'], false);
 
     $pto = User::factory()->create([
-        'role' => UserRole::PtoAdministrator,
-        'organization_name' => 'Provincial Tourism Office',
-        'organization_subtitle' => 'Province of Davao Oriental',
+        'usr_role' => UserRole::PtoAdministrator,
+        'usr_organization_name' => 'Provincial Tourism Office',
+        'usr_organization_subtitle' => 'Province of Davao Oriental',
     ]);
 
     test()->actingAs($pto)->get(route('pto.directory.index'))
         ->assertOk()
-        ->assertDontSee('qr-view-'.$listing->id, false);
+        ->assertDontSee('qr-view-'.$listing->lst_id, false);
 });
 
 test('listings:backfill-uuids fills only missing uuids and never changes an existing one', function () {
     $listingWithUuid = qrScanListingFixture();
-    $listingWithoutUuid = qrScanListingFixture(['name' => 'Legacy Inn'], false);
-    $strExistingUuid = $listingWithUuid->uuid;
-    DB::table('listings')->where('id', $listingWithoutUuid->id)->update(['uuid' => null]);
+    $listingWithoutUuid = qrScanListingFixture(['lst_name' => 'Legacy Inn'], false);
+    $strExistingUuid = $listingWithUuid->lst_uuid;
+    DB::table('tbl_listings')->where('lst_id', $listingWithoutUuid->lst_id)->update(['lst_uuid' => null]);
 
     test()->artisan('listings:backfill-uuids')->assertSuccessful();
 
-    expect($listingWithUuid->fresh()->uuid)->toBe($strExistingUuid);
-    expect($listingWithoutUuid->fresh()->uuid)->not->toBeNull();
-    expect(Listing::query()->whereNull('uuid')->count())->toBe(0);
+    expect($listingWithUuid->fresh()->lst_uuid)->toBe($strExistingUuid);
+    expect($listingWithoutUuid->fresh()->lst_uuid)->not->toBeNull();
+    expect(Listing::query()->whereNull('lst_uuid')->count())->toBe(0);
 });
 
 // --- Public check-in, Phase 3 ---
@@ -260,10 +268,10 @@ test('an unknown check-in uuid is a 404 for both the form and the submit', funct
 });
 
 test('the form offers visit type, the headcount, and the Davao Oriental municipality picker', function () {
-    Municipality::query()->firstOrCreate(['code' => 'CATEEL'], ['name' => 'Cateel']);
+    Municipality::query()->firstOrCreate(['mun_code' => 'CATEEL'], ['mun_name' => 'Cateel']);
     $listing = qrScanListingFixture();
 
-    test()->get(route('lgu.establishmentQr', ['establishment' => $listing->uuid]))
+    test()->get(route('lgu.establishmentQr', ['establishment' => $listing->lst_uuid]))
         ->assertOk()
         ->assertSee('name="visitType" value="Daytour"', false)
         ->assertSee('name="visitType" value="Overnight"', false)
@@ -275,34 +283,34 @@ test('the form offers visit type, the headcount, and the Davao Oriental municipa
 test('a valid QR check-in saves exactly one self-checkin row with today\'s date, visit type, contact, and no encoder', function () {
     $listing = qrScanListingFixture();
 
-    test()->postJson(route('checkin.store', $listing->uuid), [
+    test()->postJson(route('checkin.store', $listing->lst_uuid), [
         'visitorName' => 'Maria Santos', 'visitorContact' => '0917 000 1111', 'visitType' => 'Overnight',
         'male' => 1, 'female' => 2, 'adults' => 2, 'children' => 1, 'local' => 2, 'foreign' => 1,
         'foreignCountry' => 'Japan',
     ])->assertOk()->assertJson(['message' => 'Registration submitted.']);
 
-    $arrival = Arrival::query()->where('listing_id', $listing->id)->sole();
-    expect($arrival->source->value)->toBe('self_checkin');
-    expect($arrival->date->toDateString())->toBe(now()->toDateString());
-    expect($arrival->visit_type)->toBe('Overnight');
-    expect($arrival->visitor_name)->toBe('Maria Santos');
-    expect($arrival->visitor_contact)->toBe('0917 000 1111');
-    expect($arrival->party_size)->toBe(3);
+    $arrival = Arrival::query()->where('lst_id', $listing->lst_id)->sole();
+    expect($arrival->arr_source->value)->toBe('self_checkin');
+    expect($arrival->arr_date->toDateString())->toBe(now()->toDateString());
+    expect($arrival->arr_visit_type)->toBe('Overnight');
+    expect($arrival->arr_visitor_name)->toBe('Maria Santos');
+    expect($arrival->arr_visitor_contact)->toBe('0917 000 1111');
+    expect($arrival->arr_party_size)->toBe(3);
     expect($arrival->recorded_by)->toBeNull();
 });
 
 test('the QR check-in requires a visit type, a name, and a contact number, and saves nothing without them', function () {
     $listing = qrScanListingFixture();
 
-    test()->postJson(route('checkin.store', $listing->uuid), ['male' => 1])
+    test()->postJson(route('checkin.store', $listing->lst_uuid), ['male' => 1])
         ->assertStatus(422)
         ->assertJsonValidationErrors(['visitType', 'visitorName', 'visitorContact']);
 
-    test()->postJson(route('checkin.store', $listing->uuid), [
+    test()->postJson(route('checkin.store', $listing->lst_uuid), [
         'visitorName' => 'Jane Doe', 'visitorContact' => '0912', 'visitType' => 'Weekend', 'male' => 1,
     ])->assertJsonValidationErrors('visitType');
 
-    expect(Arrival::query()->where('listing_id', $listing->id)->count())->toBe(0);
+    expect(Arrival::query()->where('lst_id', $listing->lst_id)->count())->toBe(0);
 });
 
 test('the public check-in submit is rate limited per visitor and establishment', function () {
@@ -310,15 +318,15 @@ test('the public check-in submit is rate limited per visitor and establishment',
     $arrPayload = ['visitorName' => 'Jane Doe', 'visitorContact' => '0912', 'visitType' => 'Daytour', 'male' => 1, 'adults' => 1, 'local' => 1];
 
     for ($intAttempt = 1; $intAttempt <= 10; $intAttempt++) {
-        test()->postJson(route('checkin.store', $listing->uuid), $arrPayload)->assertOk();
+        test()->postJson(route('checkin.store', $listing->lst_uuid), $arrPayload)->assertOk();
     }
 
-    test()->postJson(route('checkin.store', $listing->uuid), $arrPayload)->assertStatus(429);
-    expect(Arrival::query()->where('listing_id', $listing->id)->count())->toBe(10);
+    test()->postJson(route('checkin.store', $listing->lst_uuid), $arrPayload)->assertStatus(429);
+    expect(Arrival::query()->where('lst_id', $listing->lst_id)->count())->toBe(10);
 });
 
 test('end to end: the QR on the poster leads to the form, and a submitted check-in shows up in the establishment\'s Arrival Records', function () {
-    $listing = qrScanListingFixture(['name' => 'End To End Resort']);
+    $listing = qrScanListingFixture(['lst_name' => 'End To End Resort']);
     $owner = $listing->establishmentUser;
     $strCheckinUrl = app(QrCodeService::class)->buildCheckinUrl($listing);
 
@@ -326,7 +334,7 @@ test('end to end: the QR on the poster leads to the form, and a submitted check-
     test()->actingAs($owner)->get(route('qrCodes.poster', $listing))->assertOk()->assertSee(preg_replace('#^https?://#', '', $strCheckinUrl));
     test()->get(parse_url($strCheckinUrl, PHP_URL_PATH))->assertOk()->assertSee('establishment-qr-form', false);
 
-    test()->postJson(route('checkin.store', $listing->uuid), [
+    test()->postJson(route('checkin.store', $listing->lst_uuid), [
         'visitorName' => 'Phone Scan Visitor', 'visitorContact' => '0912', 'visitType' => 'Daytour',
         'female' => 1, 'adults' => 1, 'local' => 1,
     ])->assertOk();

@@ -1,10 +1,12 @@
 <?php
 
-/*
- * System     : iTOUR - Integrated Tourism Information and Monitoring System
- * Purpose    : Orchestrates an establishment photo upload — processing, storage, duplicate checking, and the approval-routing status.
- * Programmer : <name(s)>
- * Copyright  : 2026 University of Mindanao. All rights reserved.
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Orchestrates an establishment photo upload — processing, storage, duplicate checking,
+ * and the approval-routing status.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
  */
 
 namespace App\Services;
@@ -77,7 +79,7 @@ class EstablishmentImageUploader
                 // back), then re-reads the now-current live count. This is
                 // the authoritative cap check; the pre-check above is only
                 // a fast-fail convenience.
-                $objLockedListing = Listing::query()->lockForUpdate()->findOrFail($objListing->id);
+                $objLockedListing = Listing::query()->lockForUpdate()->findOrFail($objListing->lst_id);
 
                 $strLockedRejectionMessage = $objLockedListing->remainingSlotsErrorMessage(count($arrPreparedImages));
 
@@ -89,17 +91,17 @@ class EstablishmentImageUploader
 
                 foreach ($arrPreparedImages as $arrPrepared) {
                     $arrCreatedImages[] = EstablishmentImage::query()->create([
-                        'listing_id' => $objListing->id,
+                        'lst_id' => $objListing->lst_id,
                         'img_path' => $arrPrepared['path'],
                         'img_thumbnail_path' => $arrPrepared['thumbnailPath'],
-                        'img_alt_text' => $objListing->name,
+                        'img_alt_text' => $objListing->lst_name,
                         'img_credit' => $strCredit,
                         'img_source_role' => $objSourceRole,
                         'img_status' => $objStatus,
                         'img_is_cover' => false,
                         'img_sort_order' => $intSortOrder++,
                         'img_hash' => $arrPrepared['hash'],
-                        'img_uploaded_by' => $objUploader->id,
+                        'img_uploaded_by' => $objUploader->usr_id,
                         'img_has_ownership_declared' => true,
                     ]);
                 }
@@ -114,7 +116,7 @@ class EstablishmentImageUploader
 
             throw $objValidationException;
         } catch (\Throwable $objException) {
-            Log::error('Failed to save establishment image upload.', ['exception' => $objException, 'listing_id' => $objListing->id]);
+            Log::error('Failed to save establishment image upload.', ['exception' => $objException, 'listing_id' => $objListing->lst_id]);
 
             foreach ($arrPreparedImages as $arrPrepared) {
                 Storage::disk(self::DISK)->delete([$arrPrepared['path'], $arrPrepared['thumbnailPath']]);
@@ -126,7 +128,7 @@ class EstablishmentImageUploader
         }
 
         foreach ($arrCreatedImages as $objCreatedImage) {
-            OperationLogger::created($objUploader, 'establishment_image', $objCreatedImage->img_id, $objListing->municipality_id, $objListing->id, [
+            OperationLogger::created($objUploader, 'establishment_image', $objCreatedImage->img_id, $objListing->mun_id, $objListing->lst_id, [
                 'img_status' => $objCreatedImage->img_status->value,
                 'img_source_role' => $objCreatedImage->img_source_role->value,
             ]);
@@ -161,7 +163,7 @@ class EstablishmentImageUploader
         $arrPrepared = $this->_prepareImage($objListing, $objUploadedFile);
 
         $objNewImage = EstablishmentImage::query()->create([
-            'listing_id' => $objListing->id,
+            'lst_id' => $objListing->lst_id,
             'img_path' => $arrPrepared['path'],
             'img_thumbnail_path' => $arrPrepared['thumbnailPath'],
             'img_alt_text' => $objOldImage->img_alt_text,
@@ -173,12 +175,12 @@ class EstablishmentImageUploader
             // inherited sort order only applies once approved.
             'img_sort_order' => $objOldImage->img_sort_order,
             'img_hash' => $arrPrepared['hash'],
-            'img_uploaded_by' => $objUploader->id,
+            'img_uploaded_by' => $objUploader->usr_id,
             'img_has_ownership_declared' => true,
             'img_replaces_id' => $objOldImage->img_id,
         ]);
 
-        OperationLogger::replaced($objUploader, 'establishment_image', $objNewImage->img_id, $objListing->municipality_id, $objListing->id, [
+        OperationLogger::replaced($objUploader, 'establishment_image', $objNewImage->img_id, $objListing->mun_id, $objListing->lst_id, [
             'replaces_image_id' => $objOldImage->img_id,
         ]);
 
@@ -191,7 +193,7 @@ class EstablishmentImageUploader
 
     private function _resolveSourceRole(User $objUploader): ImageSourceRole
     {
-        return match ($objUploader->role) {
+        return match ($objUploader->usr_role) {
             UserRole::Establishment => ImageSourceRole::Establishment,
             UserRole::Lgu => ImageSourceRole::Lgu,
             UserRole::PtoAdministrator => ImageSourceRole::Pto,
@@ -216,8 +218,8 @@ class EstablishmentImageUploader
         $strExtension = $this->_extensionForUpload($objUploadedFile);
         // Random — never the uploaded filename — per I2/7B.
         $strRandomName = Str::random(40);
-        $strPath = "establishment-images/{$objListing->id}/{$strRandomName}.{$strExtension}";
-        $strThumbnailPath = "establishment-images/{$objListing->id}/{$strRandomName}_thumb.{$strExtension}";
+        $strPath = "establishment-images/{$objListing->lst_id}/{$strRandomName}.{$strExtension}";
+        $strThumbnailPath = "establishment-images/{$objListing->lst_id}/{$strRandomName}_thumb.{$strExtension}";
 
         Storage::disk(self::DISK)->put($strPath, $strProcessedFull);
         Storage::disk(self::DISK)->put($strThumbnailPath, $strProcessedThumbnail);
@@ -228,7 +230,7 @@ class EstablishmentImageUploader
     private function _guardAgainstDuplicateHash(Listing $objListing, string $strHash): void
     {
         $blnIsDuplicate = EstablishmentImage::query()
-            ->where('listing_id', $objListing->id)
+            ->where('lst_id', $objListing->lst_id)
             ->where('img_hash', $strHash)
             ->exists();
 

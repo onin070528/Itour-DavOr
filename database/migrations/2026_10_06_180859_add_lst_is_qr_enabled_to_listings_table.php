@@ -23,8 +23,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('listings', function (Blueprint $table) {
-            $table->boolean('lst_is_qr_enabled')->default(true)->after('reporting_mode');
+        Schema::table('tbl_listings', function (Blueprint $table) {
+            $table->boolean('lst_is_qr_enabled')->default(true)->after('lst_reporting_mode');
         });
     }
 
@@ -33,7 +33,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('listings', function (Blueprint $table) {
+        Schema::table('tbl_listings', function (Blueprint $table) {
             $table->dropColumn('lst_is_qr_enabled');
         });
     }

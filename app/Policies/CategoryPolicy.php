@@ -20,6 +20,6 @@ class CategoryPolicy
 {
     public function update(User $user, Category $category): bool
     {
-        return $user->role === UserRole::PtoAdministrator;
+        return $user->usr_role === UserRole::PtoAdministrator;
     }
 }

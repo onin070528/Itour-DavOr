@@ -22,16 +22,16 @@ class EnsureUserHasRole
      *
      * Usage: ->middleware('role:pto_administrator') or ->middleware('role:lgu,establishment')
      */
-    public function handle(Request $request, Closure $next, string ...$roles): Response
+    public function handle(Request $objRequest, Closure $fnNext, string ...$roles): Response
     {
-        $user = $request->user();
+        $objUser = $objRequest->user();
 
-        $allowed = collect($roles)
-            ->map(fn (string $role) => UserRole::from($role))
-            ->contains($user?->role);
+        $blnAllowed = collect($roles)
+            ->map(fn (string $strRole) => UserRole::from($strRole))
+            ->contains($objUser?->usr_role);
 
-        abort_unless($allowed, 403);
+        abort_unless($blnAllowed, 403);
 
-        return $next($request);
+        return $fnNext($objRequest);
     }
 }

@@ -32,7 +32,7 @@ trait UpdatesAccountSettings
 {
     /**
      * The notification toggles shown on this role's Settings > Notifications
-     * tab: key (stable, used as the DB row's `key` and the form field name),
+     * tab: key (stable, used as the DB row's `npf_key` and the form field name),
      * label (exact on-screen text), default (its checked state when no row
      * has been saved yet). Implemented per controller/role.
      *
@@ -43,34 +43,34 @@ trait UpdatesAccountSettings
     /**
      * @return array<int, array{key: string, label: string, checked: bool}>
      */
-    protected function notificationPreferencesFor(int $userId): array
+    protected function notificationPreferencesFor(int $intUserId): array
     {
-        $saved = NotificationPreference::query()
-            ->where('user_id', $userId)
-            ->pluck('enabled', 'key');
+        $objSaved = NotificationPreference::query()
+            ->where('usr_id', $intUserId)
+            ->pluck('npf_enabled', 'npf_key');
 
         return collect($this->notificationPreferenceDefinitions())
-            ->map(fn (array $pref) => [
-                'key' => $pref['key'],
-                'label' => $pref['label'],
-                'checked' => $saved->has($pref['key']) ? (bool) $saved[$pref['key']] : $pref['default'],
+            ->map(fn (array $arrPref) => [
+                'key' => $arrPref['key'],
+                'label' => $arrPref['label'],
+                'checked' => $objSaved->has($arrPref['key']) ? (bool) $objSaved[$arrPref['key']] : $arrPref['default'],
             ])
             ->all();
     }
 
-    public function updateProfile(Request $request): RedirectResponse
+    public function updateProfile(Request $objRequest): RedirectResponse
     {
-        $user = $request->user();
+        $objUser = $objRequest->user();
 
-        $data = $request->validate([
+        $arrData = $objRequest->validate([
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user)],
+            'email' => ['required', 'email', 'max:255', Rule::unique('tbl_users', 'usr_email')->ignore($objUser)],
         ]);
 
         try {
-            $user->update($data);
-        } catch (\Throwable $e) {
-            Log::error('Failed to update account profile.', ['exception' => $e, 'user_id' => $user->id]);
+            $objUser->update(['usr_name' => $arrData['name'], 'usr_email' => $arrData['email']]);
+        } catch (\Throwable $objException) {
+            Log::error('Failed to update account profile.', ['exception' => $objException, 'usr_id' => $objUser->usr_id]);
 
             return back()->with('toast', 'Something went wrong while saving your profile. Please try again.')->with('toast_tone', 'danger');
         }
@@ -78,48 +78,48 @@ trait UpdatesAccountSettings
         return back()->with('toast', 'Profile changes saved.');
     }
 
-    public function updatePassword(Request $request): RedirectResponse
+    public function updatePassword(Request $objRequest): RedirectResponse
     {
-        $data = $request->validate([
+        $arrData = $objRequest->validate([
             'current_password' => ['required', 'current_password'],
             'password' => ['required', 'confirmed', Password::default()],
         ]);
 
-        $user = $request->user();
+        $objUser = $objRequest->user();
 
         try {
-            $user->forceFill([
-                'password' => $data['password'],
+            $objUser->forceFill([
+                'usr_password' => $arrData['password'],
                 'usr_must_change_password' => false,
                 'usr_password_changed_at' => now(),
             ])->save();
-        } catch (\Throwable $e) {
-            Log::error('Failed to update account password.', ['exception' => $e, 'user_id' => $user->id]);
+        } catch (\Throwable $objException) {
+            Log::error('Failed to update account password.', ['exception' => $objException, 'usr_id' => $objUser->usr_id]);
 
             return back()->with('toast', 'Something went wrong while updating your password. Please try again.')->with('toast_tone', 'danger');
         }
 
-        SessionSecurity::invalidateOtherSessionsFor($user, $request->session()->getId());
+        SessionSecurity::invalidateOtherSessionsFor($objUser, $objRequest->session()->getId());
 
-        event(new UserPasswordChanged($user));
+        event(new UserPasswordChanged($objUser));
 
         return back()->with('toast', 'Password updated.');
     }
 
-    public function updatePreferences(Request $request): RedirectResponse
+    public function updatePreferences(Request $objRequest): RedirectResponse
     {
-        $user = $request->user();
-        $keys = collect($this->notificationPreferenceDefinitions())->pluck('key');
+        $objUser = $objRequest->user();
+        $objKeys = collect($this->notificationPreferenceDefinitions())->pluck('key');
 
         try {
-            foreach ($keys as $key) {
+            foreach ($objKeys as $key) {
                 NotificationPreference::query()->updateOrCreate(
-                    ['user_id' => $user->id, 'key' => $key],
-                    ['enabled' => $request->boolean("preferences.{$key}")],
+                    ['usr_id' => $objUser->usr_id, 'npf_key' => $key],
+                    ['npf_enabled' => $objRequest->boolean("preferences.{$key}")],
                 );
             }
-        } catch (\Throwable $e) {
-            Log::error('Failed to update notification preferences.', ['exception' => $e, 'user_id' => $user->id]);
+        } catch (\Throwable $objException) {
+            Log::error('Failed to update notification preferences.', ['exception' => $objException, 'usr_id' => $objUser->usr_id]);
 
             return back()->with('toast', 'Something went wrong while saving your preferences. Please try again.')->with('toast_tone', 'danger');
         }

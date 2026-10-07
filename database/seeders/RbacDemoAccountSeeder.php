@@ -1,10 +1,11 @@
 <?php
 
-/*
- * System     : iTOUR - Integrated Tourism Information and Monitoring System
- * Purpose    : Seeds the development RBAC accounts — PTO (primary and secondary), one LGU Tourism Admin per municipality/city, and the demo Establishment.
- * Programmer : <name(s)>
- * Copyright  : 2026 University of Mindanao. All rights reserved.
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Seeds the development RBAC accounts — PTO (primary and secondary), one LGU Tourism Admin per municipality/city, and the demo Establishment.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
  */
 
 namespace Database\Seeders;
@@ -82,26 +83,26 @@ class RbacDemoAccountSeeder extends Seeder
             $this->_seedDemoEstablishmentsAndPrimaryAccounts($arrMunicipalitiesByCode['MATI'], $arrMunicipalitiesByCode['BAG'], $strPassword);
 
             $this->_seedAccountWithTemporaryPassword(self::SECONDARY_PTO_EMAIL, [
-                'name' => 'iTOUR PTO Administrator (Secondary)',
-                'role' => UserRole::PtoAdministrator,
-                'organization_name' => 'Provincial Tourism Office',
-                'organization_subtitle' => 'Province of Davao Oriental',
-                'municipality_id' => null,
-                'establishment_id' => null,
+                'usr_name' => 'iTOUR PTO Administrator (Secondary)',
+                'usr_role' => UserRole::PtoAdministrator,
+                'usr_organization_name' => 'Provincial Tourism Office',
+                'usr_organization_subtitle' => 'Province of Davao Oriental',
+                'mun_id' => null,
+                'lst_id' => null,
             ], $strPassword);
 
             foreach (self::LGU_ACCOUNTS as $strCode => [$strEmailLocalPart, $strOfficeName]) {
                 $objMunicipality = $arrMunicipalitiesByCode[$strCode];
 
-                // organization_subtitle must be the exact municipality name —
+                // usr_organization_subtitle must be the exact municipality name —
                 // it's the display label LGU pages key on.
                 $this->_seedAccountWithTemporaryPassword(self::_lguEmailFor($strEmailLocalPart), [
-                    'name' => "LGU Tourism Admin ({$objMunicipality->name})",
-                    'role' => UserRole::Lgu,
-                    'organization_name' => $strOfficeName,
-                    'organization_subtitle' => $objMunicipality->name,
-                    'municipality_id' => $objMunicipality->id,
-                    'establishment_id' => null,
+                    'usr_name' => "LGU Tourism Admin ({$objMunicipality->mun_name})",
+                    'usr_role' => UserRole::Lgu,
+                    'usr_organization_name' => $strOfficeName,
+                    'usr_organization_subtitle' => $objMunicipality->mun_name,
+                    'mun_id' => $objMunicipality->mun_id,
+                    'lst_id' => null,
                 ], $strPassword);
             } // end foreach LGU account
         });
@@ -137,9 +138,9 @@ class RbacDemoAccountSeeder extends Seeder
     private function _resolveMunicipalities(): array
     {
         $arrMunicipalitiesByCode = Municipality::query()
-            ->whereIn('code', array_keys(self::LGU_ACCOUNTS))
+            ->whereIn('mun_code', array_keys(self::LGU_ACCOUNTS))
             ->get()
-            ->keyBy('code')
+            ->keyBy('mun_code')
             ->all();
 
         $arrMissingCodes = array_values(array_diff(array_keys(self::LGU_ACCOUNTS), array_keys($arrMunicipalitiesByCode)));
@@ -162,11 +163,11 @@ class RbacDemoAccountSeeder extends Seeder
     private function _assertNoConflictingLguAccounts(array $arrMunicipalitiesByCode): void
     {
         $arrConflictingEmails = User::query()
-            ->where('role', UserRole::Lgu)
-            ->where('status', '!=', 'Inactive')
-            ->whereIn('municipality_id', collect($arrMunicipalitiesByCode)->pluck('id'))
-            ->whereNotIn('email', self::lguEmailsByMunicipalityCode())
-            ->pluck('email')
+            ->where('usr_role', UserRole::Lgu)
+            ->where('usr_status', '!=', 'Inactive')
+            ->whereIn('mun_id', collect($arrMunicipalitiesByCode)->pluck('mun_id'))
+            ->whereNotIn('usr_email', self::lguEmailsByMunicipalityCode())
+            ->pluck('usr_email')
             ->all();
 
         if ($arrConflictingEmails !== []) {
@@ -185,16 +186,16 @@ class RbacDemoAccountSeeder extends Seeder
      */
     private function _seedAccountWithTemporaryPassword(string $strEmail, array $arrProfile, string $strPassword): void
     {
-        $objUser = User::query()->firstOrNew(['email' => $strEmail]);
+        $objUser = User::query()->firstOrNew(['usr_email' => $strEmail]);
 
         $objUser->fill([
             ...$arrProfile,
-            'email_verified_at' => $objUser->email_verified_at ?? now(),
-            'status' => 'Active',
+            'usr_email_verified_at' => $objUser->usr_email_verified_at ?? now(),
+            'usr_status' => 'Active',
         ]);
 
         if ($objUser->usr_password_changed_at === null) {
-            $objUser->password = $strPassword;
+            $objUser->usr_password = $strPassword;
             $objUser->usr_must_change_password = true;
         }
 
@@ -227,66 +228,66 @@ class RbacDemoAccountSeeder extends Seeder
         $intAccommodationCategoryId = Category::query()->where('cat_name', 'Accommodation')->value('cat_id');
 
         $objMatiEstablishment = Listing::query()->updateOrCreate(
-            ['slug' => 'itour-demo-establishment-mati'],
+            ['lst_slug' => 'itour-demo-establishment-mati'],
             [
-                'name' => 'iTOUR Demo Establishment (Mati)',
-                'category' => 'accommodation',
-                'municipality' => 'City of Mati',
+                'lst_name' => 'iTOUR Demo Establishment (Mati)',
+                'lst_category' => 'accommodation',
+                'lst_municipality' => 'City of Mati',
                 'cat_id' => $intAccommodationCategoryId,
-                'type' => 'Resort',
-                'municipality_id' => $objMati->id,
-                'barangay' => 'Poblacion',
-                'description' => 'RBAC demo/test fixture — not a real establishment.',
-                'status' => 'DRAFT',
+                'lst_type' => 'Resort',
+                'mun_id' => $objMati->mun_id,
+                'lst_barangay' => 'Poblacion',
+                'lst_description' => 'RBAC demo/test fixture — not a real establishment.',
+                'lst_status' => 'DRAFT',
                 // Has the demo Establishment account below, so it reports online.
-                'reporting_mode' => ReportingMethod::OnlineItour,
+                'lst_reporting_mode' => ReportingMethod::OnlineItour,
             ]
         );
 
         Listing::query()->updateOrCreate(
-            ['slug' => 'itour-demo-establishment-baganga'],
+            ['lst_slug' => 'itour-demo-establishment-baganga'],
             [
-                'name' => 'iTOUR Demo Establishment (Baganga)',
-                'category' => 'accommodation',
-                'municipality' => 'Baganga',
+                'lst_name' => 'iTOUR Demo Establishment (Baganga)',
+                'lst_category' => 'accommodation',
+                'lst_municipality' => 'Baganga',
                 'cat_id' => $intAccommodationCategoryId,
-                'type' => 'Resort',
-                'municipality_id' => $objBaganga->id,
-                'barangay' => 'Poblacion',
-                'description' => 'RBAC demo/test fixture — not a real establishment. Used to verify cross-municipality access denial.',
-                'status' => 'DRAFT',
+                'lst_type' => 'Resort',
+                'mun_id' => $objBaganga->mun_id,
+                'lst_barangay' => 'Poblacion',
+                'lst_description' => 'RBAC demo/test fixture — not a real establishment. Used to verify cross-municipality access denial.',
+                'lst_status' => 'DRAFT',
                 // No account, so its reports are encoded by the Baganga LGU.
-                'reporting_mode' => ReportingMethod::ManualPaper,
+                'lst_reporting_mode' => ReportingMethod::ManualPaper,
             ]
         );
 
         User::query()->updateOrCreate(
-            ['email' => 'tourism@itourdavor.gov.ph'],
+            ['usr_email' => 'tourism@itourdavor.gov.ph'],
             [
-                'name' => 'iTOUR PTO Demo Account',
-                'password' => $strPassword,
-                'email_verified_at' => now(),
-                'role' => UserRole::PtoAdministrator,
-                'organization_name' => 'Provincial Tourism Office',
-                'organization_subtitle' => 'Province of Davao Oriental',
-                'municipality_id' => null,
-                'establishment_id' => null,
-                'status' => 'Active',
+                'usr_name' => 'iTOUR PTO Demo Account',
+                'usr_password' => $strPassword,
+                'usr_email_verified_at' => now(),
+                'usr_role' => UserRole::PtoAdministrator,
+                'usr_organization_name' => 'Provincial Tourism Office',
+                'usr_organization_subtitle' => 'Province of Davao Oriental',
+                'mun_id' => null,
+                'lst_id' => null,
+                'usr_status' => 'Active',
             ]
         );
 
         User::query()->updateOrCreate(
-            ['email' => 'establishments@itourdavor.gov.ph'],
+            ['usr_email' => 'establishments@itourdavor.gov.ph'],
             [
-                'name' => 'iTOUR Establishment Demo Account',
-                'password' => $strPassword,
-                'email_verified_at' => now(),
-                'role' => UserRole::Establishment,
-                'organization_name' => $objMatiEstablishment->name,
-                'organization_subtitle' => "{$objMatiEstablishment->barangay}, {$objMatiEstablishment->municipality}",
-                'municipality_id' => $objMati->id,
-                'establishment_id' => $objMatiEstablishment->id,
-                'status' => 'Active',
+                'usr_name' => 'iTOUR Establishment Demo Account',
+                'usr_password' => $strPassword,
+                'usr_email_verified_at' => now(),
+                'usr_role' => UserRole::Establishment,
+                'usr_organization_name' => $objMatiEstablishment->lst_name,
+                'usr_organization_subtitle' => "{$objMatiEstablishment->lst_barangay}, {$objMatiEstablishment->lst_municipality}",
+                'mun_id' => $objMati->mun_id,
+                'lst_id' => $objMatiEstablishment->lst_id,
+                'usr_status' => 'Active',
             ]
         );
     }

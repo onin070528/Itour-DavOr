@@ -1,4 +1,11 @@
 {{--
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: Cookie and local storage notice banner.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+--}}
+{{--
     Storage & Cache Usage notice — public pages only (see x-layouts.public),
     never inside the PTO/LGU/Establishment portals. Informational only: every
     cookie/cache item listed here is essential or functional, nothing is

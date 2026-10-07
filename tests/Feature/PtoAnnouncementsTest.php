@@ -1,12 +1,20 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Tests — pto announcements.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 use App\Enums\UserRole;
 use App\Models\Announcement;
 use App\Models\User;
 
 function makePtoForAnnouncements(): User
 {
-    return User::factory()->create(['role' => UserRole::PtoAdministrator]);
+    return User::factory()->create(['usr_role' => UserRole::PtoAdministrator]);
 }
 
 test('a PTO administrator can create an announcement, which starts as an unpublished draft', function () {
@@ -61,7 +69,7 @@ test('publishing then unpublishing an announcement toggles its visibility on the
 });
 
 test('a non-PTO user cannot manage announcements', function () {
-    $lgu = User::factory()->create(['role' => UserRole::Lgu]);
+    $lgu = User::factory()->create(['usr_role' => UserRole::Lgu]);
 
     test()->actingAs($lgu)->get(route('pto.announcements.index'))->assertForbidden();
     test()->actingAs($lgu)->post(route('pto.announcements.store'), [])->assertForbidden();

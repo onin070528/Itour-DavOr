@@ -1,3 +1,10 @@
+{{--
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: PTO LGU Submissions page — one row per municipality.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+--}}
 @php
     $statusTone = fn (string $status) => match ($status) {
         'Verified' => 'success',
@@ -78,14 +85,14 @@
                         <tr
                             data-row
                             data-status="{{ $row['status'] }}"
-                            data-search-text="{{ strtolower($row['municipality']->name) }}"
+                            data-search-text="{{ strtolower($row['municipality']->mun_name) }}"
                             class="hover:bg-sand-50"
                         >
-                            <td class="px-4 py-3 font-medium text-sand-900">{{ $row['municipality']->name }}</td>
+                            <td class="px-4 py-3 font-medium text-sand-900">{{ $row['municipality']->mun_name }}</td>
                             <td class="px-4 py-3"><x-dashboard.status-badge :tone="$statusTone($row['status'])">{{ $row['status'] }}</x-dashboard.status-badge></td>
-                            <td class="px-4 py-3 text-sand-700">{{ $row['report']?->created_at?->format('M j, Y') ?? '—' }}</td>
-                            <td class="px-4 py-3 text-right font-semibold text-sand-800">{{ $row['report'] ? number_format($row['report']->total_arrivals) : '—' }}</td>
-                            <td class="px-4 py-3 text-sand-700">{{ $row['report']?->updated_at?->format('M j, Y g:i A') ?? '—' }}</td>
+                            <td class="px-4 py-3 text-sand-700">{{ $row['report']?->mrp_created_at?->format('M j, Y') ?? '—' }}</td>
+                            <td class="px-4 py-3 text-right font-semibold text-sand-800">{{ $row['report'] ? number_format($row['report']->mrp_total_arrivals) : '—' }}</td>
+                            <td class="px-4 py-3 text-sand-700">{{ $row['report']?->mrp_updated_at?->format('M j, Y g:i A') ?? '—' }}</td>
                             <td class="px-4 py-3 text-right">
                                 @if ($row['report'])
                                     <a href="{{ route('pto.municipalReports.show', $row['report']) }}" class="rounded-sm border border-sand-300 px-3 py-1.5 text-xs font-semibold text-sand-800 hover:border-primary-300">

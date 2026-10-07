@@ -29,14 +29,14 @@ class MonthlyArrivalReportPolicy
      */
     public function view(User $user, MonthlyArrivalReport $report): bool
     {
-        if ($report->status === MonthlyReportStatus::Draft) {
+        if ($report->mar_status === MonthlyReportStatus::Draft) {
             return $this->_isOwner($user, $report);
         }
 
-        return match ($user->role) {
+        return match ($user->usr_role) {
             UserRole::PtoAdministrator => true,
-            UserRole::Lgu => $report->municipality_id !== null && $report->municipality_id === $user->municipality_id,
-            UserRole::Establishment => $report->listing_id === $user->establishment_id,
+            UserRole::Lgu => $report->mun_id !== null && $report->mun_id === $user->mun_id,
+            UserRole::Establishment => $report->lst_id === $user->lst_id,
             default => false,
         };
     }
@@ -51,11 +51,11 @@ class MonthlyArrivalReportPolicy
      */
     public function update(User $user, MonthlyArrivalReport $report): bool
     {
-        $blnIsSubmittedOrVerified = in_array($report->status, [MonthlyReportStatus::Submitted, MonthlyReportStatus::ForReview, MonthlyReportStatus::Verified], true);
+        $blnIsSubmittedOrVerified = in_array($report->mar_status, [MonthlyReportStatus::Submitted, MonthlyReportStatus::ForReview, MonthlyReportStatus::Verified], true);
 
-        return $user->role === UserRole::Lgu
-            && $report->municipality_id !== null
-            && $report->municipality_id === $user->municipality_id
+        return $user->usr_role === UserRole::Lgu
+            && $report->mun_id !== null
+            && $report->mun_id === $user->mun_id
             && $blnIsSubmittedOrVerified
             && ! $this->isLocked($report);
     }
@@ -66,10 +66,10 @@ class MonthlyArrivalReportPolicy
      */
     public function startReview(User $user, MonthlyArrivalReport $report): bool
     {
-        return $user->role === UserRole::Lgu
-            && $report->municipality_id !== null
-            && $report->municipality_id === $user->municipality_id
-            && $report->status === MonthlyReportStatus::Submitted;
+        return $user->usr_role === UserRole::Lgu
+            && $report->mun_id !== null
+            && $report->mun_id === $user->mun_id
+            && $report->mar_status === MonthlyReportStatus::Submitted;
     } // end startReview
 
     /**
@@ -79,10 +79,10 @@ class MonthlyArrivalReportPolicy
      */
     public function verify(User $user, MonthlyArrivalReport $report): bool
     {
-        return $user->role === UserRole::Lgu
-            && $report->municipality_id !== null
-            && $report->municipality_id === $user->municipality_id
-            && $report->status === MonthlyReportStatus::ForReview;
+        return $user->usr_role === UserRole::Lgu
+            && $report->mun_id !== null
+            && $report->mun_id === $user->mun_id
+            && $report->mar_status === MonthlyReportStatus::ForReview;
     }
 
     /**
@@ -92,11 +92,11 @@ class MonthlyArrivalReportPolicy
      */
     public function returnForCorrection(User $user, MonthlyArrivalReport $report): bool
     {
-        return $user->role === UserRole::Lgu
-            && $report->municipality_id !== null
-            && $report->municipality_id === $user->municipality_id
-            && $report->status === MonthlyReportStatus::ForReview
-            && $report->submission_source === ReportSubmissionSource::Digital;
+        return $user->usr_role === UserRole::Lgu
+            && $report->mun_id !== null
+            && $report->mun_id === $user->mun_id
+            && $report->mar_status === MonthlyReportStatus::ForReview
+            && $report->mar_submission_source === ReportSubmissionSource::Digital;
     } // end returnForCorrection
 
     /**
@@ -105,7 +105,7 @@ class MonthlyArrivalReportPolicy
      */
     public function editDraft(User $user, MonthlyArrivalReport $report): bool
     {
-        return $this->_isOwner($user, $report) && $report->status->isEditableByOwner();
+        return $this->_isOwner($user, $report) && $report->mar_status->isEditableByOwner();
     } // end editDraft
 
     /**
@@ -126,7 +126,7 @@ class MonthlyArrivalReportPolicy
      */
     private function isLocked(MonthlyArrivalReport $report): bool
     {
-        return $report->municipalReport !== null && $report->municipalReport->status !== MunicipalReport::STATUS_RETURNED;
+        return $report->municipalReport !== null && $report->municipalReport->mrp_status !== MunicipalReport::STATUS_RETURNED;
     }
 
     /**
@@ -136,13 +136,13 @@ class MonthlyArrivalReportPolicy
      */
     private function _isOwner(User $user, MonthlyArrivalReport $report): bool
     {
-        $blnIsOwnEstablishment = $user->role === UserRole::Establishment
-            && $report->listing_id === $user->establishment_id;
-        $blnIsOwnMunicipalityLgu = $user->role === UserRole::Lgu
-            && $report->municipality_id !== null
-            && $report->municipality_id === $user->municipality_id;
+        $blnIsOwnEstablishment = $user->usr_role === UserRole::Establishment
+            && $report->lst_id === $user->lst_id;
+        $blnIsOwnMunicipalityLgu = $user->usr_role === UserRole::Lgu
+            && $report->mun_id !== null
+            && $report->mun_id === $user->mun_id;
 
-        return match ($report->submission_source) {
+        return match ($report->mar_submission_source) {
             ReportSubmissionSource::Digital => $blnIsOwnEstablishment,
             ReportSubmissionSource::ManualPaper => $blnIsOwnMunicipalityLgu,
             default => false,

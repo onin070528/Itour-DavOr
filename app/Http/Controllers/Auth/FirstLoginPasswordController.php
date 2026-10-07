@@ -39,7 +39,7 @@ class FirstLoginPasswordController extends Controller
             return redirect()->to($this->_dashboardUrlFor($objUser));
         }
 
-        return view('auth.change-password', ['email' => $objUser->email]);
+        return view('auth.change-password', ['email' => $objUser->usr_email]);
     }
 
     /**
@@ -61,7 +61,7 @@ class FirstLoginPasswordController extends Controller
             'password' => ['required', 'confirmed', Password::default()],
         ]);
 
-        if (Hash::check($arrData['password'], $objUser->password)) {
+        if (Hash::check($arrData['password'], $objUser->usr_password)) {
             throw ValidationException::withMessages([
                 'password' => 'Choose a new password. It cannot be the same as your temporary password.',
             ]);
@@ -69,12 +69,12 @@ class FirstLoginPasswordController extends Controller
 
         try {
             $objUser->forceFill([
-                'password' => $arrData['password'],
+                'usr_password' => $arrData['password'],
                 'usr_must_change_password' => false,
                 'usr_password_changed_at' => now(),
             ])->save();
         } catch (Throwable $e) {
-            Log::error('Failed to save the first-login password change.', ['exception' => $e, 'user_id' => $objUser->id]);
+            Log::error('Failed to save the first-login password change.', ['exception' => $e, 'user_id' => $objUser->usr_id]);
 
             return back()->withErrors(['password' => 'Something went wrong while saving your password. Please try again.']);
         }
@@ -90,6 +90,6 @@ class FirstLoginPasswordController extends Controller
 
     private function _dashboardUrlFor(User $objUser): string
     {
-        return $objUser->role ? route($objUser->role->dashboardRouteName()) : route('home');
+        return $objUser->usr_role ? route($objUser->usr_role->dashboardRouteName()) : route('home');
     }
 }

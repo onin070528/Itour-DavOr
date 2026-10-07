@@ -1,10 +1,12 @@
 <?php
 
-/*
- * System     : iTOUR - Integrated Tourism Information and Monitoring System
- * Purpose    : In-app notification telling an uploader the outcome of one approve-all/return-all decision on their photos.
- * Programmer : <name(s)>
- * Copyright  : 2026 University of Mindanao. All rights reserved.
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: In-app notification telling an uploader the outcome of one approve-all/return-all decision
+ * on their photos.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
  */
 
 namespace App\Notifications;
@@ -41,8 +43,8 @@ class EstablishmentImageBatchDecided extends Notification
     public function toDatabase(object $objNotifiable): array
     {
         return [
-            'listing_name' => $this->objListing->name,
-            'message' => "{$this->objListing->name}: {$this->strOutcomeMessage}",
+            'listing_name' => $this->objListing->lst_name,
+            'message' => "{$this->objListing->lst_name}: {$this->strOutcomeMessage}",
         ];
     }
 }

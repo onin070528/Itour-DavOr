@@ -25,20 +25,20 @@ return new class extends Migration
      */
     public function up(): void
     {
-        $intRecreationCategoryId = DB::table('tblcategories')->where('cat_name', 'Recreation & Activities')->value('cat_id');
+        $intRecreationCategoryId = DB::table('tbl_categories')->where('cat_name', 'Recreation & Activities')->value('cat_id');
 
         if ($intRecreationCategoryId === null) {
             return;
         }
 
-        DB::table('listings')
-            ->where('slug', self::SLUG)
-            ->where('category', 'tour-guides')
-            ->whereNull('type')
+        DB::table('tbl_listings')
+            ->where('lst_slug', self::SLUG)
+            ->where('lst_category', 'tour-guides')
+            ->whereNull('lst_type')
             ->update([
-                'category' => 'recreation-activities',
+                'lst_category' => 'recreation-activities',
                 'cat_id' => $intRecreationCategoryId,
-                'type' => 'Diving / Water Activity',
+                'lst_type' => 'Diving / Water Activity',
             ]);
     }
 
@@ -48,16 +48,16 @@ return new class extends Migration
      */
     public function down(): void
     {
-        $intTravelCategoryId = DB::table('tblcategories')->where('cat_name', 'Travel & Tours')->value('cat_id');
+        $intTravelCategoryId = DB::table('tbl_categories')->where('cat_name', 'Travel & Tours')->value('cat_id');
 
-        DB::table('listings')
-            ->where('slug', self::SLUG)
-            ->where('category', 'recreation-activities')
-            ->where('type', 'Diving / Water Activity')
+        DB::table('tbl_listings')
+            ->where('lst_slug', self::SLUG)
+            ->where('lst_category', 'recreation-activities')
+            ->where('lst_type', 'Diving / Water Activity')
             ->update([
-                'category' => 'tour-guides',
+                'lst_category' => 'tour-guides',
                 'cat_id' => $intTravelCategoryId,
-                'type' => null,
+                'lst_type' => null,
             ]);
     }
 };

@@ -1,4 +1,11 @@
-<x-layouts.public :title="$listing->name">
+{{--
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: Public listing detail page.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+--}}
+<x-layouts.public :title="$listing->lst_name">
     <div class="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
         <a href="{{ route('explore') }}" class="inline-flex items-center gap-1.5 text-sm font-semibold text-primary-700 hover:text-primary-900">
             <i class="ti ti-arrow-left" aria-hidden="true"></i>
@@ -7,7 +14,7 @@
 
         <div class="relative mt-4 h-64 overflow-hidden rounded-md bg-sand-200 sm:h-96">
             @if ($coverImageUrl)
-                <img src="{{ $coverImageUrl }}" alt="{{ $listing->name }}" class="absolute inset-0 h-full w-full object-cover">
+                <img src="{{ $coverImageUrl }}" alt="{{ $listing->lst_name }}" class="absolute inset-0 h-full w-full object-cover">
             @else
                 <div class="absolute inset-0 flex items-center justify-center bg-sand-200">
                     <i class="ti {{ $categoryIcon }} text-6xl text-sand-400" aria-hidden="true"></i>
@@ -19,27 +26,27 @@
 
         <div class="mt-6 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div>
-                <h1 class="font-display text-2xl font-bold text-sand-900 sm:text-3xl">{{ $listing->name }}</h1>
+                <h1 class="font-display text-2xl font-bold text-sand-900 sm:text-3xl">{{ $listing->lst_name }}</h1>
                 <p class="mt-1 flex items-center gap-1 text-sm font-medium text-sand-500">
                     <i class="ti ti-map-pin" aria-hidden="true"></i>
-                    {{ $listing->barangay }}, {{ $listing->municipality }}
+                    {{ $listing->lst_barangay }}, {{ $listing->lst_municipality }}
                 </p>
             </div>
-            @if ($listing->rating !== null)
+            @if ($listing->lst_rating !== null)
                 <span class="inline-flex items-center gap-1 text-sm font-semibold text-sand-800">
                     <i class="ti ti-star text-accent-500" aria-hidden="true"></i>
-                    {{ number_format((float) $listing->rating, 1) }}
+                    {{ number_format((float) $listing->lst_rating, 1) }}
                 </span>
             @endif
         </div>
 
-        @if ($listing->description)
-            <p class="mt-4 max-w-3xl text-sm leading-relaxed text-sand-700">{{ $listing->description }}</p>
+        @if ($listing->lst_description)
+            <p class="mt-4 max-w-3xl text-sm leading-relaxed text-sand-700">{{ $listing->lst_description }}</p>
         @endif
 
-        @if (! empty($listing->tags))
+        @if (! empty($listing->lst_tags))
             <div class="mt-4 flex flex-wrap gap-1.5">
-                @foreach ($listing->tags as $tag)
+                @foreach ($listing->lst_tags as $tag)
                     <span class="rounded-sm bg-sand-100 px-2 py-1 text-xs font-medium text-sand-700">{{ $tag }}</span>
                 @endforeach
             </div>
@@ -78,7 +85,7 @@
                             <a href="{{ route('establishmentImages.file', [$image, 'full']) }}" target="_blank" rel="noopener">
                                 <img
                                     src="{{ route('establishmentImages.file', [$image, 'thumbnail']) }}"
-                                    alt="{{ $image->img_alt_text ?: $listing->name }}"
+                                    alt="{{ $image->img_alt_text ?: $listing->lst_name }}"
                                     loading="lazy"
                                     class="h-32 w-full object-cover transition-transform hover:scale-105 sm:h-36"
                                 >

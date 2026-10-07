@@ -1,10 +1,12 @@
 <?php
 
-/*
- * System     : iTOUR - Integrated Tourism Information and Monitoring System
- * Purpose    : Validates the PTO "Add User" form — role-conditional municipality and establishment fields.
- * Programmer : <name(s)>
- * Copyright  : 2026 University of Mindanao. All rights reserved.
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Validates the PTO "Add User" form — role-conditional municipality and establishment
+ * fields.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
  */
 
 namespace App\Http\Requests;
@@ -35,9 +37,9 @@ class StoreUserRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')],
+            'email' => ['required', 'email', 'max:255', Rule::unique('tbl_users', 'usr_email')],
             'role' => ['required', Rule::in(array_column(UserRole::cases(), 'value'))],
-            'municipality_id' => ['required_unless:role,'.UserRole::PtoAdministrator->value, 'nullable', 'integer', 'exists:municipalities,id'],
+            'municipality_id' => ['required_unless:role,'.UserRole::PtoAdministrator->value, 'nullable', 'integer', 'exists:tbl_municipalities,mun_id'],
             'establishment_id' => ['required_if:role,'.UserRole::Establishment->value, 'nullable', 'integer'],
         ];
     }
@@ -67,9 +69,9 @@ class StoreUserRequest extends FormRequest
             }
 
             $objListing = Listing::query()
-                ->where('id', $this->input('establishment_id'))
-                ->where('municipality_id', $this->input('municipality_id'))
-                ->where('category', '!=', 'destinations')
+                ->where('lst_id', $this->input('establishment_id'))
+                ->where('mun_id', $this->input('municipality_id'))
+                ->where('lst_category', '!=', 'destinations')
                 ->whereDoesntHave('establishmentUser')
                 ->first();
 

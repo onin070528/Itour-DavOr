@@ -34,16 +34,16 @@ class UsersController extends LguController
     /**
      * Users: Establishment accounts in this municipality only.
      */
-    public function index(Request $request): View
+    public function index(Request $objRequest): View
     {
-        $users = User::query()
-            ->visibleTo($request->user())
+        $objUsers = User::query()
+            ->visibleTo($objRequest->user())
             ->with(['establishment.categoryRecord'])
-            ->orderBy('name')
+            ->orderBy('usr_name')
             ->get();
 
-        return $this->renderLgu($request, 'lgu.users', 'users', 'Users', [
-            'users' => $users,
+        return $this->renderLgu($objRequest, 'lgu.users', 'users', 'Users', [
+            'users' => $objUsers,
             'categories' => Category::query()->active()->forEstablishments()->get(),
         ]);
     }
@@ -64,33 +64,33 @@ class UsersController extends LguController
     /**
      * Edits the account itself — the account holder's name and sign-in
      * email. Establishment details are edited on the establishment page
-     * (Lgu\EstablishmentsController). Role, municipality_id,
-     * establishment_id, and status are never accepted from this endpoint.
+     * (Lgu\EstablishmentsController). Role, mun_id,
+     * lst_id, and status are never accepted from this endpoint.
      */
-    public function update(Request $request, User $user): RedirectResponse
+    public function update(Request $objRequest, User $user): RedirectResponse
     {
-        abort_unless($request->user()->can('update', $user), 403);
+        abort_unless($objRequest->user()->can('update', $user), 403);
 
-        $arrData = $request->validate([
+        $arrData = $objRequest->validate([
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user)],
+            'email' => ['required', 'email', 'max:255', Rule::unique('tbl_users', 'usr_email')->ignore($user)],
         ]);
 
         $arrBefore = $user->getOriginal();
 
         try {
             $user->update([
-                'name' => $arrData['name'],
-                'email' => $arrData['email'],
+                'usr_name' => $arrData['name'],
+                'usr_email' => $arrData['email'],
             ]);
-        } catch (\Throwable $e) {
-            Log::error('Failed to update establishment user account.', ['exception' => $e, 'user_id' => $user->id]);
+        } catch (\Throwable $objException) {
+            Log::error('Failed to update establishment user account.', ['exception' => $objException, 'user_id' => $user->usr_id]);
 
             return back()->withInput()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
 
         // OperationLogger::diff() masks the email in the log.
-        OperationLogger::updated($request->user(), 'user', $user->id, $user->municipality_id, $user->establishment_id, OperationLogger::diff($arrBefore, $user));
+        OperationLogger::updated($objRequest->user(), 'user', $user->usr_id, $user->mun_id, $user->lst_id, OperationLogger::diff($arrBefore, $user));
 
         return back()->with('toast', 'Account saved.');
     }
@@ -100,22 +100,22 @@ class UsersController extends LguController
      * automatic send failed — same pattern as Pto\UsersController's
      * equivalent, scoped to the LGU's own municipality.
      */
-    public function resendWelcomeEmail(Request $request): JsonResponse
+    public function resendWelcomeEmail(Request $objRequest): JsonResponse
     {
-        $data = $request->validate([
-            'user_id' => ['required', 'integer', 'exists:users,id'],
+        $arrData = $objRequest->validate([
+            'user_id' => ['required', 'integer', 'exists:tbl_users,usr_id'],
             'passphrase' => ['required', 'string'],
         ]);
 
-        $user = User::query()->findOrFail($data['user_id']);
-        abort_unless($request->user()->can('view', $user), 403);
+        $objUser = User::query()->findOrFail($arrData['user_id']);
+        abort_unless($objRequest->user()->can('view', $objUser), 403);
 
         try {
-            Mail::to($user->email)->send(new WelcomeAccountCreated($user, $data['passphrase']));
+            Mail::to($objUser->usr_email)->send(new WelcomeAccountCreated($objUser, $arrData['passphrase']));
 
             return response()->json(['sent' => true]);
-        } catch (\Throwable $e) {
-            Log::error('Failed to resend the welcome email.', ['exception' => $e, 'user_id' => $user->id]);
+        } catch (\Throwable $objException) {
+            Log::error('Failed to resend the welcome email.', ['exception' => $objException, 'user_id' => $objUser->usr_id]);
 
             return response()->json(['sent' => false], 500);
         }
@@ -127,35 +127,35 @@ class UsersController extends LguController
      * Online iTOUR" on the establishment, so the account and the reporting
      * method never disagree.
      */
-    public function toggleStatus(Request $request, User $user): RedirectResponse
+    public function toggleStatus(Request $objRequest, User $user): RedirectResponse
     {
         // UserPolicy::deactivate() also covers "nobody can change their own status".
-        abort_unless($request->user()->can('deactivate', $user), 403);
+        abort_unless($objRequest->user()->can('deactivate', $user), 403);
 
-        $next = $user->status === Listing::ACCOUNT_STATUS_ACTIVE ? 'Inactive' : Listing::ACCOUNT_STATUS_ACTIVE;
+        $strNext = $user->usr_status === Listing::ACCOUNT_STATUS_ACTIVE ? 'Inactive' : Listing::ACCOUNT_STATUS_ACTIVE;
         $objListing = $user->establishment;
-        $blnIsEnablingPaperEstablishment = $next === Listing::ACCOUNT_STATUS_ACTIVE
+        $blnIsEnablingPaperEstablishment = $strNext === Listing::ACCOUNT_STATUS_ACTIVE
             && $objListing !== null
             && ! $objListing->reportingMethod()->isOnline();
 
         if ($blnIsEnablingPaperEstablishment) {
             return back()
-                ->with('toast', "{$objListing->name} reports on paper. Open the establishment and choose \"Switch to Online iTOUR\" to reactivate its account.")
+                ->with('toast', "{$objListing->lst_name} reports on paper. Open the establishment and choose \"Switch to Online iTOUR\" to reactivate its account.")
                 ->with('toast_tone', 'danger');
         }
 
         try {
-            $user->update(['status' => $next]);
-        } catch (\Throwable $e) {
-            Log::error('Failed to toggle establishment user account status.', ['exception' => $e, 'user_id' => $user->id]);
+            $user->update(['usr_status' => $strNext]);
+        } catch (\Throwable $objException) {
+            Log::error('Failed to toggle establishment user account status.', ['exception' => $objException, 'user_id' => $user->usr_id]);
 
             return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
 
-        event(new UserAccountStatusChanged($request->user(), $user, $next));
+        event(new UserAccountStatusChanged($objRequest->user(), $user, $strNext));
 
-        $verb = $next === Listing::ACCOUNT_STATUS_ACTIVE ? 'enabled' : 'disabled';
+        $strVerb = $strNext === Listing::ACCOUNT_STATUS_ACTIVE ? 'enabled' : 'disabled';
 
-        return back()->with('toast', "{$user->name}'s account was {$verb}.");
+        return back()->with('toast', "{$user->usr_name}'s account was {$strVerb}.");
     }
 }

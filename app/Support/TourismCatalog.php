@@ -42,13 +42,13 @@ class TourismCatalog
     /**
      * The display label for a category slug (e.g. "accommodation" → "Accommodation").
      */
-    public static function categoryLabel(string $slug): string
+    public static function categoryLabel(string $strSlug): string
     {
         // Summary comment: slugs for the newer categories (e.g.
         // recreation-activities) only exist in exploreCategories().
-        return collect(self::categories())->firstWhere('slug', $slug)['label']
-            ?? collect(self::exploreCategories())->firstWhere('slug', $slug)['label']
-            ?? $slug;
+        return collect(self::categories())->firstWhere('slug', $strSlug)['label']
+            ?? collect(self::exploreCategories())->firstWhere('slug', $strSlug)['label']
+            ?? $strSlug;
     }
 
     /**
@@ -56,10 +56,10 @@ class TourismCatalog
      * placeholder (7E: "a neutral icon ... we own") when a listing has no
      * cover photo at all.
      */
-    public static function categoryIcon(string $slug): string
+    public static function categoryIcon(string $strSlug): string
     {
-        return collect(self::categories())->firstWhere('slug', $slug)['icon']
-            ?? collect(self::exploreCategories())->firstWhere('slug', $slug)['icon']
+        return collect(self::categories())->firstWhere('slug', $strSlug)['icon']
+            ?? collect(self::exploreCategories())->firstWhere('slug', $strSlug)['icon']
             ?? 'ti-photo';
     }
 
@@ -118,7 +118,7 @@ class TourismCatalog
 
     /**
      * Every destination and tourism establishment, in one unified shape,
-     * read from the real `listings` table (App\Models\Listing) — the DB
+     * read from the real `tbl_listings` table (App\Models\Listing) — the DB
      * rows are seeded verbatim from self::seedData() by ListingSeeder, so
      * every existing caller of listings() keeps working unchanged against
      * real, editable data instead of this static array.
@@ -134,38 +134,38 @@ class TourismCatalog
     public static function listings(): array
     {
         return Listing::query()
-            ->with(['establishmentImages' => fn ($query) => $query->where('img_status', 'PUBLISHED')])
-            ->orderBy('id')
+            ->with(['establishmentImages' => fn ($objQuery) => $objQuery->where('img_status', 'PUBLISHED')])
+            ->orderBy('lst_id')
             ->get()
-            ->map(fn ($listing) => [
-                'id' => $listing->slug,
-                'name' => $listing->name,
-                'category' => $listing->category,
-                'municipality' => $listing->municipality,
-                'barangay' => $listing->barangay,
-                'lat' => $listing->lat,
-                'lng' => $listing->lng,
-                'description' => $listing->description,
-                'rating' => $listing->rating !== null ? (float) $listing->rating : null,
-                'tags' => $listing->tags ?? [],
-                'image' => $listing->image,
-                'displayImageUrl' => $listing->publicCoverImageUrl(),
-                'categoryIcon' => self::categoryIcon($listing->category),
-                'contactOffice' => $listing->contact_office,
-                'contactPhone' => $listing->contact_phone,
-                'hours' => $listing->hours,
-                'href' => route('listings.show', $listing->slug),
-                'status' => $listing->status,
-                'isPubliclyVisible' => $listing->isPubliclyVisible(),
-                'email' => $listing->email,
-                'website' => $listing->website,
+            ->map(fn ($objListing) => [
+                'id' => $objListing->lst_slug,
+                'name' => $objListing->lst_name,
+                'category' => $objListing->lst_category,
+                'municipality' => $objListing->lst_municipality,
+                'barangay' => $objListing->lst_barangay,
+                'lat' => $objListing->lst_lat,
+                'lng' => $objListing->lst_lng,
+                'description' => $objListing->lst_description,
+                'rating' => $objListing->lst_rating !== null ? (float) $objListing->lst_rating : null,
+                'tags' => $objListing->lst_tags ?? [],
+                'image' => $objListing->lst_image,
+                'displayImageUrl' => $objListing->publicCoverImageUrl(),
+                'categoryIcon' => self::categoryIcon($objListing->lst_category),
+                'contactOffice' => $objListing->lst_contact_office,
+                'contactPhone' => $objListing->lst_contact_phone,
+                'hours' => $objListing->lst_hours,
+                'href' => route('listings.show', $objListing->lst_slug),
+                'status' => $objListing->lst_status,
+                'isPubliclyVisible' => $objListing->isPubliclyVisible(),
+                'email' => $objListing->lst_email,
+                'website' => $objListing->lst_website,
             ])
             ->all();
     }
 
     /**
      * The original, hand-authored listing content — the seed data
-     * ListingSeeder loads into the `listings` table. Not used for reads
+     * ListingSeeder loads into the `tbl_listings` table. Not used for reads
      * anymore (see listings() above); kept here so the content itself has
      * exactly one authored source.
      *
@@ -425,12 +425,12 @@ class TourismCatalog
      * LGU/PTO management tables also read — archived listings are filtered
      * out here.
      */
-    public static function featuredDestinations(int $limit = 8): array
+    public static function featuredDestinations(int $intLimit = 8): array
     {
         return collect(self::listings())
             ->where('category', 'destinations')
             ->where('isPubliclyVisible', true)
-            ->take($limit)
+            ->take($intLimit)
             ->all();
     }
 
@@ -440,12 +440,12 @@ class TourismCatalog
      * FOR_PTO_REVIEW/UNPUBLISHED/Archived establishments aren't yet meant to
      * be publicly visible (see App\Services\ListingPublishWorkflow).
      */
-    public static function featuredEstablishments(int $limit = 6): array
+    public static function featuredEstablishments(int $intLimit = 6): array
     {
         return collect(self::listings())
             ->where('category', '!=', 'destinations')
             ->where('isPubliclyVisible', true)
-            ->take($limit)
+            ->take($intLimit)
             ->all();
     }
 
@@ -460,7 +460,7 @@ class TourismCatalog
      */
     public static function signatureExperiences(): array
     {
-        $order = [
+        $arrOrder = [
             'dahican-beach',
             'aliwagwag-falls',
             'hamiguitan',
@@ -469,12 +469,12 @@ class TourismCatalog
             'pasalubong-center',
         ];
 
-        $byId = collect(self::listings())
+        $objById = collect(self::listings())
             ->where('isPubliclyVisible', true)
             ->keyBy('id');
 
-        return collect($order)
-            ->map(fn (string $id) => $byId->get($id))
+        return collect($arrOrder)
+            ->map(fn (string $strId) => $objById->get($strId))
             ->filter()
             ->values()
             ->all();

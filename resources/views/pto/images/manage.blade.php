@@ -1,12 +1,13 @@
 {{--
-    System     : iTOUR - Integrated Tourism Information and Monitoring System
-    Purpose    : PTO photo management for any establishment, province-wide.
-    Programmer : <name(s)>
-    Copyright  : 2026 University of Mindanao. All rights reserved.
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: PTO photo management for any establishment, province-wide.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
 --}}
 <x-layouts.dashboard :user="$user" :nav-sections="$navSections" :page-title="$pageTitle" account-heading="System" :settings-href="route('pto.settings')">
     <x-dashboard.page-header
-        :title="$listing->name.' — Photos'"
+        :title="$listing->lst_name.' — Photos'"
         description="Uploads made here publish immediately. Removing, setting a cover, and reordering apply immediately."
     >
         <x-slot:actions>

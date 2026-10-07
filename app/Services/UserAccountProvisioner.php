@@ -26,7 +26,7 @@ class UserAccountProvisioner
     /**
      * Creates the account in one transaction with a freshly generated
      * passphrase, fires the audit event, and attempts the welcome email.
-     * $attributes must NOT include 'password' or 'usr_must_change_password'
+     * $arrAttributes must NOT include 'password' or 'usr_must_change_password'
      * — this method owns both. Returns the new User, the plain-text
      * passphrase (for the one-time confirmation panel only — never
      * persisted, never logged), and whether the welcome email went out.
@@ -36,12 +36,12 @@ class UserAccountProvisioner
      * createWithPassphrase() and notifyCreated() instead — see
      * Lgu\UsersController::store().
      *
-     * @param  array<string, mixed>  $attributes
+     * @param  array<string, mixed>  $arrAttributes
      * @return array{user: User, passphrase: string, emailSent: bool}
      */
-    public function provision(User $objActor, array $attributes): array
+    public function provision(User $objActor, array $arrAttributes): array
     {
-        $arrCreated = DB::transaction(fn () => $this->createWithPassphrase($attributes));
+        $arrCreated = DB::transaction(fn () => $this->createWithPassphrase($arrAttributes));
 
         $blnEmailSent = $this->notifyCreated($objActor, $arrCreated['user'], $arrCreated['passphrase']);
 
@@ -55,15 +55,15 @@ class UserAccountProvisioner
      * to), so a failure anywhere in that transaction leaves nothing
      * orphaned.
      *
-     * @param  array<string, mixed>  $attributes
+     * @param  array<string, mixed>  $arrAttributes
      * @return array{user: User, passphrase: string}
      */
-    public function createWithPassphrase(array $attributes): array
+    public function createWithPassphrase(array $arrAttributes): array
     {
         $strPassphrase = PassphraseGenerator::generate();
 
-        $objUser = User::query()->create(array_merge($attributes, [
-            'password' => $strPassphrase,
+        $objUser = User::query()->create(array_merge($arrAttributes, [
+            'usr_password' => $strPassphrase,
             'usr_must_change_password' => true,
         ]));
 
@@ -89,11 +89,11 @@ class UserAccountProvisioner
     private function _sendWelcomeEmail(User $objUser, string $strPassphrase): bool
     {
         try {
-            Mail::to($objUser->email)->send(new WelcomeAccountCreated($objUser, $strPassphrase));
+            Mail::to($objUser->usr_email)->send(new WelcomeAccountCreated($objUser, $strPassphrase));
 
             return true;
-        } catch (Throwable $e) {
-            Log::error('Failed to send the welcome email for a new account.', ['exception' => $e, 'user_id' => $objUser->id]);
+        } catch (Throwable $objException) {
+            Log::error('Failed to send the welcome email for a new account.', ['exception' => $objException, 'user_id' => $objUser->usr_id]);
 
             return false;
         }

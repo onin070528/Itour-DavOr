@@ -19,32 +19,32 @@ use Illuminate\View\View;
 
 class ReportVerificationController extends Controller
 {
-    public function show(Request $request): View
+    public function show(Request $objRequest): View
     {
-        $code = trim((string) $request->query('code'));
-        $result = null;
-        $notFound = false;
+        $strCode = trim((string) $objRequest->query('code'));
+        $arrResult = null;
+        $blnNotFound = false;
 
-        if ($code !== '') {
-            $report = MunicipalReport::query()->where('verification_code', $code)->first();
+        if ($strCode !== '') {
+            $objReport = MunicipalReport::query()->where('mrp_verification_code', $strCode)->first();
 
-            if ($report) {
-                $result = [
-                    'reference_number' => sprintf('MRP-%06d', $report->id),
-                    'municipality' => $report->municipality,
-                    'period_label' => $report->period_start->format('F Y'),
-                    'status_label' => MunicipalReportsController::statusLabel($report->status),
-                    'verified_at' => $report->reviewed_at?->format('F j, Y'),
+            if ($objReport) {
+                $arrResult = [
+                    'reference_number' => sprintf('MRP-%06d', $objReport->mrp_id),
+                    'municipality' => $objReport->mrp_municipality,
+                    'period_label' => $objReport->mrp_period_start->format('F Y'),
+                    'status_label' => MunicipalReportsController::statusLabel($objReport->mrp_status),
+                    'verified_at' => $objReport->mrp_reviewed_at?->format('F j, Y'),
                 ];
             } else {
-                $notFound = true;
+                $blnNotFound = true;
             }
         }
 
         return view('verify-report', [
-            'code' => $code,
-            'result' => $result,
-            'notFound' => $notFound,
+            'code' => $strCode,
+            'result' => $arrResult,
+            'notFound' => $blnNotFound,
         ]);
     }
 }

@@ -11,21 +11,27 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['listing_id', 'path', 'caption', 'is_primary', 'sort_order'])]
+#[Table('tbl_listing_images', key: 'lsi_id')]
+#[Fillable(['lst_id', 'lsi_path', 'lsi_caption', 'lsi_is_primary', 'lsi_sort_order'])]
 class ListingImage extends Model
 {
+    public const CREATED_AT = 'lsi_created_at';
+
+    public const UPDATED_AT = 'lsi_updated_at';
+
     protected function casts(): array
     {
         return [
-            'is_primary' => 'boolean',
+            'lsi_is_primary' => 'boolean',
         ];
     }
 
     public function listing(): BelongsTo
     {
-        return $this->belongsTo(Listing::class);
+        return $this->belongsTo(Listing::class, 'lst_id', 'lst_id');
     }
 }

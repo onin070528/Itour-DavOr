@@ -63,19 +63,19 @@
                     @endphp
                     <tr class="hover:bg-sand-50">
                         <td class="px-4 py-3">
-                            <p class="font-medium text-sand-900">{{ $row['listing']->name }}</p>
+                            <p class="font-medium text-sand-900">{{ $row['listing']->lst_name }}</p>
                             <p class="text-xs text-sand-500">{{ $row['listing']->categoryName() }}</p>
                         </td>
                         <td class="px-4 py-3"><x-dashboard.status-badge :tone="$statusTone($strStatus)">{{ $strStatus }}</x-dashboard.status-badge></td>
                         <td class="px-4 py-3 text-sand-700">
-                            @if ($report?->submitted_at)
-                                {{ $report->submitted_at->format('M j, Y') }}
-                                <span class="block text-xs text-sand-500">{{ $report->submitter->name ?? '—' }}</span>
+                            @if ($report?->mar_submitted_at)
+                                {{ $report->mar_submitted_at->format('M j, Y') }}
+                                <span class="block text-xs text-sand-500">{{ $report->submitter->usr_name ?? '—' }}</span>
                             @else
                                 —
                             @endif
                         </td>
-                        <td class="px-4 py-3 text-right font-semibold text-sand-800">{{ $report ? number_format($report->total_visitors) : '—' }}</td>
+                        <td class="px-4 py-3 text-right font-semibold text-sand-800">{{ $report ? number_format($report->mar_total_visitors) : '—' }}</td>
                         <td class="px-4 py-3 text-right">
                             @if ($row['draftInProgress'])
                                 <span class="text-xs text-sand-500">Draft from when it reported online</span>
@@ -83,7 +83,7 @@
                                 <a href="{{ route('lgu.monthlyReports.manualEntry', ['listing' => $row['listing'], 'period' => $period]) }}" class="btn-primary btn-small">
                                     <i class="ti ti-pencil" aria-hidden="true"></i> Encode
                                 </a>
-                            @elseif ($report->status === \App\Enums\MonthlyReportStatus::Draft)
+                            @elseif ($report->mar_status === \App\Enums\MonthlyReportStatus::Draft)
                                 <div class="inline-flex items-center gap-2">
                                     <a href="{{ route('lgu.monthlyReports.manualEntry', ['listing' => $row['listing'], 'period' => $period]) }}" class="btn-secondary btn-small">Continue draft</a>
                                     <a href="{{ route('lgu.monthlyReports.show', ['monthlyArrivalReport' => $report, 'view' => 'a4']) }}" class="btn-primary btn-small">Preview &amp; submit</a>

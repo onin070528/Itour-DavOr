@@ -13,6 +13,7 @@ use App\Models\Listing;
 use App\Services\AttractionRecordService;
 use App\Support\SecurityLogger;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Str;
 
 /**
  * Used by Lgu\AttractionsController::store() and ::update(). There is no
@@ -32,7 +33,7 @@ class SaveAttractionRequest extends FormRequest
     {
         $objUser = $this->user();
 
-        if ($objUser === null || ! $objUser->isLgu() || $objUser->municipality_id === null) {
+        if ($objUser === null || ! $objUser->isLgu() || $objUser->mun_id === null) {
             return false;
         }
 
@@ -42,10 +43,10 @@ class SaveAttractionRequest extends FormRequest
             return true;
         }
 
-        $blnIsOwnMunicipality = $objListing->municipality_id !== null && $objListing->municipality_id === $objUser->municipality_id;
+        $blnIsOwnMunicipality = $objListing->mun_id !== null && $objListing->mun_id === $objUser->mun_id;
 
         if (! $blnIsOwnMunicipality) {
-            SecurityLogger::accessDenied($objUser, 'municipality_scope', Listing::class, $objListing->municipality_id);
+            SecurityLogger::accessDenied($objUser, 'municipality_scope', Listing::class, $objListing->mun_id);
 
             return false;
         }
@@ -77,7 +78,8 @@ class SaveAttractionRequest extends FormRequest
 
         // Summary comment: public destination content stays as submitted while the PTO reviews it.
         if ($objListing !== null && $objListing->hasLockedPublicContent()) {
-            $arrRules = array_diff_key($arrRules, array_flip(Listing::PUBLIC_CONTENT_FIELDS));
+            $arrLockedFields = array_map(fn (string $strField) => Str::startsWith($strField, 'lst_') ? Str::after($strField, 'lst_') : $strField, Listing::PUBLIC_CONTENT_FIELDS);
+            $arrRules = array_diff_key($arrRules, array_flip($arrLockedFields));
         }
 
         // Summary comment: the Photos section exists on the Add form only —

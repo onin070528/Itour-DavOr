@@ -1,5 +1,13 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Tests — audit logs export.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 use App\Enums\UserRole;
 use App\Models\Listing;
 use App\Models\Municipality;
@@ -8,10 +16,10 @@ use App\Models\SecurityLog;
 use App\Models\User;
 
 test('PTO can export security logs as a CSV containing only role-scoped rows', function () {
-    $mati = Municipality::query()->firstOrCreate(['code' => 'MATI'], ['name' => 'City of Mati']);
-    $pto = User::factory()->create(['role' => UserRole::PtoAdministrator]);
-    $lgu = User::factory()->create(['role' => UserRole::Lgu, 'name' => 'Exportable Lgu Officer', 'municipality_id' => $mati->id]);
-    SecurityLog::factory()->create(['user_id' => $lgu->id, 'municipality_id' => $mati->id]);
+    $mati = Municipality::query()->firstOrCreate(['mun_code' => 'MATI'], ['mun_name' => 'City of Mati']);
+    $pto = User::factory()->create(['usr_role' => UserRole::PtoAdministrator]);
+    $lgu = User::factory()->create(['usr_role' => UserRole::Lgu, 'usr_name' => 'Exportable Lgu Officer', 'mun_id' => $mati->mun_id]);
+    SecurityLog::factory()->create(['usr_id' => $lgu->usr_id, 'mun_id' => $mati->mun_id]);
 
     $response = test()->actingAs($pto)->get(route('pto.auditLogs.export', ['tab' => 'security']));
 
@@ -23,33 +31,33 @@ test('PTO can export security logs as a CSV containing only role-scoped rows', f
 });
 
 test('an export records its own export_report operation log entry', function () {
-    $mati = Municipality::query()->firstOrCreate(['code' => 'MATI'], ['name' => 'City of Mati']);
-    $pto = User::factory()->create(['role' => UserRole::PtoAdministrator, 'municipality_id' => null]);
+    $mati = Municipality::query()->firstOrCreate(['mun_code' => 'MATI'], ['mun_name' => 'City of Mati']);
+    $pto = User::factory()->create(['usr_role' => UserRole::PtoAdministrator, 'mun_id' => null]);
     SecurityLog::factory()->create();
 
     test()->actingAs($pto)->get(route('pto.auditLogs.export', ['tab' => 'security']))->assertOk()->streamedContent();
 
-    $log = OperationLog::where('action', 'export_report')->where('user_id', $pto->id)->first();
+    $log = OperationLog::where('opl_action', 'export_report')->where('usr_id', $pto->usr_id)->first();
     expect($log)->not->toBeNull();
-    expect($log->entity_type)->toBe('security_log');
-    expect($log->new_values['row_count'])->toBeInt();
+    expect($log->opl_entity_type)->toBe('security_log');
+    expect($log->opl_new_values['row_count'])->toBeInt();
 });
 
 test('an LGU export only contains rows from its own municipality', function () {
-    $mati = Municipality::query()->firstOrCreate(['code' => 'MATI'], ['name' => 'City of Mati']);
-    $baganga = Municipality::query()->firstOrCreate(['code' => 'BAG'], ['name' => 'Baganga']);
-    $matiLgu = User::factory()->create(['role' => UserRole::Lgu, 'municipality_id' => $mati->id]);
+    $mati = Municipality::query()->firstOrCreate(['mun_code' => 'MATI'], ['mun_name' => 'City of Mati']);
+    $baganga = Municipality::query()->firstOrCreate(['mun_code' => 'BAG'], ['mun_name' => 'Baganga']);
+    $matiLgu = User::factory()->create(['usr_role' => UserRole::Lgu, 'mun_id' => $mati->mun_id]);
     $bagangaListing = Listing::query()->create([
-        'slug' => 'baganga-export-test',
-        'name' => 'Baganga Export Test Inn',
-        'category' => 'accommodation',
-        'municipality' => 'Baganga',
-        'municipality_id' => $baganga->id,
-        'barangay' => 'Poblacion',
-        'status' => 'PUBLISHED',
+        'lst_slug' => 'baganga-export-test',
+        'lst_name' => 'Baganga Export Test Inn',
+        'lst_category' => 'accommodation',
+        'lst_municipality' => 'Baganga',
+        'mun_id' => $baganga->mun_id,
+        'lst_barangay' => 'Poblacion',
+        'lst_status' => 'PUBLISHED',
     ]);
-    OperationLog::factory()->create(['municipality_id' => $mati->id, 'action' => 'update', 'entity_type' => 'destination', 'entity_id' => 1]);
-    OperationLog::factory()->create(['municipality_id' => $baganga->id, 'establishment_id' => $bagangaListing->id, 'action' => 'update', 'entity_type' => 'establishment', 'entity_id' => $bagangaListing->id]);
+    OperationLog::factory()->create(['mun_id' => $mati->mun_id, 'opl_action' => 'update', 'opl_entity_type' => 'destination', 'opl_entity_id' => 1]);
+    OperationLog::factory()->create(['mun_id' => $baganga->mun_id, 'lst_id' => $bagangaListing->lst_id, 'opl_action' => 'update', 'opl_entity_type' => 'establishment', 'opl_entity_id' => $bagangaListing->lst_id]);
 
     $response = test()->actingAs($matiLgu)->get(route('lgu.auditLogs.export', ['tab' => 'operation']));
 
@@ -59,9 +67,9 @@ test('an LGU export only contains rows from its own municipality', function () {
 });
 
 test('export is capped and respects the same filters shown on the page', function () {
-    $pto = User::factory()->create(['role' => UserRole::PtoAdministrator]);
-    SecurityLog::factory()->create(['event_type' => 'login_success']);
-    SecurityLog::factory()->create(['event_type' => 'login_failed']);
+    $pto = User::factory()->create(['usr_role' => UserRole::PtoAdministrator]);
+    SecurityLog::factory()->create(['sec_event_type' => 'login_success']);
+    SecurityLog::factory()->create(['sec_event_type' => 'login_failed']);
 
     $response = test()->actingAs($pto)->get(route('pto.auditLogs.export', ['tab' => 'security', 'event_type' => 'login_failed']));
 

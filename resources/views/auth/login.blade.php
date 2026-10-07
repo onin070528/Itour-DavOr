@@ -1,3 +1,10 @@
+{{--
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: Sign-in page for PTO, LGU and Establishment accounts.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+--}}
 <x-layouts.auth title="Sign In">
     <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 

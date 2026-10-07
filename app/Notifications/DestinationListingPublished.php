@@ -40,11 +40,11 @@ class DestinationListingPublished extends Notification
     public function toDatabase(object $objNotifiable): array
     {
         return [
-            'listing_id' => $this->objListing->id,
-            'listing_name' => $this->objListing->name,
+            'listing_id' => $this->objListing->lst_id,
+            'listing_name' => $this->objListing->lst_name,
             'message' => $this->blnIsChangeRequest
-                ? "PTO approved the changes to \"{$this->objListing->name}\". They are now live."
-                : "PTO approved and published \"{$this->objListing->name}\" as a tourist destination.",
+                ? "PTO approved the changes to \"{$this->objListing->lst_name}\". They are now live."
+                : "PTO approved and published \"{$this->objListing->lst_name}\" as a tourist destination.",
             // Relative, so the bell only ever redirects within iTOUR.
             'url' => $this->objListing->lguDetailsPath(),
         ];

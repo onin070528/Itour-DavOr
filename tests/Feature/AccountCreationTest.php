@@ -1,10 +1,11 @@
 <?php
 
-/*
- * System     : iTOUR - Integrated Tourism Information and Monitoring System
- * Purpose    : Sub-stage B verification — the rebuilt Add User modal, passphrase, and welcome email.
- * Programmer : <name(s)>
- * Copyright  : 2026 University of Mindanao. All rights reserved.
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Sub-stage B verification — the rebuilt Add User modal, passphrase, and welcome email.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
  */
 
 use App\Enums\UserRole;
@@ -19,12 +20,12 @@ use Illuminate\Support\Str;
 
 function accountCreationMunicipalityFixture(string $name, string $code): Municipality
 {
-    return Municipality::query()->firstOrCreate(['code' => $code], ['name' => $name]);
+    return Municipality::query()->firstOrCreate(['mun_code' => $code], ['mun_name' => $name]);
 }
 
 function accountCreationPtoFixture(): User
 {
-    return User::factory()->create(['role' => UserRole::PtoAdministrator]);
+    return User::factory()->create(['usr_role' => UserRole::PtoAdministrator]);
 }
 
 function accountCreationUnassignedEstablishmentFixture(Municipality $municipality, string $name): Listing
@@ -35,14 +36,14 @@ function accountCreationUnassignedEstablishmentFixture(Municipality $municipalit
     );
 
     return Listing::query()->create([
-        'slug' => Str::slug($name.'-'.Str::random(6)),
-        'name' => $name,
-        'category' => 'accommodation',
+        'lst_slug' => Str::slug($name.'-'.Str::random(6)),
+        'lst_name' => $name,
+        'lst_category' => 'accommodation',
         'cat_id' => $category->cat_id,
-        'municipality' => $municipality->name,
-        'municipality_id' => $municipality->id,
-        'barangay' => 'Poblacion',
-        'status' => 'PUBLISHED',
+        'lst_municipality' => $municipality->mun_name,
+        'mun_id' => $municipality->mun_id,
+        'lst_barangay' => 'Poblacion',
+        'lst_status' => 'PUBLISHED',
     ]);
 }
 
@@ -55,15 +56,15 @@ test('PTO creating an LGU account generates a passphrase, hashes it, and require
         'name' => 'New LGU Officer',
         'email' => 'lgu.officer@example.test',
         'role' => UserRole::Lgu->value,
-        'municipality_id' => $cateel->id,
+        'municipality_id' => $cateel->mun_id,
     ])->assertRedirect();
 
-    $created = User::query()->where('email', 'lgu.officer@example.test')->first();
+    $created = User::query()->where('usr_email', 'lgu.officer@example.test')->first();
     expect($created)->not->toBeNull();
     expect($created->usr_must_change_password)->toBeTrue();
     expect($created->usr_password_changed_at)->toBeNull();
     // The stored value is a bcrypt/argon hash, never the plain passphrase.
-    expect($created->password)->not->toContain('-'.date('Y'));
+    expect($created->usr_password)->not->toContain('-'.date('Y'));
 });
 
 test('creating an establishment account requires an establishment belonging to the chosen municipality with no linked account', function () {
@@ -77,25 +78,25 @@ test('creating an establishment account requires an establishment belonging to t
         'name' => 'Front Desk',
         'email' => 'frontdesk@baganga-inn.test',
         'role' => UserRole::Establishment->value,
-        'municipality_id' => $mati->id,
-        'establishment_id' => $listingInBaganga->id,
+        'municipality_id' => $mati->mun_id,
+        'establishment_id' => $listingInBaganga->lst_id,
     ])->assertSessionHasErrors('establishment_id');
 
-    expect(User::query()->where('email', 'frontdesk@baganga-inn.test')->exists())->toBeFalse();
+    expect(User::query()->where('usr_email', 'frontdesk@baganga-inn.test')->exists())->toBeFalse();
 });
 
 test('an establishment already linked to a user cannot be assigned again', function () {
     $mati = accountCreationMunicipalityFixture('City of Mati', 'MATI');
     $listing = accountCreationUnassignedEstablishmentFixture($mati, 'Already Linked Inn');
-    User::factory()->create(['role' => UserRole::Establishment, 'establishment_id' => $listing->id, 'municipality_id' => $mati->id]);
+    User::factory()->create(['usr_role' => UserRole::Establishment, 'lst_id' => $listing->lst_id, 'mun_id' => $mati->mun_id]);
     $pto = accountCreationPtoFixture();
 
     test()->actingAs($pto)->post(route('pto.users.store'), [
         'name' => 'Second Front Desk',
         'email' => 'second@already-linked-inn.test',
         'role' => UserRole::Establishment->value,
-        'municipality_id' => $mati->id,
-        'establishment_id' => $listing->id,
+        'municipality_id' => $mati->mun_id,
+        'establishment_id' => $listing->lst_id,
     ])->assertSessionHasErrors('establishment_id');
 });
 
@@ -104,11 +105,11 @@ test('the AJAX establishments endpoint returns only unassigned establishments in
     $baganga = accountCreationMunicipalityFixture('Baganga', 'BAG');
     $unassigned = accountCreationUnassignedEstablishmentFixture($mati, 'Unassigned Mati Inn');
     $assigned = accountCreationUnassignedEstablishmentFixture($mati, 'Assigned Mati Inn');
-    User::factory()->create(['role' => UserRole::Establishment, 'establishment_id' => $assigned->id, 'municipality_id' => $mati->id]);
+    User::factory()->create(['usr_role' => UserRole::Establishment, 'lst_id' => $assigned->lst_id, 'mun_id' => $mati->mun_id]);
     $elsewhere = accountCreationUnassignedEstablishmentFixture($baganga, 'Baganga Inn');
     $pto = accountCreationPtoFixture();
 
-    $response = test()->actingAs($pto)->getJson(route('pto.users.availableEstablishments', ['municipality_id' => $mati->id]));
+    $response = test()->actingAs($pto)->getJson(route('pto.users.availableEstablishments', ['municipality_id' => $mati->mun_id]));
 
     $response->assertOk();
     $names = collect($response->json('establishments'))->pluck('name');
@@ -127,7 +128,7 @@ test('a missing required field shows an error for that field and does not create
         // municipality_id omitted — required for the Lgu role.
     ])->assertSessionHasErrors(['name', 'municipality_id']);
 
-    expect(User::query()->where('email', 'incomplete@example.test')->exists())->toBeFalse();
+    expect(User::query()->where('usr_email', 'incomplete@example.test')->exists())->toBeFalse();
 });
 
 test('the welcome email is sent with the passphrase when mail is configured', function () {
@@ -139,11 +140,11 @@ test('the welcome email is sent with the passphrase when mail is configured', fu
         'name' => 'Mail Test Officer',
         'email' => 'mail-test@example.test',
         'role' => UserRole::Lgu->value,
-        'municipality_id' => $cateel->id,
+        'municipality_id' => $cateel->mun_id,
     ]);
 
     Mail::assertSent(WelcomeAccountCreated::class, function (WelcomeAccountCreated $mail) {
-        return $mail->objUser->email === 'mail-test@example.test' && $mail->strPassphrase !== '';
+        return $mail->objUser->usr_email === 'mail-test@example.test' && $mail->strPassphrase !== '';
     });
 });
 
@@ -155,7 +156,7 @@ test('the confirmation panel shows the passphrase once and a reload does not sho
         'name' => 'Once Only Officer',
         'email' => 'once-only@example.test',
         'role' => UserRole::Lgu->value,
-        'municipality_id' => $cateel->id,
+        'municipality_id' => $cateel->mun_id,
     ]);
 
     $firstLoad = test()->actingAs($pto)->get(route('pto.users'));
@@ -175,11 +176,11 @@ test('account creation records an account_created security log entry with no pas
         'name' => 'Audit Log Officer',
         'email' => 'audit-log@example.test',
         'role' => UserRole::Lgu->value,
-        'municipality_id' => $cateel->id,
+        'municipality_id' => $cateel->mun_id,
     ]);
 
-    $created = User::query()->where('email', 'audit-log@example.test')->first();
-    $log = SecurityLog::where('event_type', 'account_created')->where('target_user_id', $created->id)->first();
+    $created = User::query()->where('usr_email', 'audit-log@example.test')->first();
+    $log = SecurityLog::where('sec_event_type', 'account_created')->where('sec_target_user_id', $created->usr_id)->first();
 
     expect($log)->not->toBeNull();
     expect(json_encode($log->toArray()))->not->toContain('-'.date('Y'));
@@ -187,25 +188,25 @@ test('account creation records an account_created security log entry with no pas
 
 test('LGU cannot reach the PTO-only account-creation route to create a PTO or LGU account', function () {
     $mati = accountCreationMunicipalityFixture('City of Mati', 'MATI');
-    $lgu = User::factory()->create(['role' => UserRole::Lgu, 'municipality_id' => $mati->id]);
+    $lgu = User::factory()->create(['usr_role' => UserRole::Lgu, 'mun_id' => $mati->mun_id]);
 
     test()->actingAs($lgu)->post(route('pto.users.store'), [
         'name' => 'Sneaky',
         'email' => 'sneaky-lgu-attempt@example.test',
         'role' => UserRole::Lgu->value,
-        'municipality_id' => $mati->id,
+        'municipality_id' => $mati->mun_id,
     ])->assertForbidden();
 
-    expect(User::query()->where('email', 'sneaky-lgu-attempt@example.test')->exists())->toBeFalse();
+    expect(User::query()->where('usr_email', 'sneaky-lgu-attempt@example.test')->exists())->toBeFalse();
 });
 
 test('LGU cannot assign an establishment account to another municipality — municipality always comes from the establishment itself', function () {
     $mati = accountCreationMunicipalityFixture('City of Mati', 'MATI');
     $baganga = accountCreationMunicipalityFixture('Baganga', 'BAG');
     $lgu = User::factory()->create([
-        'role' => UserRole::Lgu,
-        'organization_subtitle' => 'City of Mati',
-        'municipality_id' => $mati->id,
+        'usr_role' => UserRole::Lgu,
+        'usr_organization_subtitle' => 'City of Mati',
+        'mun_id' => $mati->mun_id,
     ]);
     $listing = accountCreationUnassignedEstablishmentFixture($mati, 'Cross-Municipality Inn');
     $otherListing = accountCreationUnassignedEstablishmentFixture($baganga, 'Baganga Inn');
@@ -216,13 +217,13 @@ test('LGU cannot assign an establishment account to another municipality — mun
         // The account form has no municipality or establishment field at
         // all — this attempts the closest forgeable equivalent and confirms
         // it's ignored, not merely absent from the form.
-        'municipality_id' => $baganga->id,
-        'establishment_id' => $otherListing->id,
+        'municipality_id' => $baganga->mun_id,
+        'establishment_id' => $otherListing->lst_id,
     ])->assertRedirect()->assertSessionHasNoErrors();
 
-    $created = User::query()->where('email', 'cross-municipality@example.test')->first();
-    expect($created->municipality_id)->toBe($mati->id);
-    expect($created->establishment_id)->toBe($listing->id);
+    $created = User::query()->where('usr_email', 'cross-municipality@example.test')->first();
+    expect($created->mun_id)->toBe($mati->mun_id);
+    expect($created->lst_id)->toBe($listing->lst_id);
     expect($otherListing->fresh()->establishmentUser)->toBeNull();
 });
 
@@ -230,9 +231,9 @@ test('LGU activating an establishment account also gets a passphrase and must_ch
     Mail::fake();
     $mati = accountCreationMunicipalityFixture('City of Mati', 'MATI');
     $lgu = User::factory()->create([
-        'role' => UserRole::Lgu,
-        'organization_subtitle' => 'City of Mati',
-        'municipality_id' => $mati->id,
+        'usr_role' => UserRole::Lgu,
+        'usr_organization_subtitle' => 'City of Mati',
+        'mun_id' => $mati->mun_id,
     ]);
     $listing = accountCreationUnassignedEstablishmentFixture($mati, 'LGU-Registered Inn');
 
@@ -241,7 +242,7 @@ test('LGU activating an establishment account also gets a passphrase and must_ch
         'account_email' => 'lgu-registered@example.test',
     ])->assertRedirect()->assertSessionHasNoErrors()->assertSessionHas('accountCreated.passphrase');
 
-    $created = User::query()->where('email', 'lgu-registered@example.test')->first();
+    $created = User::query()->where('usr_email', 'lgu-registered@example.test')->first();
     expect($created->usr_must_change_password)->toBeTrue();
     Mail::assertSent(WelcomeAccountCreated::class);
 });

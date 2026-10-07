@@ -33,14 +33,14 @@ class DestinationReviewsController extends PtoController
      * @var array<string, string>
      */
     private const FIELD_LABELS = [
-        'name' => 'Name',
+        'lst_name' => 'Name',
         'cat_id' => 'Category',
-        'type' => 'Type',
-        'category_note' => 'Category note',
-        'barangay' => 'Barangay / Address',
-        'lat' => 'Latitude',
-        'lng' => 'Longitude',
-        'description' => 'Description',
+        'lst_type' => 'Type',
+        'lst_category_note' => 'Category note',
+        'lst_barangay' => 'Barangay / Address',
+        'lst_lat' => 'Latitude',
+        'lst_lng' => 'Longitude',
+        'lst_description' => 'Description',
     ];
 
     /**
@@ -52,19 +52,19 @@ class DestinationReviewsController extends PtoController
         $objAwaiting = Listing::query()
             ->awaitingPtoDecision()
             ->with('categoryRecord')
-            ->orderBy('updated_at')
+            ->orderBy('lst_updated_at')
             ->get();
 
         $objReturned = Listing::query()
-            ->where('category', '!=', 'destinations')
+            ->where('lst_category', '!=', 'destinations')
             ->where(fn ($objQuery) => $objQuery
-                ->where('status', Listing::STATUS_FOR_CORRECTION)
+                ->where('lst_status', Listing::STATUS_FOR_CORRECTION)
                 ->orWhere(fn ($objPublished) => $objPublished
-                    ->where('status', 'PUBLISHED')
+                    ->where('lst_status', 'PUBLISHED')
                     ->whereNotNull('lst_pending_changes')
                     ->whereNotNull('lst_review_remarks')))
             ->with('categoryRecord')
-            ->orderByDesc('updated_at')
+            ->orderByDesc('lst_updated_at')
             ->get();
 
         return $this->renderPto($request, 'pto.destination-reviews.index', 'directory', 'Destination Listing Reviews', [
@@ -88,19 +88,19 @@ class DestinationReviewsController extends PtoController
 
         $objHistory = OperationLog::query()
             ->with('user')
-            ->where('entity_type', 'establishment')
-            ->where('entity_id', $listing->id)
-            ->whereIn('action', ['submit', 'publish', 'return', 'unpublish'])
-            ->latest('id')
+            ->where('opl_entity_type', 'establishment')
+            ->where('opl_entity_id', $listing->lst_id)
+            ->whereIn('opl_action', ['submit', 'publish', 'return', 'unpublish'])
+            ->latest('opl_id')
             ->limit(10)
             ->get();
 
-        return $this->renderPto($request, 'pto.destination-reviews.show', 'directory', "Review {$listing->name}", [
+        return $this->renderPto($request, 'pto.destination-reviews.show', 'directory', "Review {$listing->lst_name}", [
             'listing' => $listing,
             'changeRows' => $listing->hasPendingChanges() ? $this->_changeRows($listing) : collect(),
             'publishedImages' => $listing->establishmentImages->where('img_status', ImageStatus::Published)->values(),
             'pendingImageCount' => $listing->establishmentImages->where('img_status', ImageStatus::Pending)->count(),
-            'lastSubmission' => $objHistory->firstWhere('action', 'submit'),
+            'lastSubmission' => $objHistory->firstWhere('opl_action', 'submit'),
             'history' => $objHistory,
             'blnIsAwaitingDecision' => $listing->isAwaitingPtoDecision(),
         ]);

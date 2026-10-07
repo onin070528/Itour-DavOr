@@ -32,15 +32,15 @@ class LandingController extends Controller
      */
     public function index(): View
     {
-        $signatureExperiences = TourismCatalog::signatureExperiences();
-        $activeListings = collect(TourismCatalog::listings())->where('isPubliclyVisible', true);
-        $signatureIds = array_column($signatureExperiences, 'id');
+        $arrSignatureExperiences = TourismCatalog::signatureExperiences();
+        $objActiveListings = collect(TourismCatalog::listings())->where('isPubliclyVisible', true);
+        $arrSignatureIds = array_column($arrSignatureExperiences, 'id');
 
         return view('landing', [
-            'signatureExperiences' => $signatureExperiences,
-            'moreExperiences' => $activeListings->whereNotIn('id', $signatureIds)->values()->all(),
-            'listingDetails' => $activeListings
-                ->map(fn (array $listing) => [...$listing, 'categoryLabel' => TourismCatalog::categoryLabel($listing['category'])])
+            'signatureExperiences' => $arrSignatureExperiences,
+            'moreExperiences' => $objActiveListings->whereNotIn('id', $arrSignatureIds)->values()->all(),
+            'listingDetails' => $objActiveListings
+                ->map(fn (array $arrListing) => [...$arrListing, 'categoryLabel' => TourismCatalog::categoryLabel($arrListing['category'])])
                 ->keyBy('id')
                 ->all(),
             'featuredEstablishments' => TourismCatalog::featuredEstablishments(4),
@@ -61,16 +61,16 @@ class LandingController extends Controller
     {
         return collect(TourismCatalog::listings())
             ->where('isPubliclyVisible', true)
-            ->filter(fn ($listing) => $listing['lat'] !== null && $listing['lng'] !== null)
-            ->map(fn ($listing) => [
-                'name' => $listing['name'],
-                'category' => $listing['category'],
-                'categoryLabel' => TourismCatalog::categoryLabel($listing['category']),
-                'municipality' => $listing['municipality'],
-                'barangay' => $listing['barangay'],
-                'lat' => $listing['lat'],
-                'lng' => $listing['lng'],
-                'href' => $listing['href'],
+            ->filter(fn ($arrListing) => $arrListing['lat'] !== null && $arrListing['lng'] !== null)
+            ->map(fn ($arrListing) => [
+                'name' => $arrListing['name'],
+                'category' => $arrListing['category'],
+                'categoryLabel' => TourismCatalog::categoryLabel($arrListing['category']),
+                'municipality' => $arrListing['municipality'],
+                'barangay' => $arrListing['barangay'],
+                'lat' => $arrListing['lat'],
+                'lng' => $arrListing['lng'],
+                'href' => $arrListing['href'],
             ])
             ->values()
             ->all();

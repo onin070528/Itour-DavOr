@@ -26,11 +26,11 @@ use Illuminate\Validation\Rule;
 trait ManagesDestinationListings
 {
     /**
-     * @return array{name: string, barangay: string, description: ?string, contactOffice: ?string, contactPhone: ?string}
+     * @return array{lst_name: string, lst_barangay: string, lst_description: ?string, lst_contact_office: ?string, lst_contact_phone: ?string}
      */
-    protected function validatedDestinationFields(Request $request): array
+    protected function validatedDestinationFields(Request $objRequest): array
     {
-        $data = $request->validate([
+        $arrData = $objRequest->validate([
             'name' => ['required', 'string', 'max:255'],
             'barangay' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
@@ -39,26 +39,26 @@ trait ManagesDestinationListings
         ]);
 
         return [
-            'name' => $data['name'],
-            'barangay' => $data['barangay'],
-            'description' => $data['description'] ?? null,
-            'contact_office' => $data['contactOffice'] ?? null,
-            'contact_phone' => $data['contactPhone'] ?? null,
+            'name' => $arrData['name'],
+            'barangay' => $arrData['barangay'],
+            'description' => $arrData['description'] ?? null,
+            'contact_office' => $arrData['contactOffice'] ?? null,
+            'contact_phone' => $arrData['contactPhone'] ?? null,
         ];
     }
 
-    protected function uniqueDestinationSlug(string $name): string
+    protected function uniqueDestinationSlug(string $strName): string
     {
-        return Listing::uniqueSlug($name);
+        return Listing::uniqueSlug($strName);
     }
 
     /**
      * The municipality select for the PTO "Add/Edit Destination" modal,
      * validated against the real municipality list.
      */
-    protected function validatedMunicipality(Request $request): string
+    protected function validatedMunicipality(Request $objRequest): string
     {
-        return $request->validate([
+        return $objRequest->validate([
             'municipality' => ['required', 'string', Rule::in(collect(TourismCatalog::municipalities())->pluck('name'))],
         ])['municipality'];
     }

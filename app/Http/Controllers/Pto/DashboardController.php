@@ -25,39 +25,39 @@ class DashboardController extends PtoController
     /**
      * The PTO landing page: the province-wide Tourism Monitoring Dashboard.
      */
-    public function index(Request $request): View
+    public function index(Request $objRequest): View
     {
-        $filters = TourismAnalytics::resolveFilters($request);
-        $comparison = TourismAnalytics::periodComparison($filters);
+        $arrFilters = TourismAnalytics::resolveFilters($objRequest);
+        $arrComparison = TourismAnalytics::periodComparison($arrFilters);
 
-        $municipalities = Municipality::query()->orderBy('name')->get();
+        $objMunicipalities = Municipality::query()->orderBy('mun_name')->get();
 
         // The Establishment filter only ever lists records that can
         // actually collect arrivals — same single source of truth as the
         // Tourism Directory (Listing::isQrEnabled()).
-        $establishments = Listing::query()
+        $objEstablishments = Listing::query()
             ->with('categoryRecord')
-            ->when($filters['municipalityId'], fn ($q, $id) => $q->where('municipality_id', $id))
-            ->orderBy('name')
+            ->when($arrFilters['municipalityId'], fn ($objQuery, $intId) => $objQuery->where('mun_id', $intId))
+            ->orderBy('lst_name')
             ->get()
-            ->filter(fn (Listing $listing) => $listing->isQrEnabled())
+            ->filter(fn (Listing $objListing) => $objListing->isQrEnabled())
             ->values();
 
-        $reportingStatus = TourismAnalytics::reportingStatus($filters);
-        $notYetReportedCount = $reportingStatus->where('status', '!=', 'Verified')->count();
+        $objReportingStatus = TourismAnalytics::reportingStatus($arrFilters);
+        $intNotYetReportedCount = $objReportingStatus->where('status', '!=', 'Verified')->count();
 
-        return $this->renderPto($request, 'pto.dashboard', 'dashboard', 'Tourism Monitoring Dashboard', [
-            'filters' => $filters,
+        return $this->renderPto($objRequest, 'pto.dashboard', 'dashboard', 'Tourism Monitoring Dashboard', [
+            'filters' => $arrFilters,
             'yearOptions' => TourismAnalytics::yearOptions(),
-            'municipalities' => $municipalities,
-            'establishments' => $establishments,
-            'kpis' => TourismAnalytics::kpis($filters, $comparison),
-            'arrivalTrend' => TourismAnalytics::arrivalTrend($filters),
-            'municipalityComparison' => TourismAnalytics::municipalityComparison($filters),
-            'reportingStatus' => $reportingStatus,
-            'notYetReportedCount' => $notYetReportedCount,
-            'classification' => TourismAnalytics::classificationBreakdown($filters),
-            'recentActivity' => TourismAnalytics::recentActivity($filters['municipalityId']),
+            'municipalities' => $objMunicipalities,
+            'establishments' => $objEstablishments,
+            'kpis' => TourismAnalytics::kpis($arrFilters, $arrComparison),
+            'arrivalTrend' => TourismAnalytics::arrivalTrend($arrFilters),
+            'municipalityComparison' => TourismAnalytics::municipalityComparison($arrFilters),
+            'reportingStatus' => $objReportingStatus,
+            'notYetReportedCount' => $intNotYetReportedCount,
+            'classification' => TourismAnalytics::classificationBreakdown($arrFilters),
+            'recentActivity' => TourismAnalytics::recentActivity($arrFilters['municipalityId']),
         ]);
     }
 }

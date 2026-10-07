@@ -1,3 +1,10 @@
+{{--
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: PTO Tourism Monitoring Dashboard.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+--}}
 @php
     $hasTrendData = collect($arrivalTrend['month'])->sum('value') > 0 || collect($arrivalTrend['year'])->sum('value') > 0;
     $classificationTotal = $classification['local'] + $classification['foreign'];
@@ -42,7 +49,7 @@
             <select id="municipality_id" name="municipality_id" onchange="this.form.submit()" class="rounded-sm border border-sand-300 bg-sand-50 px-3 py-2.5 text-sm text-sand-900">
                 <option value="">All Municipalities</option>
                 @foreach ($municipalities as $municipality)
-                    <option value="{{ $municipality->id }}" @selected($filters['municipalityId'] === $municipality->id)>{{ $municipality->name }}</option>
+                    <option value="{{ $municipality->mun_id }}" @selected($filters['municipalityId'] === $municipality->mun_id)>{{ $municipality->mun_name }}</option>
                 @endforeach
             </select>
         </div>
@@ -51,7 +58,7 @@
             <select id="listing_id" name="listing_id" onchange="this.form.submit()" class="rounded-sm border border-sand-300 bg-sand-50 px-3 py-2.5 text-sm text-sand-900">
                 <option value="">All Establishments</option>
                 @foreach ($establishments as $establishment)
-                    <option value="{{ $establishment->id }}" @selected($filters['listingId'] === $establishment->id)>{{ $establishment->name }}</option>
+                    <option value="{{ $establishment->lst_id }}" @selected($filters['listingId'] === $establishment->lst_id)>{{ $establishment->lst_name }}</option>
                 @endforeach
             </select>
         </div>
@@ -155,9 +162,9 @@
             @else
                 <div class="mt-4 flex flex-col gap-3">
                     @foreach ($municipalityComparison as $row)
-                        <a href="{{ route('pto.monthlyReports.index', ['municipality_id' => $row['municipality']->id, 'period' => $filters['month'] ? \Carbon\CarbonImmutable::create($filters['year'], $filters['month'], 1)->format('Y-m') : null]) }}" class="block">
+                        <a href="{{ route('pto.monthlyReports.index', ['municipality_id' => $row['municipality']->mun_id, 'period' => $filters['month'] ? \Carbon\CarbonImmutable::create($filters['year'], $filters['month'], 1)->format('Y-m') : null]) }}" class="block">
                             <div class="flex items-center justify-between text-sm">
-                                <span class="font-medium text-sand-900">{{ $row['municipality']->name }}</span>
+                                <span class="font-medium text-sand-900">{{ $row['municipality']->mun_name }}</span>
                                 <span class="font-semibold text-sand-800">{{ number_format($row['total']) }}</span>
                             </div>
                             <div class="mt-1 h-2 w-full overflow-hidden rounded-full bg-sand-100">
@@ -221,9 +228,9 @@
                         <tbody class="divide-y divide-sand-100">
                             @foreach ($reportingStatus as $row)
                                 <tr>
-                                    <td class="py-2 pr-2 font-medium text-sand-900">{{ $row['municipality']->name }}</td>
+                                    <td class="py-2 pr-2 font-medium text-sand-900">{{ $row['municipality']->mun_name }}</td>
                                     <td class="py-2 pr-2"><x-dashboard.status-badge :tone="$statusTone($row['status'])">{{ $row['status'] }}</x-dashboard.status-badge></td>
-                                    <td class="py-2 pr-2 text-sand-700">{{ $row['report']?->created_at?->format('M j, Y') ?? '—' }}</td>
+                                    <td class="py-2 pr-2 text-sand-700">{{ $row['report']?->mrp_created_at?->format('M j, Y') ?? '—' }}</td>
                                 </tr>
                             @endforeach
                         </tbody>

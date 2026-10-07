@@ -24,13 +24,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        $arrConflictingMunicipalityIds = DB::table('users')
-            ->where('role', 'lgu')
-            ->where('status', '!=', 'Inactive')
-            ->whereNotNull('municipality_id')
-            ->groupBy('municipality_id')
+        $arrConflictingMunicipalityIds = DB::table('tbl_users')
+            ->where('usr_role', 'lgu')
+            ->where('usr_status', '!=', 'Inactive')
+            ->whereNotNull('mun_id')
+            ->groupBy('mun_id')
             ->havingRaw('COUNT(*) > 1')
-            ->pluck('municipality_id')
+            ->pluck('mun_id')
             ->all();
 
         if ($arrConflictingMunicipalityIds !== []) {
@@ -41,7 +41,7 @@ return new class extends Migration
             );
         }
 
-        DB::statement('CREATE UNIQUE INDEX '.self::INDEX_NAME." ON users (municipality_id) WHERE role = 'lgu' AND status <> 'Inactive'");
+        DB::statement('CREATE UNIQUE INDEX '.self::INDEX_NAME." ON tbl_users (mun_id) WHERE usr_role = 'lgu' AND usr_status <> 'Inactive'");
     }
 
     public function down(): void

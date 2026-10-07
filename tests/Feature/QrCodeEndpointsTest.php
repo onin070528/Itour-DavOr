@@ -14,7 +14,7 @@ use Illuminate\Support\Str;
 
 function qrEndpointMunicipality(string $code, string $name): Municipality
 {
-    return Municipality::query()->firstOrCreate(['code' => $code], ['name' => $name]);
+    return Municipality::query()->firstOrCreate(['mun_code' => $code], ['mun_name' => $name]);
 }
 
 /**
@@ -30,18 +30,18 @@ function qrEndpointListing(Municipality $municipality, array $overrides = [], bo
     );
 
     $listing = Listing::query()->create(array_merge([
-        'slug' => Str::slug('qr-endpoint-'.Str::random(6)),
-        'name' => 'QR Endpoint Resort',
-        'category' => 'accommodation',
+        'lst_slug' => Str::slug('qr-endpoint-'.Str::random(6)),
+        'lst_name' => 'QR Endpoint Resort',
+        'lst_category' => 'accommodation',
         'cat_id' => $category->cat_id,
-        'municipality' => $municipality->name,
-        'municipality_id' => $municipality->id,
-        'barangay' => 'Dahican',
-        'status' => 'PUBLISHED',
+        'lst_municipality' => $municipality->mun_name,
+        'mun_id' => $municipality->mun_id,
+        'lst_barangay' => 'Dahican',
+        'lst_status' => 'PUBLISHED',
     ], $overrides));
 
     if ($blnWithAccount) {
-        $listing->forceFill(['reporting_mode' => ReportingMethod::OnlineItour])->save();
+        $listing->forceFill(['lst_reporting_mode' => ReportingMethod::OnlineItour])->save();
         qrEndpointUser(UserRole::Establishment, $municipality, $listing);
     }
 
@@ -51,11 +51,11 @@ function qrEndpointListing(Municipality $municipality, array $overrides = [], bo
 function qrEndpointUser(UserRole $role, ?Municipality $municipality = null, ?Listing $listing = null): User
 {
     return User::factory()->create([
-        'role' => $role,
-        'organization_name' => $listing?->name ?? 'QR Endpoint Office',
-        'organization_subtitle' => 'Davao Oriental',
-        'municipality_id' => $municipality?->id,
-        'establishment_id' => $listing?->id,
+        'usr_role' => $role,
+        'usr_organization_name' => $listing?->lst_name ?? 'QR Endpoint Office',
+        'usr_organization_subtitle' => 'Davao Oriental',
+        'mun_id' => $municipality?->mun_id,
+        'lst_id' => $listing?->lst_id,
     ]);
 }
 
@@ -67,8 +67,8 @@ test('the check-in URL is built from the listing uuid on the APP_URL host, never
 
     $strUrl = app(QrCodeService::class)->buildCheckinUrl($listing);
 
-    expect($strUrl)->toBe('https://itour.example.gov.ph/checkin/'.$listing->uuid);
-    expect($strUrl)->toBe('https://itour.example.gov.ph'.route('lgu.establishmentQr', ['establishment' => $listing->uuid], false));
+    expect($strUrl)->toBe('https://itour.example.gov.ph/checkin/'.$listing->lst_uuid);
+    expect($strUrl)->toBe('https://itour.example.gov.ph'.route('lgu.establishmentQr', ['establishment' => $listing->lst_uuid], false));
 });
 
 test('the service generates SVG markup for a listing', function () {
@@ -82,7 +82,7 @@ test('the service generates SVG markup for a listing', function () {
 test('the service returns null and logs instead of throwing when a listing has no uuid', function () {
     Log::spy();
     $listing = qrEndpointListing(qrEndpointMunicipality('MATI', 'City of Mati'));
-    DB::table('listings')->where('id', $listing->id)->update(['uuid' => null]);
+    DB::table('tbl_listings')->where('lst_id', $listing->lst_id)->update(['lst_uuid' => null]);
 
     expect(app(QrCodeService::class)->generateSvg($listing->fresh()))->toBeNull();
     Log::shouldHaveReceived('error')->once();
@@ -106,8 +106,8 @@ test('an establishment can view and download its own QR code', function () {
 
 test('an establishment cannot view or download another establishment\'s QR code', function () {
     $mati = qrEndpointMunicipality('MATI', 'City of Mati');
-    $ownListing = qrEndpointListing($mati, ['name' => 'Own Resort']);
-    $otherListing = qrEndpointListing($mati, ['name' => 'Other Resort']);
+    $ownListing = qrEndpointListing($mati, ['lst_name' => 'Own Resort']);
+    $otherListing = qrEndpointListing($mati, ['lst_name' => 'Other Resort']);
 
     test()->actingAs($ownListing->establishmentUser)->get(route('qrCodes.show', $otherListing))->assertForbidden();
     test()->actingAs($ownListing->establishmentUser)->get(route('qrCodes.download', $otherListing))->assertForbidden();
@@ -117,7 +117,7 @@ test('an LGU can view QR codes in its own municipality only', function () {
     $mati = qrEndpointMunicipality('MATI', 'City of Mati');
     $baganga = qrEndpointMunicipality('BAGANGA', 'Baganga');
     $matiListing = qrEndpointListing($mati);
-    $bagangaListing = qrEndpointListing($baganga, ['name' => 'Baganga Inn']);
+    $bagangaListing = qrEndpointListing($baganga, ['lst_name' => 'Baganga Inn']);
     $lgu = qrEndpointUser(UserRole::Lgu, $mati);
 
     test()->actingAs($lgu)->get(route('qrCodes.download', $matiListing))->assertOk();
@@ -144,7 +144,7 @@ test('a destination never has a QR code', function () {
         ['cat_sort_order' => 0, 'cat_is_active' => true, 'cat_is_qr_enabled' => true]
     );
     $destination = qrEndpointListing(qrEndpointMunicipality('MATI', 'City of Mati'), [
-        'name' => 'Dahican Beach', 'category' => 'destinations', 'cat_id' => $category->cat_id, 'status' => 'Active',
+        'lst_name' => 'Dahican Beach', 'lst_category' => 'destinations', 'cat_id' => $category->cat_id, 'lst_status' => 'Active',
     ], false);
     $pto = qrEndpointUser(UserRole::PtoAdministrator);
 
@@ -166,7 +166,7 @@ test('the PTO directory renders the QR code for an establishment accepting regis
 
     test()->actingAs($pto)->get(route('pto.directory.index'))
         ->assertOk()
-        ->assertSee('qr-view-'.$listing->id, false)
+        ->assertSee('qr-view-'.$listing->lst_id, false)
         ->assertSee(route('qrCodes.show', $listing), false)
         ->assertSee(route('qrCodes.poster', $listing), false)
         ->assertSee(route('qrCodes.download', $listing), false)
@@ -175,7 +175,7 @@ test('the PTO directory renders the QR code for an establishment accepting regis
 });
 
 test('the establishment QR page explains why there is no QR while the establishment is suspended', function () {
-    $listing = qrEndpointListing(qrEndpointMunicipality('MATI', 'City of Mati'), ['status' => 'Suspended']);
+    $listing = qrEndpointListing(qrEndpointMunicipality('MATI', 'City of Mati'), ['lst_status' => 'Suspended']);
 
     test()->actingAs($listing->establishmentUser)->get(route('establishment.qr'))
         ->assertOk()
@@ -184,7 +184,7 @@ test('the establishment QR page explains why there is no QR while the establishm
 });
 
 test('the establishment QR page shows the QR for an Online establishment whose listing is not published yet', function () {
-    $listing = qrEndpointListing(qrEndpointMunicipality('MATI', 'City of Mati'), ['status' => 'DRAFT']);
+    $listing = qrEndpointListing(qrEndpointMunicipality('MATI', 'City of Mati'), ['lst_status' => 'DRAFT']);
 
     test()->actingAs($listing->establishmentUser)->get(route('establishment.qr'))
         ->assertOk()
@@ -241,14 +241,14 @@ test('an invalid brand color also falls back to the plain QR', function () {
 
 test('the establishment can open its own A4 poster with the current name, municipality, and uuid URL', function () {
     config(['app.url' => 'https://itour.example.gov.ph']);
-    $listing = qrEndpointListing(qrEndpointMunicipality('MATI', 'City of Mati'), ['name' => 'Seaside Haven']);
+    $listing = qrEndpointListing(qrEndpointMunicipality('MATI', 'City of Mati'), ['lst_name' => 'Seaside Haven']);
 
     test()->actingAs($listing->establishmentUser)->get(route('qrCodes.poster', $listing))
         ->assertOk()
         ->assertSee('Scan to register your visit')
         ->assertSee('Seaside Haven')
         ->assertSee('City of Mati, Davao Oriental')
-        ->assertSee('itour.example.gov.ph/checkin/'.$listing->uuid)
+        ->assertSee('itour.example.gov.ph/checkin/'.$listing->lst_uuid)
         ->assertSee('size: A4', false)
         ->assertSee('poster-qr', false);
 });
@@ -265,10 +265,10 @@ test('the table card layout is served with ?layout=card', function () {
 test('the poster follows the same authorization as the QR download', function () {
     $mati = qrEndpointMunicipality('MATI', 'City of Mati');
     $baganga = qrEndpointMunicipality('BAGANGA', 'Baganga');
-    $matiListing = qrEndpointListing($mati, ['name' => 'Mati Resort']);
-    $otherMatiListing = qrEndpointListing($mati, ['name' => 'Other Mati Resort']);
-    $bagangaListing = qrEndpointListing($baganga, ['name' => 'Baganga Resort']);
-    $noAccountListing = qrEndpointListing($mati, ['name' => 'No Account Resort'], false);
+    $matiListing = qrEndpointListing($mati, ['lst_name' => 'Mati Resort']);
+    $otherMatiListing = qrEndpointListing($mati, ['lst_name' => 'Other Mati Resort']);
+    $bagangaListing = qrEndpointListing($baganga, ['lst_name' => 'Baganga Resort']);
+    $noAccountListing = qrEndpointListing($mati, ['lst_name' => 'No Account Resort'], false);
 
     $matiLgu = qrEndpointUser(UserRole::Lgu, $mati);
 
@@ -284,17 +284,17 @@ test('the poster follows the same authorization as the QR download', function ()
 test('an establishment can turn its own QR check-in off and on, each change audit-logged with old and new values', function () {
     $listing = qrEndpointListing(qrEndpointMunicipality('MATI', 'City of Mati'));
     $owner = $listing->establishmentUser;
-    $strUuid = $listing->uuid;
+    $strUuid = $listing->lst_uuid;
 
     test()->actingAs($owner)->patch(route('qrCodes.updateStatus', $listing), ['is_enabled' => '0'])->assertRedirect();
 
     expect($listing->fresh()->lst_is_qr_enabled)->toBeFalse();
-    $offLog = OperationLog::query()->where('entity_type', 'establishment')->where('entity_id', $listing->id)->latest('id')->first();
-    expect($offLog->action)->toBe('update');
-    expect($offLog->user_id)->toBe($owner->id);
-    expect($offLog->old_values)->toBe(['lst_is_qr_enabled' => true]);
-    expect($offLog->new_values)->toBe(['lst_is_qr_enabled' => false]);
-    expect($offLog->reason)->toBe('QR check-in switched off');
+    $offLog = OperationLog::query()->where('opl_entity_type', 'establishment')->where('opl_entity_id', $listing->lst_id)->latest('opl_id')->first();
+    expect($offLog->opl_action)->toBe('update');
+    expect($offLog->usr_id)->toBe($owner->usr_id);
+    expect($offLog->opl_old_values)->toBe(['lst_is_qr_enabled' => true]);
+    expect($offLog->opl_new_values)->toBe(['lst_is_qr_enabled' => false]);
+    expect($offLog->opl_reason)->toBe('QR check-in switched off');
 
     // Public page refuses; the establishment's QR page offers to turn it back on.
     test()->get(route('lgu.establishmentQr', ['establishment' => $strUuid]))->assertSee('This establishment is not accepting registrations');
@@ -303,9 +303,9 @@ test('an establishment can turn its own QR check-in off and on, each change audi
     test()->actingAs($owner)->patch(route('qrCodes.updateStatus', $listing), ['is_enabled' => '1'])->assertRedirect();
 
     expect($listing->fresh()->lst_is_qr_enabled)->toBeTrue();
-    expect($listing->fresh()->uuid)->toBe($strUuid);
-    $onLog = OperationLog::query()->where('entity_type', 'establishment')->where('entity_id', $listing->id)->latest('id')->first();
-    expect($onLog->new_values)->toBe(['lst_is_qr_enabled' => true]);
+    expect($listing->fresh()->lst_uuid)->toBe($strUuid);
+    $onLog = OperationLog::query()->where('opl_entity_type', 'establishment')->where('opl_entity_id', $listing->lst_id)->latest('opl_id')->first();
+    expect($onLog->opl_new_values)->toBe(['lst_is_qr_enabled' => true]);
     test()->get(route('lgu.establishmentQr', ['establishment' => $strUuid]))->assertSee('establishment-qr-form', false);
 });
 
@@ -314,15 +314,15 @@ test('repeating the current QR state changes nothing and writes no audit log', f
 
     test()->actingAs($listing->establishmentUser)->patch(route('qrCodes.updateStatus', $listing), ['is_enabled' => '1'])->assertRedirect();
 
-    expect(OperationLog::query()->where('entity_type', 'establishment')->where('entity_id', $listing->id)->count())->toBe(0);
+    expect(OperationLog::query()->where('opl_entity_type', 'establishment')->where('opl_entity_id', $listing->lst_id)->count())->toBe(0);
 });
 
 test('the LGU can switch QR check-in for its own municipality only; the PTO and other establishments cannot', function () {
     $mati = qrEndpointMunicipality('MATI', 'City of Mati');
     $baganga = qrEndpointMunicipality('BAGANGA', 'Baganga');
-    $matiListing = qrEndpointListing($mati, ['name' => 'Mati Resort']);
-    $otherMatiListing = qrEndpointListing($mati, ['name' => 'Other Mati Resort']);
-    $bagangaListing = qrEndpointListing($baganga, ['name' => 'Baganga Resort']);
+    $matiListing = qrEndpointListing($mati, ['lst_name' => 'Mati Resort']);
+    $otherMatiListing = qrEndpointListing($mati, ['lst_name' => 'Other Mati Resort']);
+    $bagangaListing = qrEndpointListing($baganga, ['lst_name' => 'Baganga Resort']);
 
     $matiLgu = qrEndpointUser(UserRole::Lgu, $mati);
 
@@ -345,7 +345,7 @@ test('the QR switch rejects a missing or non-boolean value and never applies to 
         ->assertSessionHasErrors('is_enabled');
     expect($listing->fresh()->lst_is_qr_enabled)->toBeTrue();
 
-    $destination = qrEndpointListing($mati, ['name' => 'Dahican Beach', 'category' => 'destinations', 'status' => 'Active'], false);
+    $destination = qrEndpointListing($mati, ['lst_name' => 'Dahican Beach', 'lst_category' => 'destinations', 'lst_status' => 'Active'], false);
     test()->actingAs(qrEndpointUser(UserRole::Lgu, $mati))->patch(route('qrCodes.updateStatus', $destination), ['is_enabled' => '0'])->assertForbidden();
 });
 
@@ -353,17 +353,17 @@ test('the QR switch rejects a missing or non-boolean value and never applies to 
 
 test('getQrStatus explains why a QR is or is not usable', function () {
     $mati = qrEndpointMunicipality('MATI', 'City of Mati');
-    $active = qrEndpointListing($mati, ['name' => 'Active Inn']);
-    $switchedOff = qrEndpointListing($mati, ['name' => 'Paused Inn']);
+    $active = qrEndpointListing($mati, ['lst_name' => 'Active Inn']);
+    $switchedOff = qrEndpointListing($mati, ['lst_name' => 'Paused Inn']);
     $switchedOff->forceFill(['lst_is_qr_enabled' => false])->save();
-    $paper = qrEndpointListing($mati, ['name' => 'Paper Inn'], false);
-    $onlineWithoutAccount = qrEndpointListing($mati, ['name' => 'Online Inn'], false);
-    $onlineWithoutAccount->forceFill(['reporting_mode' => ReportingMethod::OnlineItour])->save();
-    $suspendedAccount = qrEndpointListing($mati, ['name' => 'Suspended Account Inn']);
-    $suspendedAccount->establishmentUser->update(['status' => 'Inactive']);
+    $paper = qrEndpointListing($mati, ['lst_name' => 'Paper Inn'], false);
+    $onlineWithoutAccount = qrEndpointListing($mati, ['lst_name' => 'Online Inn'], false);
+    $onlineWithoutAccount->forceFill(['lst_reporting_mode' => ReportingMethod::OnlineItour])->save();
+    $suspendedAccount = qrEndpointListing($mati, ['lst_name' => 'Suspended Account Inn']);
+    $suspendedAccount->establishmentUser->update(['usr_status' => 'Inactive']);
     // QR does not depend on the destination listing being Published.
-    $draft = qrEndpointListing($mati, ['name' => 'Draft Inn', 'status' => 'DRAFT']);
-    $suspended = qrEndpointListing($mati, ['name' => 'Suspended Inn', 'status' => 'Suspended']);
+    $draft = qrEndpointListing($mati, ['lst_name' => 'Draft Inn', 'lst_status' => 'DRAFT']);
+    $suspended = qrEndpointListing($mati, ['lst_name' => 'Suspended Inn', 'lst_status' => 'Suspended']);
 
     expect($active->fresh()->getQrStatus())->toBe(Listing::QR_STATUS_ACTIVE);
     expect($switchedOff->fresh()->getQrStatus())->toBe(Listing::QR_STATUS_SWITCHED_OFF);
@@ -376,20 +376,20 @@ test('getQrStatus explains why a QR is or is not usable', function () {
 
 test('the LGU Establishments page shows each own establishment\'s QR status, with view, print, download, and the on/off switch', function () {
     $mati = qrEndpointMunicipality('MATI', 'City of Mati');
-    $active = qrEndpointListing($mati, ['name' => 'Active Inn']);
-    $switchedOff = qrEndpointListing($mati, ['name' => 'Paused Inn']);
+    $active = qrEndpointListing($mati, ['lst_name' => 'Active Inn']);
+    $switchedOff = qrEndpointListing($mati, ['lst_name' => 'Paused Inn']);
     $switchedOff->forceFill(['lst_is_qr_enabled' => false])->save();
-    qrEndpointListing($mati, ['name' => 'Paper Inn'], false);
+    qrEndpointListing($mati, ['lst_name' => 'Paper Inn'], false);
     $lgu = User::factory()->create([
-        'role' => UserRole::Lgu,
-        'organization_name' => 'City of Mati LGU',
-        'organization_subtitle' => 'City of Mati',
-        'municipality_id' => $mati->id,
+        'usr_role' => UserRole::Lgu,
+        'usr_organization_name' => 'City of Mati LGU',
+        'usr_organization_subtitle' => 'City of Mati',
+        'mun_id' => $mati->mun_id,
     ]);
 
     test()->actingAs($lgu)->get(route('lgu.directory.establishments'))
         ->assertOk()
-        ->assertSee('qr-view-'.$active->id, false)
+        ->assertSee('qr-view-'.$active->lst_id, false)
         ->assertSee(route('qrCodes.show', $active), false)
         ->assertSee(route('qrCodes.poster', $active), false)
         ->assertSee(route('qrCodes.download', $active), false)

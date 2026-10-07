@@ -1,3 +1,10 @@
+{{--
+    iTOUR — Davao Oriental Tourism Information System
+
+    Purpose: Public Explore page — filterable destinations and establishments.
+    Programmer/s: iTOUR Development Team
+    Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+--}}
 <x-layouts.public title="Explore">
     <div id="explore-root" class="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
         <h1 class="text-2xl sm:text-3xl">Explore the Heart of Davao Oriental</h1>

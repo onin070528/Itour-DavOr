@@ -22,13 +22,13 @@ const FIRST_LOGIN_NEW_PASSWORD = 'My-own-passw0rd!';
  */
 function createFirstLoginLgu(bool $blnMustChangePassword = true): User
 {
-    $objMati = Municipality::query()->firstOrCreate(['code' => 'MATI'], ['name' => 'City of Mati']);
+    $objMati = Municipality::query()->firstOrCreate(['mun_code' => 'MATI'], ['mun_name' => 'City of Mati']);
 
     return User::factory()->create([
-        'role' => UserRole::Lgu,
-        'organization_name' => 'Mati City Tourism Office',
-        'organization_subtitle' => 'City of Mati',
-        'municipality_id' => $objMati->id,
+        'usr_role' => UserRole::Lgu,
+        'usr_organization_name' => 'Mati City Tourism Office',
+        'usr_organization_subtitle' => 'City of Mati',
+        'mun_id' => $objMati->mun_id,
         'usr_must_change_password' => $blnMustChangePassword,
     ]);
 }
@@ -38,7 +38,7 @@ function createFirstLoginLgu(bool $blnMustChangePassword = true): User
 test('a user who must change their password is sent to the change-password page after login', function () {
     $objLgu = createFirstLoginLgu();
 
-    $this->post(route('login.store'), ['email' => $objLgu->email, 'password' => 'password'])
+    $this->post(route('login.store'), ['email' => $objLgu->usr_email, 'password' => 'password'])
         ->assertRedirect(route('password.change'));
 
     $this->assertAuthenticatedAs($objLgu);
@@ -105,9 +105,9 @@ test('a valid new password is saved hashed and clears the flag', function () {
 
     expect($objLgu->mustChangePassword())->toBeFalse();
     expect($objLgu->usr_password_changed_at)->not->toBeNull();
-    expect($objLgu->getRawOriginal('password'))->not->toBe(FIRST_LOGIN_NEW_PASSWORD);
-    expect(Hash::check(FIRST_LOGIN_NEW_PASSWORD, $objLgu->password))->toBeTrue();
-    $this->assertDatabaseHas('security_logs', ['user_id' => $objLgu->id, 'event_type' => 'password_changed']);
+    expect($objLgu->getRawOriginal('usr_password'))->not->toBe(FIRST_LOGIN_NEW_PASSWORD);
+    expect(Hash::check(FIRST_LOGIN_NEW_PASSWORD, $objLgu->usr_password))->toBeTrue();
+    $this->assertDatabaseHas('tbl_security_logs', ['usr_id' => $objLgu->usr_id, 'sec_event_type' => 'password_changed']);
 });
 
 // 4. Invalid passwords are rejected by the existing policy
@@ -123,7 +123,7 @@ test('a password that breaks the policy is rejected and the flag stays set', fun
         ->assertSessionHasErrors('password');
 
     expect($objLgu->fresh()->mustChangePassword())->toBeTrue();
-    expect(Hash::check('password', $objLgu->fresh()->password))->toBeTrue();
+    expect(Hash::check('password', $objLgu->fresh()->usr_password))->toBeTrue();
 })->with([
     'shorter than 12 characters' => ['Sh0rt-pass!', null],
     'no number' => ['No-numbers-here!', null],
@@ -134,8 +134,8 @@ test('a password that breaks the policy is rejected and the flag stays set', fun
 
 test('the new password cannot be the temporary password', function () {
     $objPto = User::factory()->create([
-        'role' => UserRole::PtoAdministrator,
-        'password' => 'Temporary-passw0rd!',
+        'usr_role' => UserRole::PtoAdministrator,
+        'usr_password' => 'Temporary-passw0rd!',
         'usr_must_change_password' => true,
     ]);
 
@@ -154,7 +154,7 @@ test('the new password cannot be the temporary password', function () {
 test('after changing the password the user reaches the dashboard and the change page is closed', function () {
     $objLgu = createFirstLoginLgu();
 
-    $this->post(route('login.store'), ['email' => $objLgu->email, 'password' => 'password']);
+    $this->post(route('login.store'), ['email' => $objLgu->usr_email, 'password' => 'password']);
     $this->put(route('password.change.store'), [
         'password' => FIRST_LOGIN_NEW_PASSWORD,
         'password_confirmation' => FIRST_LOGIN_NEW_PASSWORD,
@@ -167,15 +167,15 @@ test('after changing the password the user reaches the dashboard and the change 
         'password_confirmation' => 'Another-passw0rd!',
     ])->assertRedirect(route('lgu.dashboard'));
 
-    expect(Hash::check(FIRST_LOGIN_NEW_PASSWORD, $objLgu->fresh()->password))->toBeTrue();
+    expect(Hash::check(FIRST_LOGIN_NEW_PASSWORD, $objLgu->fresh()->usr_password))->toBeTrue();
 });
 
 // 6. Accounts without the flag log in normally
 
 test('a user who does not need to change their password logs in normally', function () {
-    $objPto = User::factory()->create(['role' => UserRole::PtoAdministrator, 'usr_must_change_password' => false]);
+    $objPto = User::factory()->create(['usr_role' => UserRole::PtoAdministrator, 'usr_must_change_password' => false]);
 
-    $this->post(route('login.store'), ['email' => $objPto->email, 'password' => 'password'])
+    $this->post(route('login.store'), ['email' => $objPto->usr_email, 'password' => 'password'])
         ->assertRedirect(route('pto.dashboard'));
 
     $this->get(route('pto.dashboard'))->assertOk();
@@ -185,7 +185,7 @@ test('a user who does not need to change their password logs in normally', funct
 // 7. No bypass through direct URLs
 
 test('every other page redirects to the change-password page, whatever the URL', function (string $strRouteName) {
-    $objPto = User::factory()->create(['role' => UserRole::PtoAdministrator, 'usr_must_change_password' => true]);
+    $objPto = User::factory()->create(['usr_role' => UserRole::PtoAdministrator, 'usr_must_change_password' => true]);
 
     $this->actingAs($objPto)->get(route($strRouteName))->assertRedirect(route('password.change'));
 })->with(['pto.dashboard', 'pto.users', 'pto.municipalReports.index', 'pto.monthlyReports.index', 'pto.directory.index', 'pto.settings', 'home']);
@@ -201,7 +201,7 @@ test('a form post to another page is not processed before the password is change
         ])
         ->assertRedirect(route('password.change'));
 
-    expect(Hash::check('password', $objLgu->fresh()->password))->toBeTrue();
+    expect(Hash::check('password', $objLgu->fresh()->usr_password))->toBeTrue();
     expect($objLgu->fresh()->mustChangePassword())->toBeTrue();
 });
 
@@ -231,9 +231,9 @@ test('guests cannot open the change-password page', function () {
 
 test('a disabled account with a temporary password still cannot sign in', function () {
     $objLgu = createFirstLoginLgu();
-    $objLgu->forceFill(['status' => 'Inactive'])->save();
+    $objLgu->forceFill(['usr_status' => 'Inactive'])->save();
 
-    $this->post(route('login.store'), ['email' => $objLgu->email, 'password' => 'password'])
+    $this->post(route('login.store'), ['email' => $objLgu->usr_email, 'password' => 'password'])
         ->assertSessionHasErrors('email');
 
     $this->assertGuest();

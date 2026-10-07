@@ -36,33 +36,33 @@ class BusinessHours
      */
     public static function times(): array
     {
-        $times = [];
+        $arrTimes = [];
 
-        for ($minutes = 0; $minutes < 24 * 60; $minutes += 30) {
-            $key = sprintf('%02d:%02d', intdiv($minutes, 60), $minutes % 60);
-            $times[$key] = date('g:i A', strtotime($key));
+        for ($intMinutes = 0; $intMinutes < 24 * 60; $intMinutes += 30) {
+            $strKey = sprintf('%02d:%02d', intdiv($intMinutes, 60), $intMinutes % 60);
+            $arrTimes[$strKey] = date('g:i A', strtotime($strKey));
         }
 
-        return $times;
+        return $arrTimes;
     }
 
     /**
      * Builds the stored `hours` string from the dropdown values, or null
      * when no days were chosen.
      */
-    public static function format(?string $days, ?string $opens, ?string $closes): ?string
+    public static function format(?string $strDays, ?string $strOpens, ?string $strCloses): ?string
     {
-        if (! $days || ! $opens) {
+        if (! $strDays || ! $strOpens) {
             return null;
         }
 
-        $dayLabel = self::days()[$days];
+        $strDayLabel = self::days()[$strDays];
 
-        if ($opens === self::OPEN_24_HOURS) {
-            return "{$dayLabel}, Open 24 hours";
+        if ($strOpens === self::OPEN_24_HOURS) {
+            return "{$strDayLabel}, Open 24 hours";
         }
 
-        return "{$dayLabel}, ".self::times()[$opens].' – '.self::times()[$closes];
+        return "{$strDayLabel}, ".self::times()[$strOpens].' – '.self::times()[$strCloses];
     }
 
     /**
@@ -72,32 +72,32 @@ class BusinessHours
      *
      * @return array{days: ?string, opens: ?string, closes: ?string}
      */
-    public static function parse(?string $hours): array
+    public static function parse(?string $strHours): array
     {
-        $empty = ['days' => null, 'opens' => null, 'closes' => null];
+        $arrEmpty = ['days' => null, 'opens' => null, 'closes' => null];
 
-        if (! $hours || ! preg_match('/^(.+?), (.+)$/u', $hours, $parts)) {
-            return $empty;
+        if (! $strHours || ! preg_match('/^(.+?), (.+)$/u', $strHours, $parts)) {
+            return $arrEmpty;
         }
 
-        $days = array_search($parts[1], self::days(), true);
+        $strDays = array_search($parts[1], self::days(), true);
 
-        if ($days === false) {
-            return $empty;
+        if ($strDays === false) {
+            return $arrEmpty;
         }
 
         if ($parts[2] === 'Open 24 hours') {
-            return ['days' => $days, 'opens' => self::OPEN_24_HOURS, 'closes' => null];
+            return ['days' => $strDays, 'opens' => self::OPEN_24_HOURS, 'closes' => null];
         }
 
-        $range = explode(' – ', $parts[2]);
-        $opens = array_search($range[0], self::times(), true);
-        $closes = array_search($range[1] ?? '', self::times(), true);
+        $arrRange = explode(' – ', $parts[2]);
+        $strOpens = array_search($arrRange[0], self::times(), true);
+        $strCloses = array_search($arrRange[1] ?? '', self::times(), true);
 
-        if ($opens === false || $closes === false) {
-            return $empty;
+        if ($strOpens === false || $strCloses === false) {
+            return $arrEmpty;
         }
 
-        return ['days' => $days, 'opens' => $opens, 'closes' => $closes];
+        return ['days' => $strDays, 'opens' => $strOpens, 'closes' => $strCloses];
     }
 }

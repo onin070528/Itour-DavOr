@@ -1,5 +1,13 @@
 <?php
 
+/**
+ * iTOUR — Davao Oriental Tourism Information System
+ *
+ * Purpose: Tests — account settings.
+ * Programmer/s: iTOUR Development Team
+ * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
+ */
+
 use App\Enums\UserRole;
 use App\Models\SecurityLog;
 use App\Models\User;
@@ -9,7 +17,7 @@ use Illuminate\Support\Facades\Hash;
 
 function makeSettingsPto(): User
 {
-    return User::factory()->create(['role' => UserRole::PtoAdministrator]);
+    return User::factory()->create(['usr_role' => UserRole::PtoAdministrator]);
 }
 
 test('an 11-character password is rejected when changing password', function () {
@@ -22,7 +30,7 @@ test('an 11-character password is rejected when changing password', function () 
     ]);
 
     $response->assertSessionHasErrors('password');
-    expect(Hash::check('short11111', $user->fresh()->password))->toBeFalse();
+    expect(Hash::check('short11111', $user->fresh()->usr_password))->toBeFalse();
 });
 
 test('a password without a number is rejected when changing password', function () {
@@ -47,7 +55,7 @@ test('a 12-character password with letters and numbers is accepted when changing
     ]);
 
     $response->assertSessionHasNoErrors();
-    expect(Hash::check('valid-pass123', $user->fresh()->password))->toBeTrue();
+    expect(Hash::check('valid-pass123', $user->fresh()->usr_password))->toBeTrue();
 });
 
 test('changing password never stores it in plain text', function () {
@@ -59,8 +67,8 @@ test('changing password never stores it in plain text', function () {
         'password_confirmation' => 'valid-pass123',
     ]);
 
-    expect($user->fresh()->password)->not->toBe('valid-pass123');
-    expect($user->fresh()->password)->toStartWith('$2y$');
+    expect($user->fresh()->usr_password)->not->toBe('valid-pass123');
+    expect($user->fresh()->usr_password)->toStartWith('$2y$');
 });
 
 // UpdatesAccountSettings::updatePassword and NewPasswordController::store
@@ -74,9 +82,9 @@ test('SessionSecurity invalidates every other session for a user but keeps the e
     $otherUser = makeSettingsPto();
 
     DB::table('sessions')->insert([
-        ['id' => 'session-a', 'user_id' => $user->id, 'payload' => '', 'last_activity' => now()->timestamp],
-        ['id' => 'session-b', 'user_id' => $user->id, 'payload' => '', 'last_activity' => now()->timestamp],
-        ['id' => 'session-c', 'user_id' => $otherUser->id, 'payload' => '', 'last_activity' => now()->timestamp],
+        ['id' => 'session-a', 'user_id' => $user->usr_id, 'payload' => '', 'last_activity' => now()->timestamp],
+        ['id' => 'session-b', 'user_id' => $user->usr_id, 'payload' => '', 'last_activity' => now()->timestamp],
+        ['id' => 'session-c', 'user_id' => $otherUser->usr_id, 'payload' => '', 'last_activity' => now()->timestamp],
     ]);
 
     SessionSecurity::invalidateOtherSessionsFor($user, 'session-b');
@@ -91,13 +99,13 @@ test('SessionSecurity invalidates all sessions for a user when no exception is g
     $user = makeSettingsPto();
 
     DB::table('sessions')->insert([
-        ['id' => 'session-a', 'user_id' => $user->id, 'payload' => '', 'last_activity' => now()->timestamp],
-        ['id' => 'session-b', 'user_id' => $user->id, 'payload' => '', 'last_activity' => now()->timestamp],
+        ['id' => 'session-a', 'user_id' => $user->usr_id, 'payload' => '', 'last_activity' => now()->timestamp],
+        ['id' => 'session-b', 'user_id' => $user->usr_id, 'payload' => '', 'last_activity' => now()->timestamp],
     ]);
 
     SessionSecurity::invalidateOtherSessionsFor($user);
 
-    expect(DB::table('sessions')->where('user_id', $user->id)->count())->toBe(0);
+    expect(DB::table('sessions')->where('user_id', $user->usr_id)->count())->toBe(0);
 });
 
 test('changing password records a security log entry', function () {
@@ -109,5 +117,5 @@ test('changing password records a security log entry', function () {
         'password_confirmation' => 'valid-pass123',
     ]);
 
-    expect(SecurityLog::where('user_id', $user->id)->where('event_type', 'password_changed')->exists())->toBeTrue();
+    expect(SecurityLog::where('usr_id', $user->usr_id)->where('sec_event_type', 'password_changed')->exists())->toBeTrue();
 });
