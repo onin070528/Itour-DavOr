@@ -98,12 +98,14 @@ class ListingPolicy
      * unaffected: their own review work is untouched by this status check.
      * Which *fields* an establishment may change (a "limited" edit per the
      * matrix) is enforced by the controller/validation, not this ability.
+     * An LGU may not edit a PTO-managed destination, even in its own
+     * municipality (Objective 3, D10).
      */
     public function update(User $objUser, Listing $objListing): bool
     {
         return match ($objUser->usr_role) {
             UserRole::PtoAdministrator => true,
-            UserRole::Lgu => $objListing->mun_id === $objUser->mun_id,
+            UserRole::Lgu => $objListing->mun_id === $objUser->mun_id && ! $objListing->isManagedByPto(),
             UserRole::Establishment => $objListing->lst_category !== 'destinations'
                 && $objListing->lst_id === $objUser->lst_id
                 && in_array($objListing->lst_status, ['DRAFT', 'UNPUBLISHED'], true),
@@ -126,13 +128,30 @@ class ListingPolicy
      * same way. Covers establishments and destination-only records alike:
      * both go through the same PTO review (Phase 6). Controllers
      * additionally check the current status before allowing a specific
-     * transition; this is the jurisdiction check alone.
+     * transition; this is the jurisdiction check alone. The managing level
+     * decides who moves a destination-only record into review: the LGU for
+     * an LGU-managed one, the PTO for a PTO-managed one (Objective 3, D10).
      */
     public function submit(User $objUser, Listing $objListing): bool
     {
-        return $objUser->usr_role === UserRole::Lgu
-            && $objListing->mun_id !== null
-            && $objListing->mun_id === $objUser->mun_id;
+        return match ($objUser->usr_role) {
+            UserRole::Lgu => $objListing->mun_id !== null
+                && $objListing->mun_id === $objUser->mun_id
+                && ! $objListing->isManagedByPto(),
+            UserRole::PtoAdministrator => $objListing->isManagedByPto(),
+            default => false,
+        };
+    }
+
+    /**
+     * Suspend, archive, restore an archived record to Draft, or reinstate
+     * a suspended one to Draft — PTO only (Objective 3, D3). An LGU request
+     * is denied here, which Gate::after (AppServiceProvider) records through
+     * SecurityLogger::accessDenied().
+     */
+    public function archive(User $objUser, Listing $objListing): bool
+    {
+        return $objUser->usr_role === UserRole::PtoAdministrator;
     }
 
     /**

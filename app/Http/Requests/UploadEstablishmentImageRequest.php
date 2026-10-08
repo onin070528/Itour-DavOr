@@ -15,6 +15,7 @@ use App\Models\Listing;
 use App\Policies\ImagePolicy;
 use App\Rules\MinimumImageDimensions;
 use App\Rules\RealImageMimeType;
+use App\Support\SecurityLogger;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 
@@ -35,7 +36,15 @@ class UploadEstablishmentImageRequest extends FormRequest
             return false;
         }
 
-        return app(ImagePolicy::class)->uploadFor($this->user(), $objListing);
+        $blnIsAllowed = app(ImagePolicy::class)->uploadFor($this->user(), $objListing);
+
+        // ImagePolicy is called directly (not through the Gate), so a
+        // denial is security-logged explicitly, as Gate::after logs others.
+        if (! $blnIsAllowed) {
+            SecurityLogger::lguPolicyDenied($this->user(), 'uploadFor', $objListing);
+        }
+
+        return $blnIsAllowed;
     }
 
     /**

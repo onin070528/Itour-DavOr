@@ -8,6 +8,7 @@
  */
 import { initEstablishmentPhotoPreviews } from './establishment_form';
 import { initEstablishmentTypeSelects, isTourGuideTypeSelected, syncEstablishmentTypeOptions } from './establishment_type_select';
+import { initLocationPickers } from './location_picker';
 import { initAutoSubmitSelects } from './report_filters';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -31,6 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initEstablishmentPhotoPreviews();
     initPhotoReorder();
     initAutoSubmitSelects();
+    initLocationPickers();
 });
 
 /**
@@ -1020,9 +1022,14 @@ function initCategoryPanels() {
  * selected category/type. `[data-show-when="establishment"]` (the
  * dependent Type select) shows for every category except Tourist
  * Destinations, `[data-show-when="guide"]` only for the tour guide type,
- * `[[data-hide-when="guide"]]` (coordinates, QR) hide for a guide, and
+ * `[data-show-when="guide-or-destination"]` (accreditation status) for a
+ * tour guide or Tourist Destinations,
+ * `[[data-hide-when="guide"]]` (coordinates, QR) hide for a guide,
  * `[data-show-when="others"]` (the category note) only shows for the
- * Others category. Re-run after an edit trigger populates the form (see
+ * Others category, and `[data-show-when="destination"]` (destination type,
+ * visitor information, entrance fee, managing level) only shows for
+ * Tourist Destinations — the server ignores those fields for any other
+ * category. Re-run after an edit trigger populates the form (see
  * initEditTriggers) since setting .value directly doesn't fire `change`.
  */
 function initDirectoryFormToggles() {
@@ -1038,6 +1045,7 @@ function initListingFormToggles(form) {
     function apply() {
         const categoryName = categorySelect?.selectedOptions?.[0]?.dataset.categoryName;
         const isEstablishment = categoryName !== undefined && categoryName !== 'Tourist Destinations';
+        const isDestination = categoryName === 'Tourist Destinations';
         const isOthers = categoryName === 'Others';
 
         if (typeSelect && categorySelect) {
@@ -1047,8 +1055,10 @@ function initListingFormToggles(form) {
         const isGuide = isEstablishment && isTourGuideTypeSelected(typeSelect);
 
         form.querySelectorAll('[data-show-when="establishment"]').forEach((el) => el.classList.toggle('hidden', !isEstablishment));
+        form.querySelectorAll('[data-show-when="destination"]').forEach((el) => el.classList.toggle('hidden', !isDestination));
         form.querySelectorAll('[data-show-when="others"]').forEach((el) => el.classList.toggle('hidden', !isOthers));
         form.querySelectorAll('[data-show-when="guide"]').forEach((el) => el.classList.toggle('hidden', !isGuide));
+        form.querySelectorAll('[data-show-when="guide-or-destination"]').forEach((el) => el.classList.toggle('hidden', !(isGuide || isDestination)));
         form.querySelectorAll('[data-hide-when="guide"]').forEach((el) => el.classList.toggle('hidden', isGuide));
     }
 

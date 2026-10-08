@@ -1,7 +1,7 @@
 {{--
     iTOUR — Davao Oriental Tourism Information System
 
-    Purpose: LGU Destinations directory — add, edit and archive.
+    Purpose: LGU Destinations directory — add and edit (archiving is PTO-only).
     Programmer/s: iTOUR Development Team
     Copyright (c) 2026 iTOUR Development Team. All rights reserved.
 --}}
@@ -70,21 +70,7 @@
                                         >
                                             <i class="ti ti-pencil" aria-hidden="true"></i> Edit
                                         </button>
-                                        <form method="POST" action="{{ route('lgu.directory.destinations.archive', $d['id']) }}">
-                                            @csrf
-                                            @method('PATCH')
-                                            <button
-                                                type="button"
-                                                data-confirm-trigger
-                                                data-confirm-title="Archive {{ $d['name'] }}?"
-                                                data-confirm-message="Archived destinations are hidden from the public site until restored."
-                                                data-confirm-label="Archive"
-                                                data-confirm-tone="danger"
-                                                class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-danger hover:bg-danger-bg"
-                                            >
-                                                <i class="ti ti-archive" aria-hidden="true"></i> Archive
-                                            </button>
-                                        </form>
+                                        {{-- No Archive action: archiving is PTO-only (Objective 3, D3). --}}
                                     </div>
                                 </div>
                             </div>

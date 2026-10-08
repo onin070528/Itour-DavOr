@@ -89,6 +89,16 @@
                     <dt class="detail-term">Operating hours</dt>
                     <dd class="detail-value">{{ $listing->lst_hours ?: '—' }}</dd>
                 </div>
+                @if ($listing->isDestinationOnly())
+                    <div>
+                        <dt class="detail-term">Entrance fee</dt>
+                        <dd class="detail-value">{{ $listing->lst_entrance_fee ?: '—' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="detail-term">Managed by</dt>
+                        <dd class="detail-value">{{ $listing->managingLevel()->label() }}{{ $listing->lst_contact_office ? ' · '.$listing->lst_contact_office : '' }}</dd>
+                    </div>
+                @endif
                 <div>
                     <dt class="detail-term">Contact</dt>
                     <dd class="detail-value">{{ collect([$listing->lst_contact_phone, $listing->lst_email])->filter()->implode(' · ') ?: '—' }}</dd>
@@ -101,6 +111,12 @@
                     <dt class="detail-term">Description</dt>
                     <dd class="detail-value whitespace-pre-line">{{ $listing->lst_description ?: '—' }}</dd>
                 </div>
+                @if ($listing->isDestinationOnly())
+                    <div class="sm:col-span-2">
+                        <dt class="detail-term">Visitor information</dt>
+                        <dd class="detail-value whitespace-pre-line">{{ $listing->lst_visitor_information ?: '—' }}</dd>
+                    </div>
+                @endif
             </dl>
         </section>
 

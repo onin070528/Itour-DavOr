@@ -55,8 +55,17 @@ use App\Http\Controllers\ReportVerificationController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [LandingController::class, 'index'])->name('home');
-Route::get('/explore', [ExploreController::class, 'index'])->name('explore');
-Route::get('/listings/{listing}', [ListingDetailController::class, 'show'])->name('listings.show');
+// Public Tourism Directory (Objective 3): server-side search, detail pages,
+// and a destination's Find Nearby list — rate-limited per IP, generously.
+Route::middleware('throttle:public-directory')->group(function () {
+    Route::get('/explore', [ExploreController::class, 'index'])->name('explore');
+    Route::get('/listings/{listing}', [ListingDetailController::class, 'show'])->name('listings.show');
+    Route::get('/listings/{listing}/nearby', [ListingDetailController::class, 'nearby'])->name('listings.nearby');
+
+    // Find Near Me: the visitor's location travels only in this POST JSON
+    // body (never a URL), under its own rate limit.
+    Route::post('/find-near-me', [ExploreController::class, 'nearMe'])->middleware('throttle:find-near-me')->name('findNearMe');
+});
 Route::get('/hotlines', [HotlinesController::class, 'index'])->name('hotlines');
 Route::get('/verify-report', [ReportVerificationController::class, 'show'])->name('reports.verify');
 Route::get('/privacy', [PrivacyController::class, 'show'])->name('privacy');
@@ -137,6 +146,7 @@ Route::middleware(['auth', 'role:pto_administrator'])->prefix('pto')->name('pto.
         Route::post('/', [PtoDirectoryController::class, 'store'])->name('store');
         Route::put('/{listing}', [PtoDirectoryController::class, 'update'])->name('update');
         Route::put('/{listing}/status', [PtoDirectoryController::class, 'updateStatus'])->name('updateStatus');
+        Route::patch('/{listing}/submit', [PtoDirectoryController::class, 'submitForReview'])->name('submit');
         Route::patch('/{listing}/publish', [PtoDirectoryController::class, 'publish'])->name('publish');
         Route::patch('/{listing}/return', [PtoDirectoryController::class, 'returnToLgu'])->name('returnToLgu');
         Route::patch('/{listing}/unpublish', [PtoDirectoryController::class, 'unpublish'])->name('unpublish');

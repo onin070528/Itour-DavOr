@@ -7,10 +7,13 @@
             <h2 class="dashboard-panel-title">Photos</h2>
             <p class="mt-0.5 text-xs text-sand-500">{{ $listing->liveImageCount() }} of {{ $listing->maxLiveImages() }} photos</p>
         </div>
-        <a href="{{ $listing->isDestinationOnly() ? route('lgu.directory.attractions.edit', $listing) : route('lgu.directory.establishments.edit', $listing) }}#photos" class="btn-small">
-            <i class="ti ti-camera" aria-hidden="true"></i>
-            Manage photos
-        </a>
+        {{-- A PTO-managed attraction's photos are managed by the PTO (Objective 3, D10). --}}
+        @unless ($listing->isManagedByPto())
+            <a href="{{ $listing->isDestinationOnly() ? route('lgu.directory.attractions.edit', $listing) : route('lgu.directory.establishments.edit', $listing) }}#photos" class="btn-small">
+                <i class="ti ti-camera" aria-hidden="true"></i>
+                Manage photos
+            </a>
+        @endunless
     </div>
 
     @if ($colImages->isEmpty())

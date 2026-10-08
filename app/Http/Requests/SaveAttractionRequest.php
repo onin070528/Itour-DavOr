@@ -10,10 +10,12 @@
 namespace App\Http\Requests;
 
 use App\Models\Listing;
+use App\Rules\WithinDavaoOrientalBounds;
 use App\Services\AttractionRecordService;
 use App\Support\SecurityLogger;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 /**
  * Used by Lgu\AttractionsController::store() and ::update(). There is no
@@ -25,9 +27,11 @@ use Illuminate\Support\Str;
 class SaveAttractionRequest extends FormRequest
 {
     /**
-     * LGU only; on edit, only an attraction in the LGU's own municipality.
-     * A cross-municipality attempt is security-logged and answered with
-     * 403 (CLAUDE.md), before any validation runs.
+     * LGU only; on edit, only an LGU-managed attraction in the LGU's own
+     * municipality. A cross-municipality attempt is security-logged and
+     * answered with 403 (CLAUDE.md), before any validation runs; so is an
+     * edit of a PTO-managed destination (ListingPolicy::update(), logged by
+     * Gate::after in AppServiceProvider).
      */
     public function authorize(): bool
     {
@@ -54,7 +58,33 @@ class SaveAttractionRequest extends FormRequest
         // An establishment is not edited through the attraction form.
         abort_unless($objListing->isDestinationOnly(), 404);
 
-        return true;
+        return $objUser->can('update', $objListing);
+    }
+
+    /**
+     * Destination type: optional, one of config/tourism_directory.php
+     * 'destination_types'. Shared with the PTO directory form.
+     *
+     * @return array<int, mixed>
+     */
+    public static function destinationTypeRules(): array
+    {
+        return ['nullable', 'string', Rule::in(config('tourism_directory.destination_types'))];
+    }
+
+    /**
+     * Visitor information and entrance fee — destination content reviewed
+     * by the PTO (Listing::PUBLIC_CONTENT_FIELDS). Shared with the PTO
+     * directory form.
+     *
+     * @return array<string, array<int, mixed>>
+     */
+    public static function visitorFieldRules(): array
+    {
+        return [
+            'visitor_information' => ['nullable', 'string', 'max:5000'],
+            'entrance_fee' => ['nullable', 'string', 'max:255'],
+        ];
     }
 
     /**
@@ -64,14 +94,18 @@ class SaveAttractionRequest extends FormRequest
     {
         $arrRules = [
             'name' => ['required', 'string', 'max:255'],
+            'type' => self::destinationTypeRules(),
             'barangay' => ['required', 'string', 'max:255'],
-            'lat' => ['nullable', 'numeric', 'between:-90,90'],
-            'lng' => ['nullable', 'numeric', 'between:-180,180'],
+            'lat' => WithinDavaoOrientalBounds::latitudeRules(),
+            'lng' => WithinDavaoOrientalBounds::longitudeRules(),
             'description' => ['nullable', 'string', 'max:5000'],
+            ...self::visitorFieldRules(),
             'contact_office' => ['nullable', 'string', 'max:255'],
             'contact_phone' => ['nullable', 'string', 'max:255'],
             'hours' => ['nullable', 'string', 'max:255'],
             'website' => ['nullable', 'string', 'max:255'],
+            // The existing lst_accreditation_status free-text field, with the establishment rule.
+            'accreditation_status' => ['nullable', 'string', 'max:255'],
         ];
 
         $objListing = $this->_routeListing();
@@ -102,6 +136,7 @@ class SaveAttractionRequest extends FormRequest
     {
         return [
             'barangay.required' => 'Enter the barangay or address of the attraction.',
+            'type.in' => 'Choose a destination type from the list.',
             'photos.max' => 'You can add up to :max photos.',
             ...UploadEstablishmentImageRequest::photoMessages(),
         ];

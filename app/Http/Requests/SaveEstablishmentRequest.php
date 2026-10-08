@@ -12,6 +12,7 @@ namespace App\Http\Requests;
 use App\Models\Category;
 use App\Models\Listing;
 use App\Rules\EstablishmentTypeBelongsToCategory;
+use App\Rules\WithinDavaoOrientalBounds;
 use App\Support\SecurityLogger;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Str;
@@ -120,8 +121,8 @@ class SaveEstablishmentRequest extends FormRequest
             'type' => EstablishmentTypeBelongsToCategory::rulesFor($objCategory),
             'owner_name' => ['nullable', 'string', 'max:255'],
             'barangay' => [$blnIsTourGuide ? 'nullable' : 'required', 'string', 'max:255'],
-            'lat' => [$blnIsTourGuide ? 'prohibited' : 'nullable', 'numeric', 'between:-90,90'],
-            'lng' => [$blnIsTourGuide ? 'prohibited' : 'nullable', 'numeric', 'between:-180,180'],
+            'lat' => $blnIsTourGuide ? ['prohibited'] : WithinDavaoOrientalBounds::latitudeRules(),
+            'lng' => $blnIsTourGuide ? ['prohibited'] : WithinDavaoOrientalBounds::longitudeRules(),
             'description' => ['nullable', 'string'],
             'contact_office' => ['nullable', 'string', 'max:255'],
             'contact_phone' => ['nullable', 'string', 'max:255'],

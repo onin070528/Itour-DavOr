@@ -41,6 +41,7 @@ class ImagePolicy
                 && in_array($objListing->lst_status, ['DRAFT', 'UNPUBLISHED'], true),
             UserRole::Lgu => $objUser->mun_id !== null
                 && $objUser->mun_id === $objListing->mun_id
+                && ! $objListing->isManagedByPto()
                 && ($objListing->establishmentUser === null || $objListing->reportingMethod() === ReportingMethod::ManualPaper),
             UserRole::PtoAdministrator => true,
             default => false,
@@ -107,11 +108,13 @@ class ImagePolicy
         return match ($objUser->usr_role) {
             // Same editable window as uploadFor() above — LGU/PTO keep
             // managing photos regardless of status, their own review work
-            // is unaffected.
+            // is unaffected. An LGU never manages a PTO-managed
+            // destination's photos (Objective 3, D10).
             UserRole::Establishment => $objUser->lst_id === $objListing->lst_id
                 && in_array($objListing->lst_status, ['DRAFT', 'UNPUBLISHED'], true),
             UserRole::Lgu => $objUser->mun_id !== null
-                && $objUser->mun_id === $objListing->mun_id,
+                && $objUser->mun_id === $objListing->mun_id
+                && ! $objListing->isManagedByPto(),
             UserRole::PtoAdministrator => true,
             default => false,
         };

@@ -11,6 +11,7 @@
 namespace App\Models;
 
 use App\Enums\ImageStatus;
+use App\Enums\ManagingLevel;
 use App\Enums\ReportingMethod;
 use App\Enums\UserRole;
 use App\Support\SecurityLogger;
@@ -44,14 +45,17 @@ use Illuminate\Support\Str;
  * only a signed-in PTO Administrator may move a listing to another
  * municipality — enforced in booted() below, whichever code path tries.
  * `lst_reporting_mode` is deliberately NOT fillable: switching it has side
- * effects (QR, account), so it is only ever set explicitly.
+ * effects (QR, account), so it is only ever set explicitly. Likewise
+ * `lst_managing_level`, `lst_created_by`, and `lst_updated_by` decide or
+ * record who may edit a record, so they are set explicitly by application
+ * logic, never mass-assigned.
  */
 #[Table('tbl_listings', key: 'lst_id')]
 #[Fillable([
     'lst_slug', 'lst_name', 'lst_owner_name', 'lst_category', 'cat_id', 'lst_type', 'lst_license_number', 'lst_accreditation_status',
     'lst_category_note', 'lst_municipality', 'mun_id', 'lst_barangay', 'lst_lat', 'lst_lng', 'lst_description',
     'lst_rating', 'lst_tags', 'lst_image', 'lst_contact_office', 'lst_contact_phone', 'lst_hours',
-    'lst_email', 'lst_website', 'lst_status',
+    'lst_email', 'lst_website', 'lst_status', 'lst_visitor_information', 'lst_entrance_fee',
 ])]
 class Listing extends Model
 {
@@ -100,12 +104,36 @@ class Listing extends Model
      * list reaches the public site without PTO approval (R10): while a new
      * request is with the PTO they are locked for LGU edits
      * (hasLockedPublicContent()), and LGU edits to a Published listing are
-     * held in lst_pending_changes until the PTO approves them. Contact and
-     * operating fields are not public destination content and always save.
+     * held in lst_pending_changes until the PTO approves them. Visitor
+     * information and the entrance fee are reviewed too (Objective 3, D9).
+     * Contact details and hours are not public destination content and
+     * always save.
      *
      * @var array<int, string>
      */
-    public const PUBLIC_CONTENT_FIELDS = ['lst_name', 'cat_id', 'lst_type', 'lst_category_note', 'lst_barangay', 'lst_lat', 'lst_lng', 'lst_description'];
+    public const PUBLIC_CONTENT_FIELDS = [
+        'lst_name', 'cat_id', 'lst_type', 'lst_category_note', 'lst_barangay', 'lst_lat', 'lst_lng', 'lst_description',
+        'lst_visitor_information', 'lst_entrance_fee',
+    ];
+
+    /**
+     * Public content the Explore keyword search looks in (plus the category
+     * name). Never owner, contact-person, workflow, or internal fields.
+     *
+     * @var array<int, string>
+     */
+    public const PUBLIC_SEARCH_COLUMNS = ['lst_name', 'lst_municipality', 'lst_barangay', 'lst_type', 'lst_description'];
+
+    /**
+     * The stored accreditation text (lst_accreditation_status, free text)
+     * that means "DOT Accredited", after isDotAccredited() normalizes case
+     * and punctuation — "DOT Accredited" and the form's own example
+     * "DOT-accredited" both qualify.
+     */
+    public const DOT_ACCREDITED_NORMALIZED = 'dot accredited';
+
+    /** Destination statuses the PTO can return to Draft: Archived (restore) and Suspended (reinstate). */
+    public const DRAFT_RETURNABLE_STATUSES = ['Archived', 'Suspended'];
 
     protected static function booted(): void
     {
@@ -147,6 +175,7 @@ class Listing extends Model
             'lst_is_qr_enabled' => 'boolean',
             'lst_pending_changes' => 'array',
             'lst_reporting_mode' => ReportingMethod::class,
+            'lst_managing_level' => ManagingLevel::class,
         ];
     }
 
@@ -173,14 +202,15 @@ class Listing extends Model
     /**
      * A slug from $strName not used by any listing yet ("aliwagwag-falls",
      * then "aliwagwag-falls-2", ...). Slugs are the public URL of a listing.
+     * $strFallbackBase is used when $strName has no slug-able characters.
      */
-    public static function uniqueSlug(string $strName): string
+    public static function uniqueSlug(string $strName, string $strFallbackBase = 'destination'): string
     {
-        $strBase = Str::slug($strName) ?: 'destination';
+        $strBase = Str::slug($strName) ?: $strFallbackBase;
         $strSlug = $strBase;
         $intSuffix = 2;
 
-        while (static::query()->where('slug', $strSlug)->exists()) {
+        while (static::query()->where('lst_slug', $strSlug)->exists()) {
             $strSlug = "{$strBase}-{$intSuffix}";
             $intSuffix++;
         } // end while slug taken
@@ -359,6 +389,22 @@ class Listing extends Model
     }
 
     /**
+     * The account that created this record (lst_created_by), when recorded.
+     */
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'lst_created_by', 'usr_id');
+    }
+
+    /**
+     * The account that last updated this record (lst_updated_by), when recorded.
+     */
+    public function updater(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'lst_updated_by', 'usr_id');
+    }
+
+    /**
      * The fixed-lookup category (tbl_categories) — being cut over to from the
      * legacy free-text `lst_category` string column, which is kept untouched
      * until every reader has moved onto this relation.
@@ -403,6 +449,51 @@ class Listing extends Model
     }
 
     /**
+     * Which office level manages this destination (App\Enums\ManagingLevel).
+     * Falls back to LGU when none is stored — the behavior every record had
+     * before the managing level existed — so callers always get an enum.
+     */
+    public function managingLevel(): ManagingLevel
+    {
+        return $this->lst_managing_level instanceof ManagingLevel
+            ? $this->lst_managing_level
+            : ManagingLevel::default();
+    }
+
+    /**
+     * The statuses the PTO "Change Status" action may move this record to
+     * from its current status (Objective 3, D3). Destination-only records:
+     * Archived can only be restored to Draft, Suspended can only be
+     * reinstated to Draft (never straight to Published) or archived, and
+     * anything else can be suspended or archived. Establishments keep their
+     * existing Suspend/Archive options, unchanged.
+     *
+     * @return array<int, string>
+     */
+    public function statusChangeOptions(): array
+    {
+        if (! $this->isDestinationOnly()) {
+            return self::INACTIVE_ESTABLISHMENT_STATUSES;
+        }
+
+        return match ($this->lst_status) {
+            'Archived' => ['DRAFT'],
+            'Suspended' => ['DRAFT', 'Archived'],
+            default => ['Suspended', 'Archived'],
+        };
+    }
+
+    /**
+     * Whether this is a destination-only record managed by the PTO — the
+     * LGU of its municipality may view it but not edit, submit, or manage
+     * its photos (Objective 3, D10). Establishments have no managing level.
+     */
+    public function isManagedByPto(): bool
+    {
+        return $this->isDestinationOnly() && $this->managingLevel() === ManagingLevel::Pto;
+    }
+
+    /**
      * Single source of truth for "is this listing visible on public pages
      * right now" — branches on category since destinations and
      * establishments use two different status vocabularies (destinations:
@@ -417,6 +508,78 @@ class Listing extends Model
         return $this->lst_category === 'destinations'
             ? $this->lst_status === 'Active'
             : $this->lst_status === 'PUBLISHED';
+    }
+
+    /**
+     * Case-insensitive keyword search over public content
+     * (PUBLIC_SEARCH_COLUMNS) and the category name — "Sleeping Dinosaur",
+     * "Mati", "Resort", or "Accommodation". The keyword is a bound value;
+     * LIKE wildcards in it (% and _) are escaped so they match literally.
+     */
+    public function scopeMatchingPublicSearch(Builder $objQuery, string $strKeyword): Builder
+    {
+        $strPattern = '%'.addcslashes(Str::lower($strKeyword), '\\%_').'%';
+        $strCondition = "LIKE ? ESCAPE '\\'";
+
+        return $objQuery->where(function (Builder $objMatch) use ($strPattern, $strCondition) {
+            foreach (self::PUBLIC_SEARCH_COLUMNS as $strColumn) {
+                $objMatch->orWhereRaw("LOWER({$strColumn}) {$strCondition}", [$strPattern]);
+            } // end foreach searchable column
+
+            $objMatch->orWhereHas('categoryRecord', fn (Builder $objCategory) => $objCategory->whereRaw("LOWER(cat_name) {$strCondition}", [$strPattern]));
+        });
+    }
+
+    /**
+     * Whether the existing accreditation field explicitly says DOT
+     * Accredited — the only source of the public "DOT Accredited" badge.
+     * The field is free text, so this is strict: after lower-casing and
+     * turning punctuation into spaces it must read exactly "dot accredited".
+     * NULL, empty, "Pending", "Not DOT accredited", "Accredited" (without
+     * DOT), or any longer note do not qualify. Only this yes/no reaches
+     * public pages, never the stored text.
+     */
+    public function isDotAccredited(): bool
+    {
+        $strNormalized = trim((string) preg_replace('/[^a-z0-9]+/', ' ', Str::lower((string) $this->lst_accreditation_status)));
+
+        return $strNormalized === self::DOT_ACCREDITED_NORMALIZED;
+    }
+
+    /**
+     * Whether this listing has a usable map location: both coordinates set
+     * and within the valid latitude/longitude range. A listing without one
+     * never takes part in nearby search, and its Find Nearby is disabled.
+     * App\Services\NearbySearchService applies the same rule in SQL.
+     */
+    public function hasValidCoordinates(): bool
+    {
+        $blnHasBoth = $this->lst_lat !== null && $this->lst_lng !== null;
+
+        if (! $blnHasBoth) {
+            return false;
+        }
+
+        $blnIsValidLatitude = $this->lst_lat >= -90 && $this->lst_lat <= 90;
+        $blnIsValidLongitude = $this->lst_lng >= -180 && $this->lst_lng <= 180;
+
+        return $blnIsValidLatitude && $blnIsValidLongitude;
+    }
+
+    /**
+     * Query form of isPubliclyVisible() — the same rule, for database
+     * queries that must filter before loading rows (nearby search, the
+     * paginated directory). Keep the two in step.
+     */
+    public function scopePubliclyVisible(Builder $objQuery): Builder
+    {
+        return $objQuery->where(fn (Builder $objVisible) => $objVisible
+            ->where(fn (Builder $objDestination) => $objDestination
+                ->where('lst_category', 'destinations')
+                ->where('lst_status', 'Active'))
+            ->orWhere(fn (Builder $objEstablishment) => $objEstablishment
+                ->where('lst_category', '!=', 'destinations')
+                ->where('lst_status', 'PUBLISHED')));
     }
 
     public function isDraft(): bool

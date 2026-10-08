@@ -371,3 +371,58 @@ test('non-LGU roles cannot reach the LGU establishment pages', function () {
         test()->actingAs($objUser)->post(route('lgu.directory.establishments.store'), managementPayload())->assertForbidden();
     } // end foreach non-LGU user
 });
+
+test('two attractions with the same name get distinct, stable slugs', function () {
+    $objLgu = managementLgu(managementMunicipality('City of Mati', 'MATI'));
+
+    foreach ([1, 2] as $intAttempt) {
+        test()->actingAs($objLgu)->post(route('lgu.directory.attractions.store'), [
+            'name' => 'Aliwagwag Falls',
+            'barangay' => 'Dapnan',
+        ])->assertSessionHasNoErrors();
+    } // end foreach attempt
+
+    expect(Listing::query()->where('lst_name', 'Aliwagwag Falls')->orderBy('lst_id')->pluck('lst_slug')->all())
+        ->toBe(['aliwagwag-falls', 'aliwagwag-falls-2']);
+});
+
+test('attraction coordinates must be numeric, paired, and inside Davao Oriental', function () {
+    $objLgu = managementLgu(managementMunicipality('City of Mati', 'MATI'));
+    $strOutsideMessage = 'The selected location must be inside Davao Oriental. Move the map marker into the province.';
+
+    // Summary comment: one half of the pair alone is rejected.
+    test()->actingAs($objLgu)->post(route('lgu.directory.attractions.store'), ['name' => 'Half Pin', 'barangay' => 'Dahican', 'lat' => 6.9578])
+        ->assertSessionHasErrors(['lat' => 'Set both latitude and longitude, or leave both empty.']);
+
+    // Summary comment: a real coordinate outside the province (Manila) is rejected on both fields.
+    test()->actingAs($objLgu)->post(route('lgu.directory.attractions.store'), ['name' => 'Manila Pin', 'barangay' => 'Ermita', 'lat' => 14.5995, 'lng' => 120.9842])
+        ->assertSessionHasErrors(['lat' => $strOutsideMessage, 'lng' => $strOutsideMessage]);
+
+    test()->actingAs($objLgu)->post(route('lgu.directory.attractions.store'), ['name' => 'Text Pin', 'barangay' => 'Dahican', 'lat' => 'north', 'lng' => 126.2478])
+        ->assertSessionHasErrors('lat');
+
+    expect(Listing::query()->whereIn('lst_name', ['Half Pin', 'Manila Pin', 'Text Pin'])->exists())->toBeFalse();
+
+    // Summary comment: a point inside Davao Oriental, or no location at all, is accepted.
+    test()->actingAs($objLgu)->post(route('lgu.directory.attractions.store'), ['name' => 'Dahican Pin', 'barangay' => 'Dahican', 'lat' => 6.9578, 'lng' => 126.2478])
+        ->assertSessionHasNoErrors();
+    test()->actingAs($objLgu)->post(route('lgu.directory.attractions.store'), ['name' => 'No Pin Yet', 'barangay' => 'Dahican'])
+        ->assertSessionHasNoErrors();
+
+    expect(Listing::query()->where('lst_name', 'Dahican Pin')->first()?->lst_lat)->toBe(6.9578);
+    expect(Listing::query()->where('lst_name', 'No Pin Yet')->first()?->lst_lat)->toBeNull();
+});
+
+test('the establishment and PTO directory forms apply the same Davao Oriental coordinate guard', function () {
+    $objMati = managementMunicipality('City of Mati', 'MATI');
+    $objPto = User::factory()->create(['usr_role' => UserRole::PtoAdministrator]);
+    $arrOutside = ['lat' => 14.5995, 'lng' => 120.9842];
+
+    test()->actingAs(managementLgu($objMati))->post(route('lgu.directory.establishments.store'), managementPayload($arrOutside))
+        ->assertSessionHasErrors(['lat', 'lng']);
+
+    test()->actingAs($objPto)->post(route('pto.directory.store'), managementPayload([...$arrOutside, 'municipality' => 'City of Mati']))
+        ->assertSessionHasErrors(['lat', 'lng']);
+
+    expect(Listing::query()->where('lst_name', 'Dahican Beach Resort')->exists())->toBeFalse();
+});

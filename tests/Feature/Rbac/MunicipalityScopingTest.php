@@ -56,16 +56,24 @@ test('PTO can reach the province-wide directory regardless of municipality', fun
     test()->actingAs($pto)->get(route('pto.directory.index'))->assertOk();
 });
 
-test('an LGU can manage a destination inside its own municipality', function () {
+test('an LGU can manage a destination inside its own municipality, but archiving is PTO-only', function () {
     $mati = makeMunicipality('City of Mati', 'MATI');
     $matiDestination = makeListing($mati, 'destinations');
     $matiLgu = makeLguUser($mati);
 
+    test()->actingAs($matiLgu)->put(route('lgu.directory.destinations.update', $matiDestination), [
+        'name' => $matiDestination->lst_name,
+        'barangay' => $matiDestination->lst_barangay,
+        'contactPhone' => '09171234567',
+    ])->assertRedirect();
+
+    // Objective 3 (D3): a direct LGU archive request is refused, never silently performed.
     test()->actingAs($matiLgu)
         ->patch(route('lgu.directory.destinations.archive', $matiDestination))
-        ->assertRedirect();
+        ->assertForbidden();
 
-    expect($matiDestination->fresh()->lst_status)->toBe('Archived');
+    expect($matiDestination->fresh()->lst_contact_phone)->toBe('09171234567');
+    expect($matiDestination->fresh()->lst_status)->toBe('Active');
 });
 
 test('an LGU cannot update or archive a destination belonging to another municipality', function () {

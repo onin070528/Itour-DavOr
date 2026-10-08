@@ -1,7 +1,7 @@
 {{--
     iTOUR — Davao Oriental Tourism Information System
 
-    Purpose: Landing page "Near you" map section.
+    Purpose: Landing page "Near you" section — Find Near Me (server-side nearest places) and a map that plots them.
     Programmer/s: iTOUR Development Team
     Copyright (c) 2026 iTOUR Development Team. All rights reserved.
 --}}
@@ -13,23 +13,11 @@
             <p class="text-xs font-bold tracking-widest text-accent-500 uppercase">Nearby Services</p>
             <h2 class="mt-2 text-2xl text-sand-0 sm:text-3xl">Everything you need, wherever the road takes you.</h2>
             <p class="mt-4 max-w-lg text-sm leading-relaxed text-white/75 sm:text-base">
-                Find the nearest accredited accommodation, restaurants, transport, tour guides and emergency services from anywhere in the province.
+                Find the nearest published destinations, accommodation, food, and other tourism services from wherever you are in the province.
             </p>
 
-            <div class="mt-6 flex flex-wrap gap-2">
-                @foreach (['Accommodation', 'Restaurants', 'Transportation', 'Emergency Services'] as $tag)
-                    <span class="rounded-full border border-white/25 px-3.5 py-1.5 text-xs font-semibold text-sand-0">{{ $tag }}</span>
-                @endforeach
-            </div>
-
-            <button
-                type="button"
-                id="find-near-you-button"
-                class="mt-8 inline-flex items-center justify-center gap-2 rounded-sm bg-accent-500 px-6 py-3 text-sm font-semibold text-sand-0 shadow-sm transition-colors hover:bg-accent-600 disabled:cursor-wait disabled:opacity-70"
-            >
-                Open Nearby map
-                <i class="ti ti-arrow-right" aria-hidden="true"></i>
-            </button>
+            {{-- Find Near Me: the server finds the nearest places; the map on the right plots them. --}}
+            <x-find-near-me class="mt-6" />
         </div>
 
         <div class="relative h-80 overflow-hidden rounded-lg border border-white/10 shadow-sm sm:h-96">
@@ -40,7 +28,7 @@
             <div class="absolute inset-0 bg-gradient-to-br from-sand-200 to-primary-100">
                 <div
                     id="nearby-map"
-                    data-mapbox-token="{{ config('services.mapbox.token') }}"
+                    data-mapbox-token="{{ \App\Support\MapboxToken::browserToken() }}"
                     data-mapbox-center-lat="6.9214"
                     data-mapbox-center-lng="126.2686"
                     class="h-full w-full"

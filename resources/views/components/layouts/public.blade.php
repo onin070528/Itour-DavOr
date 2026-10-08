@@ -5,7 +5,7 @@
     Programmer/s: iTOUR Development Team
     Copyright (c) 2026 iTOUR Development Team. All rights reserved.
 --}}
-@props(['title' => null])
+@props(['title' => null, 'description' => null, 'canonical' => null])
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
     <head>
@@ -14,7 +14,10 @@
         <meta name="csrf-token" content="{{ csrf_token() }}">
 
         <title>{{ $title ? "{$title} · iTOUR Davao Oriental" : 'iTOUR — Discover Davao Oriental' }}</title>
-        <meta name="description" content="iTOUR is the official tourism information platform of the Provincial Tourism Office of Davao Oriental — explore destinations, accommodations, restaurants, and tourism establishments across the province.">
+        <meta name="description" content="{{ $description ?: 'iTOUR is the official tourism information platform of the Provincial Tourism Office of Davao Oriental — explore destinations, accommodations, restaurants, and tourism establishments across the province.' }}">
+        @if ($canonical)
+            <link rel="canonical" href="{{ $canonical }}">
+        @endif
 
         @fonts
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/3.46.0/tabler-icons.min.css">

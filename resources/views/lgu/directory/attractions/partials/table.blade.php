@@ -30,7 +30,7 @@
                         <tr data-row data-search-text="{{ Str::lower($attraction->lst_name.' '.$attraction->lst_barangay) }}" class="hover:bg-sand-50">
                             <td class="px-4 py-3">
                                 <a href="{{ route('lgu.directory.attractions.show', $attraction) }}" class="font-medium text-sand-900 hover:text-primary-700">{{ $attraction->lst_name }}</a>
-                                <span class="block text-xs text-sand-500">Tourist attraction</span>
+                                <span class="block text-xs text-sand-500">Tourist attraction{{ $attraction->isManagedByPto() ? ' · Managed by PTO' : '' }}</span>
                             </td>
                             <td class="px-4 py-3 text-sand-700">{{ $attraction->lst_barangay ?: '—' }}</td>
                             <td class="px-4 py-3 text-sand-700">{{ $attraction->intPhotoCount }}</td>
@@ -38,7 +38,9 @@
                             <td class="px-4 py-3">
                                 <div class="flex justify-end gap-2">
                                     <a href="{{ route('lgu.directory.attractions.show', $attraction) }}" class="btn-small">View</a>
-                                    <a href="{{ route('lgu.directory.attractions.edit', $attraction) }}" class="btn-small">Edit</a>
+                                    @unless ($attraction->isManagedByPto())
+                                        <a href="{{ route('lgu.directory.attractions.edit', $attraction) }}" class="btn-small">Edit</a>
+                                    @endunless
                                 </div>
                             </td>
                         </tr>

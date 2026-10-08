@@ -14,6 +14,7 @@ namespace App\Http\Controllers\Lgu;
 use App\Enums\ImageSourceRole;
 use App\Enums\ImageStatus;
 use App\Enums\ReportingMethod;
+use App\Http\Controllers\Concerns\AuthorizesOwnMunicipality;
 use App\Http\Controllers\Concerns\ManagesEstablishmentImages;
 use App\Http\Controllers\Concerns\ReviewsEstablishmentImageQueue;
 use App\Http\Requests\UploadEstablishmentImageRequest;
@@ -29,6 +30,7 @@ use Illuminate\View\View;
 
 class ImagesController extends LguController
 {
+    use AuthorizesOwnMunicipality;
     use ManagesEstablishmentImages;
     use ReviewsEstablishmentImageQueue;
 
@@ -76,7 +78,7 @@ class ImagesController extends LguController
      */
     public function manage(Request $objRequest, Listing $listing, ImagePolicy $objPolicy): View
     {
-        abort_unless($objRequest->user()->mun_id === $listing->mun_id, 403);
+        $this->authorizeOwnMunicipality($objRequest, $listing);
 
         return $this->renderLgu($objRequest, 'lgu.images.manage', 'images.index', 'Photos', [
             'listing' => $listing,
@@ -128,7 +130,7 @@ class ImagesController extends LguController
      */
     public function approveBatch(Request $objRequest, Listing $listing, EstablishmentImageReviewer $objReviewer): RedirectResponse
     {
-        abort_unless($objRequest->user()->mun_id === $listing->mun_id, 403);
+        $this->authorizeOwnMunicipality($objRequest, $listing);
 
         $arrData = $objRequest->validate([
             'image_ids' => ['required', 'array', 'min:1'],
@@ -146,7 +148,7 @@ class ImagesController extends LguController
      */
     public function returnBatch(Request $objRequest, Listing $listing, EstablishmentImageReviewer $objReviewer): RedirectResponse
     {
-        abort_unless($objRequest->user()->mun_id === $listing->mun_id, 403);
+        $this->authorizeOwnMunicipality($objRequest, $listing);
 
         $arrData = $objRequest->validate([
             'image_ids' => ['required', 'array', 'min:1'],

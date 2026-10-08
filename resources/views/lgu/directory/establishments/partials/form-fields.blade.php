@@ -119,6 +119,8 @@
             <input id="establishment-lng" name="lng" type="number" step="any" min="-180" max="180" value="{{ old('lng', $listing?->lst_lng) }}" @disabled($fnLockedAttribute('lng')) class="form-input">
             @error('lng') <p class="form-error">{{ $message }}</p> @enderror
         </div>
+
+        <x-dashboard.location-picker data-hide-when="guide" class="sm:col-span-2" latitude-input="establishment-lat" longitude-input="establishment-lng" :is-disabled="$fnLockedAttribute('lat')" />
     </div>
 </section>
 

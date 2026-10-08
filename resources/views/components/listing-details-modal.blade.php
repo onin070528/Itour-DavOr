@@ -27,7 +27,8 @@
         </div>
         <div data-listing-details-photo class="pointer-events-none absolute inset-0 bg-gradient-to-t from-sand-900/60 via-transparent to-transparent"></div>
 
-        {{-- "Get directions" swaps the photo for this Mapbox route map. The
+        {{-- "View on map" swaps the photo for a Mapbox map of the destination
+             only (no route, no visitor location). The
              wrapper owns the absolute positioning: mapbox-gl.css sets
              .mapboxgl-map { position: relative } unlayered, which beats
              Tailwind's layered utilities on the map element itself. --}}
@@ -35,7 +36,7 @@
             <div
                 id="listing-details-map"
                 class="h-full w-full"
-                data-mapbox-token="{{ config('services.mapbox.token') }}"
+                data-mapbox-token="{{ \App\Support\MapboxToken::browserToken() }}"
             ></div>
         </div>
 
@@ -98,12 +99,24 @@
             </a>
             <button
                 type="button"
-                id="listing-details-directions"
-                class="inline-flex cursor-pointer items-center gap-2 rounded-sm bg-primary-700 px-5 py-2.5 text-sm font-semibold text-sand-0 shadow-sm transition-colors hover:bg-primary-900"
+                id="listing-details-map-toggle"
+                class="inline-flex cursor-pointer items-center gap-2 rounded-sm border border-sand-300 px-5 py-2.5 text-sm font-semibold text-sand-800 transition-colors hover:border-primary-300 hover:text-primary-700"
+            >
+                <i class="ti ti-map-2" aria-hidden="true"></i>
+                <span data-map-toggle-label>View on map</span>
+            </button>
+            {{-- Built on the server (App\Support\DirectionsLink): the destination's coordinates only — never the visitor's location. --}}
+            <a
+                id="listing-details-directions-link"
+                href="#"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="inline-flex items-center gap-2 rounded-sm bg-primary-700 px-5 py-2.5 text-sm font-semibold text-sand-0 shadow-sm transition-colors hover:bg-primary-900"
             >
                 <i class="ti ti-route" aria-hidden="true"></i>
-                <span data-directions-label>Get directions</span>
-            </button>
+                Get directions
+                <span class="sr-only">(opens Google Maps in a new tab)</span>
+            </a>
             <button
                 type="button"
                 data-listing-details-close
@@ -113,7 +126,8 @@
             </button>
         </div>
 
-        <p id="listing-details-directions-status" class="mt-3 flex items-center gap-1.5 text-sm text-sand-600" aria-live="polite" hidden></p>
+        <p id="listing-details-map-status" class="mt-3 text-sm text-sand-600" aria-live="polite" hidden></p>
+        <p class="mt-2 text-xs text-sand-500">Directions open in Google Maps with this place as the destination. iTOUR never shares your location.</p>
     </div>
 
     <script type="application/json" id="listing-details-data">@json($listings)</script>

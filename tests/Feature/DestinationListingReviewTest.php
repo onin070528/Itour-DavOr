@@ -8,6 +8,7 @@
  * Copyright  : 2026 University of Mindanao. All rights reserved.
  */
 
+use App\Enums\ManagingLevel;
 use App\Enums\ReportingMethod;
 use App\Enums\UserRole;
 use App\Models\Category;
@@ -380,4 +381,236 @@ test('the notification bell lists the user\'s notifications, opens one (marking 
 
     test()->actingAs($objPto)->post(route('notifications.readAll'))->assertRedirect();
     expect($objPto->unreadNotifications()->count())->toBe(0);
+});
+
+/*
+ * Objective 3, Phase 2 — one destination lifecycle (Draft -> Pending Review -> For Correction ->
+ * Published -> Archived), PTO-only archive/restore/reinstate, managing level, and the
+ * reviewed visitor information / entrance fee.
+ */
+
+/**
+ * A destination-only record (Tourist Destinations) in $objMunicipality.
+ *
+ * @param  array<string, mixed>  $arrOverrides
+ */
+function reviewAttraction(Municipality $objMunicipality, array $arrOverrides = [], ?ManagingLevel $objManagingLevel = null): Listing
+{
+    $objCategory = reviewCategory('Tourist Destinations');
+    $objListing = Listing::query()->make(array_merge([
+        'lst_slug' => Str::slug('review-falls-'.Str::random(6)),
+        'lst_name' => 'Review Falls',
+        'lst_category' => 'destinations',
+        'cat_id' => $objCategory->cat_id,
+        'lst_municipality' => $objMunicipality->mun_name,
+        'mun_id' => $objMunicipality->mun_id,
+        'lst_barangay' => 'Dapnan',
+        'lst_description' => 'A multi-tiered waterfall.',
+        'lst_status' => 'DRAFT',
+    ], $arrOverrides));
+    $objListing->lst_managing_level = $objManagingLevel;
+    $objListing->save();
+
+    return $objListing;
+}
+
+test('records the PTO creates start as Draft, are not public, and record their creator', function () {
+    $objCateel = reviewMunicipality('Cateel', 'CAT');
+    $objPto = reviewPto();
+
+    test()->actingAs($objPto)->post(route('pto.directory.store'), [
+        'name' => 'Aliwagwag Falls',
+        'cat_id' => reviewCategory('Tourist Destinations')->cat_id,
+        'barangay' => 'Aliwagwag',
+        'municipality' => 'Cateel',
+        'destination_type' => 'Waterfall',
+        'managing_level' => 'pto',
+        'visitor_information' => 'Wear water shoes.',
+        'entrance_fee' => 'PHP 50',
+    ])->assertSessionHasNoErrors();
+
+    test()->actingAs($objPto)->post(route('pto.directory.store'), [
+        'name' => 'Cateel River Inn',
+        'cat_id' => reviewCategory('Accommodation')->cat_id,
+        'type' => 'Resort',
+        'barangay' => 'Poblacion',
+        'municipality' => 'Cateel',
+    ])->assertSessionHasNoErrors();
+
+    $objDestination = Listing::query()->where('lst_name', 'Aliwagwag Falls')->firstOrFail();
+    $objEstablishment = Listing::query()->where('lst_name', 'Cateel River Inn')->firstOrFail();
+
+    expect($objDestination->lst_status)->toBe('DRAFT');
+    expect($objEstablishment->lst_status)->toBe('DRAFT');
+    expect($objDestination->lst_type)->toBe('Waterfall');
+    expect($objDestination->lst_visitor_information)->toBe('Wear water shoes.');
+    expect($objDestination->lst_entrance_fee)->toBe('PHP 50');
+    expect($objDestination->managingLevel())->toBe(ManagingLevel::Pto);
+    expect($objEstablishment->lst_managing_level)->toBeNull();
+    expect($objDestination->lst_created_by)->toBe($objPto->usr_id);
+    expect($objDestination->mun_id)->toBe($objCateel->mun_id);
+
+    // Summary comment: as a member of the public (the PTO itself may preview drafts).
+    auth()->logout();
+    test()->get(route('listings.show', $objDestination))->assertNotFound();
+    test()->get(route('listings.show', $objEstablishment))->assertNotFound();
+});
+
+test('the PTO moves a PTO-managed Draft into review and then publishes it; the LGU cannot edit, submit, or manage its photos', function () {
+    $objMati = reviewMunicipality('City of Mati', 'MATI');
+    $objLgu = reviewLgu($objMati);
+    $objPto = reviewPto();
+    $objMuseum = reviewAttraction($objMati, ['lst_name' => 'Subangan Museum'], ManagingLevel::Pto);
+
+    // Summary comment: the LGU of the same municipality may view it, but not change it (403, security-logged).
+    test()->actingAs($objLgu)->get(route('lgu.directory.attractions.show', $objMuseum))->assertOk()->assertSee('managed by the Provincial Tourism Office');
+    test()->actingAs($objLgu)->get(route('lgu.directory.attractions.edit', $objMuseum))->assertForbidden();
+    test()->actingAs($objLgu)->put(route('lgu.directory.attractions.update', $objMuseum), ['name' => 'Renamed', 'barangay' => 'Central'])->assertForbidden();
+    test()->actingAs($objLgu)->patch(route('lgu.directory.attractions.submit', $objMuseum))->assertForbidden();
+    test()->actingAs($objLgu)->put(route('lgu.images.reorder', $objMuseum), ['order' => [1]])->assertForbidden();
+    test()->actingAs($objLgu)->post(route('lgu.images.store'), ['listing_id' => $objMuseum->lst_id])->assertForbidden();
+    // Summary comment: the two photo actions that call ImagePolicy directly are security-logged too (Phase 3).
+    $colPhotoDenials = SecurityLog::query()->where('usr_id', $objLgu->usr_id)->where('sec_event_type', 'access_denied')->get()->pluck('sec_details.ability');
+    expect($colPhotoDenials)->toContain('manageListing')->toContain('uploadFor');
+    expect($objMuseum->fresh()->lst_name)->toBe('Subangan Museum');
+    expect($objMuseum->fresh()->lst_status)->toBe('DRAFT');
+    expect(SecurityLog::query()->where('usr_id', $objLgu->usr_id)->where('sec_event_type', 'access_denied')->count())->toBeGreaterThanOrEqual(3);
+
+    // Summary comment: the PTO submits it (never publishes directly), then approves it.
+    test()->actingAs($objPto)->patch(route('pto.directory.submit', $objMuseum))->assertRedirect();
+    expect($objMuseum->fresh()->lst_status)->toBe('FOR_PTO_REVIEW');
+    auth()->logout();
+    test()->get(route('listings.show', $objMuseum))->assertNotFound();
+
+    test()->actingAs($objPto)->patch(route('pto.directory.publish', $objMuseum))->assertRedirect();
+    expect($objMuseum->fresh()->lst_status)->toBe('Active');
+    auth()->logout();
+    test()->get(route('listings.show', $objMuseum))->assertOk();
+});
+
+test('the PTO cannot submit an LGU-managed destination — its LGU does', function () {
+    $objMati = reviewMunicipality('City of Mati', 'MATI');
+    $objFalls = reviewAttraction($objMati);
+
+    test()->actingAs(reviewPto())->patch(route('pto.directory.submit', $objFalls))->assertForbidden();
+    expect($objFalls->fresh()->lst_status)->toBe('DRAFT');
+
+    test()->actingAs(reviewLgu($objMati))->patch(route('lgu.directory.attractions.submit', $objFalls))->assertRedirect();
+    expect($objFalls->fresh()->lst_status)->toBe('FOR_PTO_REVIEW');
+});
+
+test('a suspended destination is reinstated only to Draft and must pass review again before it is public', function () {
+    $objMati = reviewMunicipality('City of Mati', 'MATI');
+    $objLgu = reviewLgu($objMati);
+    $objPto = reviewPto();
+    $objFalls = reviewAttraction($objMati, ['lst_status' => 'Active']);
+
+    test()->actingAs($objPto)->put(route('pto.directory.updateStatus', $objFalls), ['status' => 'Suspended', 'reason' => 'Trail repairs.'])->assertSessionHasNoErrors();
+    expect($objFalls->fresh()->lst_status)->toBe('Suspended');
+    auth()->logout();
+    test()->get(route('listings.show', $objFalls))->assertNotFound();
+
+    // Summary comment: no direct way back to Published.
+    test()->actingAs($objPto)->put(route('pto.directory.updateStatus', $objFalls), ['status' => 'Active', 'reason' => 'Reopened.'])->assertSessionHasErrors('status');
+    expect($objFalls->fresh()->lst_status)->toBe('Suspended');
+
+    test()->actingAs($objPto)->put(route('pto.directory.updateStatus', $objFalls), ['status' => 'DRAFT', 'reason' => 'Repairs done.'])->assertSessionHasNoErrors();
+    expect($objFalls->fresh()->lst_status)->toBe('DRAFT');
+    auth()->logout();
+    test()->get(route('listings.show', $objFalls))->assertNotFound();
+
+    test()->actingAs($objLgu)->patch(route('lgu.directory.attractions.submit', $objFalls))->assertRedirect();
+    test()->actingAs($objPto)->patch(route('pto.directory.publish', $objFalls))->assertRedirect();
+    expect($objFalls->fresh()->lst_status)->toBe('Active');
+
+    $objLog = OperationLog::query()->where('opl_entity_type', 'destination')->where('opl_entity_id', $objFalls->lst_id)->where('opl_reason', 'Repairs done.')->first();
+    expect($objLog?->opl_new_values)->toBe(['lst_status' => 'DRAFT']);
+});
+
+test('only the PTO archives; an archived destination can only be restored to Draft, folding any held changes', function () {
+    $objMati = reviewMunicipality('City of Mati', 'MATI');
+    $objPto = reviewPto();
+    $objFalls = reviewAttraction($objMati, ['lst_status' => 'Active']);
+    $objFalls->forceFill(['lst_pending_changes' => ['lst_name' => 'Review Falls Eco-Park']])->save();
+
+    test()->actingAs(reviewLgu($objMati))->patch(route('lgu.directory.destinations.archive', $objFalls))->assertForbidden();
+    expect($objFalls->fresh()->lst_status)->toBe('Active');
+
+    test()->actingAs($objPto)->put(route('pto.directory.updateStatus', $objFalls), ['status' => 'Archived', 'reason' => 'Closed permanently.'])->assertSessionHasNoErrors();
+    $objArchived = $objFalls->fresh();
+    expect($objArchived->lst_status)->toBe('Archived');
+    expect($objArchived->lst_name)->toBe('Review Falls Eco-Park');
+    expect($objArchived->lst_pending_changes)->toBeNull();
+
+    test()->actingAs($objPto)->put(route('pto.directory.updateStatus', $objFalls), ['status' => 'Suspended', 'reason' => 'x'])->assertSessionHasErrors('status');
+
+    test()->actingAs($objPto)->put(route('pto.directory.updateStatus', $objFalls), ['status' => 'DRAFT', 'reason' => 'Reopening.'])->assertSessionHasNoErrors();
+    expect($objFalls->fresh()->lst_status)->toBe('DRAFT');
+});
+
+test('visitor information and entrance fee edits to a Published destination are held for PTO review', function () {
+    $objMati = reviewMunicipality('City of Mati', 'MATI');
+    $objLgu = reviewLgu($objMati);
+    $objFalls = reviewAttraction($objMati, ['lst_status' => 'Active', 'lst_visitor_information' => 'Bring water.', 'lst_entrance_fee' => 'Free'], ManagingLevel::Lgu);
+
+    test()->actingAs($objLgu)->put(route('lgu.directory.attractions.update', $objFalls), [
+        'name' => 'Review Falls',
+        'barangay' => 'Dapnan',
+        'description' => 'A multi-tiered waterfall.',
+        'visitor_information' => 'Bring water and a guide.',
+        'entrance_fee' => 'PHP 30',
+        'contact_phone' => '09170000000',
+    ])->assertSessionHasNoErrors();
+
+    $objHeld = $objFalls->fresh();
+    expect($objHeld->lst_visitor_information)->toBe('Bring water.');
+    expect($objHeld->lst_entrance_fee)->toBe('Free');
+    expect($objHeld->lst_pending_changes)->toBe(['lst_visitor_information' => 'Bring water and a guide.', 'lst_entrance_fee' => 'PHP 30']);
+    expect($objHeld->lst_contact_phone)->toBe('09170000000');
+    expect($objHeld->lst_updated_by)->toBe($objLgu->usr_id);
+
+    test()->actingAs(reviewPto())->get(route('pto.destinationReviews.show', $objFalls))->assertOk()->assertSee('Visitor information')->assertSee('PHP 30');
+    test()->actingAs(reviewPto())->patch(route('pto.directory.publish', $objFalls))->assertRedirect();
+
+    $objApproved = $objFalls->fresh();
+    expect($objApproved->lst_visitor_information)->toBe('Bring water and a guide.');
+    expect($objApproved->lst_entrance_fee)->toBe('PHP 30');
+    expect($objApproved->lst_pending_changes)->toBeNull();
+});
+
+test('a new LGU attraction is LGU-managed, records its creator, and only accepts a configured destination type', function () {
+    $objMati = reviewMunicipality('City of Mati', 'MATI');
+    $objLgu = reviewLgu($objMati);
+
+    test()->actingAs($objLgu)->post(route('lgu.directory.attractions.store'), ['name' => 'Bay Islet', 'barangay' => 'Badas', 'type' => 'Island'])
+        ->assertSessionHasErrors(['type' => 'Choose a destination type from the list.']);
+
+    test()->actingAs($objLgu)->post(route('lgu.directory.attractions.store'), ['name' => 'Dahican Beach', 'barangay' => 'Dahican', 'type' => 'Beach'])
+        ->assertSessionHasNoErrors();
+
+    $objBeach = Listing::query()->where('lst_name', 'Dahican Beach')->firstOrFail();
+    expect($objBeach->lst_type)->toBe('Beach');
+    expect($objBeach->lst_managing_level)->toBe(ManagingLevel::Lgu);
+    expect($objBeach->lst_created_by)->toBe($objLgu->usr_id);
+    expect(Listing::query()->where('lst_name', 'Bay Islet')->exists())->toBeFalse();
+});
+
+test('the PTO review screen shows a destination-only record\'s workflow history, and returned destinations are listed', function () {
+    $objMati = reviewMunicipality('City of Mati', 'MATI');
+    $objLgu = reviewLgu($objMati);
+    $objPto = reviewPto();
+    $objFalls = reviewAttraction($objMati, ['lst_name' => 'History Falls']);
+
+    test()->actingAs($objLgu)->patch(route('lgu.directory.attractions.submit', $objFalls))->assertRedirect();
+
+    test()->actingAs($objPto)->get(route('pto.destinationReviews.show', $objFalls))
+        ->assertOk()
+        ->assertSee('Last submitted by '.$objLgu->usr_name);
+
+    test()->actingAs($objPto)->patch(route('pto.directory.returnToLgu', $objFalls), ['reason' => 'Add the barangay hall landmark.'])->assertRedirect();
+
+    test()->actingAs($objPto)->get(route('pto.destinationReviews.index'))
+        ->assertOk()
+        ->assertSee('History Falls')
+        ->assertSee('Add the barangay hall landmark.');
 });

@@ -12,11 +12,24 @@
 namespace App\Http\Controllers;
 
 use App\Models\Announcement;
+use App\Support\DirectionsLink;
 use App\Support\TourismCatalog;
 use Illuminate\View\View;
 
 class LandingController extends Controller
 {
+    /**
+     * The catalog fields the "View Details" modal shows
+     * (resources/js/app.js initListingDetailsModal) — the only ones sent to
+     * the browser for it. `id` is the public slug.
+     *
+     * @var array<int, string>
+     */
+    private const MODAL_FIELDS = [
+        'id', 'name', 'category', 'municipality', 'barangay', 'lat', 'lng', 'description', 'rating', 'tags',
+        'displayImageUrl', 'categoryIcon', 'contactOffice', 'contactPhone', 'hours', 'href', 'email', 'website',
+    ];
+
     /**
      * Display the public iTOUR landing page.
      *
@@ -39,8 +52,15 @@ class LandingController extends Controller
         return view('landing', [
             'signatureExperiences' => $arrSignatureExperiences,
             'moreExperiences' => $objActiveListings->whereNotIn('id', $arrSignatureIds)->values()->all(),
+            // "Get directions" links are built here (destination coordinates only, App\Support\DirectionsLink).
+            // Public modal fields only (Objective 3, Phase 7): no workflow status,
+            // visibility flag, or stored file name reaches the page's JSON.
             'listingDetails' => $objActiveListings
-                ->map(fn (array $arrListing) => [...$arrListing, 'categoryLabel' => TourismCatalog::categoryLabel($arrListing['category'])])
+                ->map(fn (array $arrListing) => [
+                    ...array_intersect_key($arrListing, array_flip(self::MODAL_FIELDS)),
+                    'categoryLabel' => TourismCatalog::categoryLabel($arrListing['category']),
+                    'directionsUrl' => DirectionsLink::toDestination($arrListing['lat'], $arrListing['lng']),
+                ])
                 ->keyBy('id')
                 ->all(),
             'featuredEstablishments' => TourismCatalog::featuredEstablishments(4),

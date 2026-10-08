@@ -31,6 +31,12 @@
                     <li><strong>Reviews and feedback</strong> you choose to submit about destinations or establishments.</li>
                     <li><strong>Staff accounts</strong> — name, email, and role, for PTO, LGU, and establishment users who log in to manage listings.</li>
                 </ul>
+                <p class="mt-3">
+                    <strong>Your location (Find Near Me).</strong> Only when you choose Allow Location, your device's
+                    current location is sent once to iTOUR, rounded to about 11 metres, and used for that one
+                    nearby search. It is not stored in our database, logs, or your session, and it is never
+                    shared with anyone else.
+                </p>
             </section>
 
             <section>
@@ -57,7 +63,8 @@
                 <h2 class="font-display text-lg font-bold text-sand-900">Third parties</h2>
                 <p class="mt-2">We don't sell your data. A few third-party services help run the site and do receive some data:</p>
                 <ul class="mt-2 list-disc space-y-1.5 pl-5">
-                    <li><strong>Mapbox</strong> — powers the maps and directions features; receives your IP address and the map area or route you request.</li>
+                    <li><strong>Mapbox</strong> — powers the maps; receives your IP address and the map area you view.</li>
+                    <li><strong>Google Maps</strong> — opens only when you choose Get Directions, with the destination's location. iTOUR does not send your location; Google Maps may ask for it itself.</li>
                     <li><strong>Our hosting provider</strong> — stores the application and its database, and sees standard web traffic logs (IP address, pages requested) like any hosted web application.</li>
                 </ul>
             </section>

@@ -7,7 +7,9 @@
 --}}
 @php
     $blnIsFirstRequest = in_array($listing->lst_status, ['DRAFT', 'UNPUBLISHED', 'FOR_LGU_REVIEW'], true);
-    $blnCanSubmitToPto = $blnIsFirstRequest || $listing->isForCorrection();
+    // A PTO-managed attraction is moved into review by the PTO, not the LGU (Objective 3, D10).
+    $blnIsManagedByPto = $listing->isManagedByPto();
+    $blnCanSubmitToPto = ! $blnIsManagedByPto && ($blnIsFirstRequest || $listing->isForCorrection());
     $blnIsAttraction = $listing->isDestinationOnly();
     // A destination-only record has no establishment to return it to.
     $blnCanReturn = ! $blnIsAttraction && in_array($listing->lst_status, ['DRAFT', 'FOR_LGU_REVIEW', 'FOR_PTO_REVIEW', \App\Models\Listing::STATUS_FOR_CORRECTION], true);
@@ -33,7 +35,9 @@
     @endif
 
     <div class="mt-4 flex flex-col gap-2">
-        @if ($blnCanSubmitToPto)
+        @if ($blnIsManagedByPto)
+            <p class="text-xs text-sand-500">This attraction is managed by the Provincial Tourism Office. Its details, photos, and review are handled by the PTO.</p>
+        @elseif ($blnCanSubmitToPto)
             <form method="POST" action="{{ $strSubmitUrl }}">
                 @csrf
                 @method('PATCH')

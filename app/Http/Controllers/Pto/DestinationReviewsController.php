@@ -41,6 +41,8 @@ class DestinationReviewsController extends PtoController
         'lst_lat' => 'Latitude',
         'lst_lng' => 'Longitude',
         'lst_description' => 'Description',
+        'lst_visitor_information' => 'Visitor information',
+        'lst_entrance_fee' => 'Entrance fee',
     ];
 
     /**
@@ -55,14 +57,10 @@ class DestinationReviewsController extends PtoController
             ->orderBy('lst_updated_at')
             ->get();
 
+        // Summary comment: establishments and destination-only records alike
+        // (a returned request, or returned held changes to a live listing).
         $objReturned = Listing::query()
-            ->where('lst_category', '!=', 'destinations')
-            ->where(fn ($objQuery) => $objQuery
-                ->where('lst_status', Listing::STATUS_FOR_CORRECTION)
-                ->orWhere(fn ($objPublished) => $objPublished
-                    ->where('lst_status', 'PUBLISHED')
-                    ->whereNotNull('lst_pending_changes')
-                    ->whereNotNull('lst_review_remarks')))
+            ->returnedForCorrection()
             ->with('categoryRecord')
             ->orderByDesc('lst_updated_at')
             ->get();
@@ -86,9 +84,12 @@ class DestinationReviewsController extends PtoController
 
         $listing->load(['categoryRecord', 'establishmentImages']);
 
+        // Summary comment: the workflow logs a destination-only record as
+        // 'destination' and an establishment as 'establishment'
+        // (Listing::auditEntityType()), so read the listing's own type.
         $objHistory = OperationLog::query()
             ->with('user')
-            ->where('opl_entity_type', 'establishment')
+            ->where('opl_entity_type', $listing->auditEntityType())
             ->where('opl_entity_id', $listing->lst_id)
             ->whereIn('opl_action', ['submit', 'publish', 'return', 'unpublish'])
             ->latest('opl_id')

@@ -137,31 +137,49 @@ class TourismCatalog
             ->with(['establishmentImages' => fn ($objQuery) => $objQuery->where('img_status', 'PUBLISHED')])
             ->orderBy('lst_id')
             ->get()
-            ->map(fn ($objListing) => [
-                'id' => $objListing->lst_slug,
-                'name' => $objListing->lst_name,
-                'category' => $objListing->lst_category,
-                'municipality' => $objListing->lst_municipality,
-                'barangay' => $objListing->lst_barangay,
-                'lat' => $objListing->lst_lat,
-                'lng' => $objListing->lst_lng,
-                'description' => $objListing->lst_description,
-                'rating' => $objListing->lst_rating !== null ? (float) $objListing->lst_rating : null,
-                'tags' => $objListing->lst_tags ?? [],
-                'image' => $objListing->lst_image,
-                'displayImageUrl' => $objListing->publicCoverImageUrl(),
-                'categoryIcon' => self::categoryIcon($objListing->lst_category),
-                'contactOffice' => $objListing->lst_contact_office,
-                'contactPhone' => $objListing->lst_contact_phone,
-                'hours' => $objListing->lst_hours,
-                'href' => route('listings.show', $objListing->lst_slug),
-                'status' => $objListing->lst_status,
-                'isPubliclyVisible' => $objListing->isPubliclyVisible(),
-                'email' => $objListing->lst_email,
-                'website' => $objListing->lst_website,
-            ])
+            ->map(fn (Listing $objListing) => self::catalogEntry($objListing))
             ->all();
     }
+
+    /**
+     * One listing in the catalog shape listings() returns — also what the
+     * server-paginated Explore directory renders its cards and table rows
+     * from, so both pages share one shape. Load `establishmentImages`
+     * (PUBLISHED only) first to avoid a query per listing.
+     *
+     * @return array<string, mixed>
+     */
+    public static function catalogEntry(Listing $objListing): array
+    {
+        return [
+            'id' => $objListing->lst_slug,
+            'name' => $objListing->lst_name,
+            'category' => $objListing->lst_category,
+            'destinationType' => $objListing->isDestinationOnly() ? $objListing->lst_type : null,
+            'municipality' => $objListing->lst_municipality,
+            'barangay' => $objListing->lst_barangay,
+            'lat' => $objListing->lst_lat,
+            'lng' => $objListing->lst_lng,
+            'description' => $objListing->lst_description,
+            // Card excerpt of the description (presentation only; the stored description is unchanged).
+            'summary' => TextSummary::excerpt($objListing->lst_description),
+            // Public yes/no only — the stored accreditation text never reaches the page.
+            'isDotAccredited' => $objListing->isDotAccredited(),
+            'rating' => $objListing->lst_rating !== null ? (float) $objListing->lst_rating : null,
+            'tags' => $objListing->lst_tags ?? [],
+            'image' => $objListing->lst_image,
+            'displayImageUrl' => $objListing->publicCoverImageUrl(),
+            'categoryIcon' => self::categoryIcon($objListing->lst_category),
+            'contactOffice' => $objListing->lst_contact_office,
+            'contactPhone' => $objListing->lst_contact_phone,
+            'hours' => $objListing->lst_hours,
+            'href' => route('listings.show', $objListing->lst_slug),
+            'status' => $objListing->lst_status,
+            'isPubliclyVisible' => $objListing->isPubliclyVisible(),
+            'email' => $objListing->lst_email,
+            'website' => $objListing->lst_website,
+        ];
+    } // end catalogEntry
 
     /**
      * The original, hand-authored listing content — the seed data

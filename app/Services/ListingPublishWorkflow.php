@@ -261,6 +261,47 @@ class ListingPublishWorkflow
     }
 
     /**
+     * PTO "Change Status" with a required reason (Objective 3, D3): suspend
+     * or archive a record, restore an archived destination to Draft, or
+     * reinstate a suspended destination to Draft. The allowed targets come
+     * from Listing::statusChangeOptions(), re-checked under the row lock. A
+     * destination returned to Draft must pass PTO review again before it is
+     * public — there is no direct path back to Published. When a destination
+     * leaves public view, any held changes are folded into the (now hidden)
+     * record, as unpublish() does, because the whole record is reviewed
+     * again before it can go live. Establishment Suspend/Archive behavior is
+     * unchanged. Policy: ListingPolicy::archive() (PTO only), checked by the
+     * controller.
+     */
+    public function changeStatus(User $objPto, Listing $objListing, string $strNewStatus, string $strReason): void
+    {
+        $this->_transition(
+            $objListing,
+            fn (Listing $objLocked) => in_array($strNewStatus, $objLocked->statusChangeOptions(), true),
+            'This status change is not allowed from the listing\'s current status. Please refresh and try again.',
+            function (Listing $objLocked) use ($objPto, $strNewStatus, $strReason) {
+                $arrBefore = $objLocked->getOriginal();
+                $arrChanges = ['lst_status' => $strNewStatus];
+
+                // Summary comment: destinations — fold held changes and clear
+                // old review remarks; the record is reviewed again anyway.
+                if ($objLocked->isDestinationOnly()) {
+                    $arrChanges = [
+                        ...$this->_withLegacyCategory($objLocked->lst_pending_changes ?? []),
+                        ...$arrChanges,
+                        'lst_pending_changes' => null,
+                        'lst_review_remarks' => null,
+                    ];
+                }
+
+                $objLocked->forceFill($arrChanges)->save();
+
+                OperationLogger::updated($objPto, $objLocked->auditEntityType(), $objLocked->lst_id, $objLocked->mun_id, $objLocked->lst_id, OperationLogger::diff($arrBefore, $objLocked), $strReason);
+            },
+        );
+    } // end changeStatus
+
+    /**
      * Held public-field values, plus the legacy `category` slug whenever
      * cat_id is among them — cat_id and `category` always change together.
      *

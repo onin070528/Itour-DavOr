@@ -13,6 +13,7 @@ use App\Models\Category;
 use App\Models\Listing;
 use App\Models\MunicipalReport;
 use App\Models\OperationLog;
+use App\Models\SecurityLog;
 use App\Models\User;
 
 function makePtoForOperationLogs(): User
@@ -41,7 +42,7 @@ test('PTO creating a destination records a create operation log with the resolve
     ])->assertSessionHasNoErrors();
 
     $listing = Listing::query()->where('lst_name', 'Aliwagwag Falls')->first();
-    $log = OperationLog::where('opl_entity_type', 'establishment')->where('opl_entity_id', $listing->lst_id)->where('opl_action', 'create')->first();
+    $log = OperationLog::where('opl_entity_type', 'destination')->where('opl_entity_id', $listing->lst_id)->where('opl_action', 'create')->first();
 
     expect($log)->not->toBeNull();
     expect($log->usr_id)->toBe($pto->usr_id);
@@ -70,7 +71,7 @@ test('PTO updating a destination records an update operation log with only the c
         'municipality' => 'Cateel',
     ])->assertSessionHasNoErrors();
 
-    $log = OperationLog::where('opl_entity_type', 'establishment')->where('opl_entity_id', $listing->lst_id)->where('opl_action', 'update')->first();
+    $log = OperationLog::where('opl_entity_type', 'destination')->where('opl_entity_id', $listing->lst_id)->where('opl_action', 'update')->first();
     expect($log)->not->toBeNull();
     expect($log->opl_old_values)->toBe(['lst_barangay' => 'Aliwagwag']);
     expect($log->opl_new_values)->toBe(['lst_barangay' => 'New Barangay']);
@@ -94,12 +95,12 @@ test('suspending a destination records an update operation log with the required
         'reason' => 'Temporarily closed for maintenance.',
     ])->assertSessionHasNoErrors();
 
-    $log = OperationLog::where('opl_entity_type', 'establishment')->where('opl_entity_id', $listing->lst_id)->where('opl_action', 'update')->latest('opl_id')->first();
+    $log = OperationLog::where('opl_entity_type', 'destination')->where('opl_entity_id', $listing->lst_id)->where('opl_action', 'update')->latest('opl_id')->first();
     expect($log->opl_new_values)->toBe(['lst_status' => 'Suspended']);
     expect($log->opl_reason)->toBe('Temporarily closed for maintenance.');
 });
 
-test('LGU can create, update, and archive its own destination, each recording an operation log', function () {
+test('LGU can create and update its own destination, each recording an operation log, but archiving is PTO-only (403, security-logged)', function () {
     $mati = makeMunicipalityFixture('City of Mati', 'MATI');
     $lgu = User::factory()->create([
         'usr_role' => UserRole::Lgu,
@@ -121,10 +122,13 @@ test('LGU can create, update, and archive its own destination, each recording an
         'barangay' => 'New Barangay',
     ])->assertSessionHasNoErrors();
 
-    test()->actingAs($lgu)->patch(route('lgu.directory.destinations.archive', $listing))->assertSessionHasNoErrors();
+    // Objective 3 (D3): only the PTO archives — a direct LGU request is refused and security-logged.
+    test()->actingAs($lgu)->patch(route('lgu.directory.destinations.archive', $listing))->assertForbidden();
+    expect($listing->fresh()->lst_status)->toBe('DRAFT');
+    expect(SecurityLog::query()->where('usr_id', $lgu->usr_id)->where('sec_event_type', 'access_denied')->exists())->toBeTrue();
 
     expect(OperationLog::where('opl_entity_type', 'destination')->where('opl_entity_id', $listing->lst_id)->where('opl_action', 'create')->exists())->toBeTrue();
-    expect(OperationLog::where('opl_entity_type', 'destination')->where('opl_entity_id', $listing->lst_id)->where('opl_action', 'update')->count())->toBe(2);
+    expect(OperationLog::where('opl_entity_type', 'destination')->where('opl_entity_id', $listing->lst_id)->where('opl_action', 'update')->count())->toBe(1);
     expect(OperationLog::where('opl_entity_type', 'destination')->where('opl_entity_id', $listing->lst_id)->where('mun_id', $mati->mun_id)->exists())->toBeTrue();
 });
 

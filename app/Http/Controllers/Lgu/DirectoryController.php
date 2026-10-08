@@ -3,7 +3,7 @@
 /**
  * iTOUR — Davao Oriental Tourism Information System
  *
- * Purpose: LGU destination management (add/edit/archive, municipality-scoped)
+ * Purpose: LGU destination management (add/edit, municipality-scoped)
  * and the destination listing actions on establishments (submit to PTO,
  * return to the establishment). Establishment management itself lives in
  * Lgu\EstablishmentsController.
@@ -19,7 +19,6 @@ use App\Models\Listing;
 use App\Services\AttractionRecordService;
 use App\Services\ListingPublishWorkflow;
 use App\Support\LguMockData;
-use App\Support\OperationLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -74,6 +73,8 @@ class DirectoryController extends LguController
     {
         $this->authorizeOwnMunicipality($objRequest, $listing);
         abort_if($listing->lst_category !== 'destinations', 404);
+        // A PTO-managed destination is never edited by the LGU (D10).
+        abort_unless($objRequest->user()->can('update', $listing), 403);
 
         $arrFields = $this->validatedDestinationFields($objRequest);
 
@@ -90,24 +91,22 @@ class DirectoryController extends LguController
         return back()->with('toast', $blnIsHeldForReview ? 'Saved. Changes to the public listing were sent to the PTO for review.' : 'Destination saved.');
     }
 
+    /**
+     * Archiving is PTO-only (Objective 3, D3; Pto\DirectoryController::
+     * updateStatus()). The LGU interface no longer offers it; this route
+     * stays only so a direct LGU request is answered with 403 and recorded
+     * by SecurityLogger::accessDenied() (Gate::after in AppServiceProvider)
+     * instead of silently doing nothing. A cross-municipality attempt is
+     * still logged as a municipality-scope denial first; an own-municipality
+     * attempt is denied by ListingPolicy::archive(), which never allows an
+     * LGU account, so the redirect below is never reached here.
+     */
     public function archiveDestination(Request $objRequest, Listing $listing): RedirectResponse
     {
         $this->authorizeOwnMunicipality($objRequest, $listing);
-        abort_if($listing->lst_category !== 'destinations', 404);
+        abort_unless($objRequest->user()->can('archive', $listing), 403);
 
-        $arrBefore = $listing->getOriginal();
-
-        try {
-            $listing->update(['lst_status' => 'Archived']);
-        } catch (\Throwable $objException) {
-            Log::error('Failed to archive LGU destination.', ['exception' => $objException, 'listing_id' => $listing->lst_id]);
-
-            return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
-        }
-
-        OperationLogger::updated($objRequest->user(), 'destination', $listing->lst_id, $objRequest->user()->mun_id, null, OperationLogger::diff($arrBefore, $listing));
-
-        return back()->with('toast', "{$listing->lst_name} was archived.");
+        return back();
     }
 
     /**

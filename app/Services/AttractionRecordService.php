@@ -9,6 +9,7 @@
 
 namespace App\Services;
 
+use App\Enums\ManagingLevel;
 use App\Models\Category;
 use App\Models\Listing;
 use App\Models\User;
@@ -31,13 +32,17 @@ class AttractionRecordService
      *
      * @var array<int, string>
      */
-    public const FIELDS = ['name', 'barangay', 'lat', 'lng', 'description', 'contact_office', 'contact_phone', 'hours', 'website'];
+    public const FIELDS = [
+        'name', 'type', 'barangay', 'lat', 'lng', 'description', 'visitor_information', 'entrance_fee',
+        'contact_office', 'contact_phone', 'hours', 'website', 'accreditation_status',
+    ];
 
     public function __construct(private readonly ListingPublishWorkflow $objWorkflow) {}
 
     /**
      * New attraction: municipality from the LGU's own account (never the
-     * request), Not Requested, under the Tourist Destinations category.
+     * request), Not Requested, under the Tourist Destinations category,
+     * LGU-managed, with the LGU recorded as its creator.
      *
      * @param  array<string, mixed>  $arrFields
      */
@@ -56,6 +61,10 @@ class AttractionRecordService
             ]);
             // Destination-only records do not participate in reporting.
             $objNewListing->lst_reporting_mode = null;
+            // Set by application logic only — never mass-assigned from the request.
+            $objNewListing->lst_managing_level = ManagingLevel::Lgu;
+            $objNewListing->lst_created_by = $objLgu->usr_id;
+            $objNewListing->lst_updated_by = $objLgu->usr_id;
             $objNewListing->save();
 
             return $objNewListing;
@@ -117,7 +126,9 @@ class AttractionRecordService
         }
 
         $arrBefore = $objListing->getOriginal();
-        $objListing->update($arrFields);
+        $objListing->fill($arrFields);
+        $objListing->lst_updated_by = $objLgu->usr_id;
+        $objListing->save();
 
         OperationLogger::updated($objLgu, 'destination', $objListing->lst_id, $objListing->mun_id, null, OperationLogger::diff($arrBefore, $objListing));
 

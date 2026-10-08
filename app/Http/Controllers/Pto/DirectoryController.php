@@ -11,6 +11,8 @@
 
 namespace App\Http\Controllers\Pto;
 
+use App\Enums\ManagingLevel;
+use App\Http\Requests\SaveAttractionRequest;
 use App\Http\Requests\SaveEstablishmentRequest;
 use App\Models\Category;
 use App\Models\Listing;
@@ -20,7 +22,6 @@ use App\Support\OperationLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -53,51 +54,68 @@ class DirectoryController extends PtoController
         ]);
     }
 
+    /**
+     * A new directory record starts as Draft (Objective 3, D3) — nothing
+     * the PTO creates is published automatically. It goes live only through
+     * the review workflow: a PTO-managed destination is moved to Pending
+     * Review with submitForReview() and then approved (publish()); an
+     * LGU-managed destination or an establishment is submitted by its LGU.
+     * Every step is audit-logged.
+     */
     public function store(Request $objRequest): RedirectResponse
     {
         $arrFields = $this->validatedListingFields($objRequest);
         $intMunicipalityId = $this->municipalityIdByName($arrFields['lst_municipality']);
         $strCategory = $this->legacyCategorySlug($arrFields['cat_id']);
+        $objManagingLevel = $this->_validatedManagingLevel($objRequest, $strCategory);
+        $objPto = $objRequest->user();
 
         try {
-            $objListing = Listing::query()->create([
+            $objListing = Listing::query()->make([
                 ...$arrFields,
-                'lst_slug' => $this->uniqueListingSlug($arrFields['lst_name']),
+                'lst_slug' => Listing::uniqueSlug($arrFields['lst_name'], 'listing'),
                 'lst_category' => $strCategory,
                 'mun_id' => $intMunicipalityId,
-                // The PTO is the final authority in the publish workflow —
-                // an establishment it creates itself needs no review queue
-                // of its own, so it's PUBLISHED immediately. Destinations
-                // keep the unchanged Active/Suspended/Archived vocabulary.
-                'lst_status' => $strCategory === 'destinations' ? 'Active' : 'PUBLISHED',
+                'lst_status' => 'DRAFT',
             ]);
+            // Set by application logic only — never mass-assigned from the request.
+            $objListing->lst_managing_level = $objManagingLevel;
+            $objListing->lst_created_by = $objPto->usr_id;
+            $objListing->lst_updated_by = $objPto->usr_id;
+            $objListing->save();
         } catch (\Throwable $objException) {
             Log::error('Failed to create PTO directory listing.', ['exception' => $objException]);
 
             return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
 
-        OperationLogger::created($objRequest->user(), 'establishment', $objListing->lst_id, $intMunicipalityId, null, [
+        OperationLogger::created($objPto, $objListing->auditEntityType(), $objListing->lst_id, $intMunicipalityId, null, [
             'name' => $objListing->lst_name,
             'category' => $objListing->categoryRecord?->cat_name,
             'municipality' => $objListing->lst_municipality,
+            'status' => 'DRAFT',
         ]);
 
-        return back()->with('toast', "{$objListing->lst_name} was added.");
+        return back()->with('toast', "{$objListing->lst_name} was added as a Draft. It is not public until it passes review.");
     }
 
     public function update(Request $objRequest, Listing $listing): RedirectResponse
     {
         $arrFields = $this->validatedListingFields($objRequest);
         $intMunicipalityId = $this->municipalityIdByName($arrFields['lst_municipality']);
+        $strCategory = $this->legacyCategorySlug($arrFields['cat_id']);
+        $objManagingLevel = $this->_validatedManagingLevel($objRequest, $strCategory);
         $arrBefore = $listing->getOriginal();
 
         try {
-            $listing->update([
+            $listing->fill([
                 ...$arrFields,
-                'lst_category' => $this->legacyCategorySlug($arrFields['cat_id']),
+                'lst_category' => $strCategory,
                 'mun_id' => $intMunicipalityId,
             ]);
+            $listing->lst_managing_level = $objManagingLevel;
+            $listing->lst_updated_by = $objRequest->user()->usr_id;
+            $listing->save();
         } catch (\Throwable $objException) {
             Log::error('Failed to update PTO directory listing.', ['exception' => $objException, 'listing_id' => $listing->lst_id]);
 
@@ -106,52 +124,63 @@ class DirectoryController extends PtoController
 
         // A4/A3: the PTO can edit LGU-owned records; every such edit is
         // audit-logged with the old and new values via OperationLogger.
-        OperationLogger::updated($objRequest->user(), 'establishment', $listing->lst_id, $intMunicipalityId, $listing->lst_id, OperationLogger::diff($arrBefore, $listing));
+        OperationLogger::updated($objRequest->user(), $listing->auditEntityType(), $listing->lst_id, $intMunicipalityId, $listing->lst_id, OperationLogger::diff($arrBefore, $listing));
 
         return back()->with('toast', 'Listing saved.');
     }
 
     /**
-     * Activate/suspend/archive a destination, or suspend/archive an
-     * establishment — always requires a reason, written into the operation
-     * log alongside the old/new status. An establishment's PUBLISHED/
-     * UNPUBLISHED state is never set here: that's App\Services\
-     * ListingPublishWorkflow's job (publish()/unpublish()/
-     * returnToLgu()), each gated by App\Policies\ListingPolicy::publish()
-     * (P1 — only the PTO publishes).
+     * "Change Status", always with a reason written into the operation log:
+     * suspend or archive a record, restore an archived destination to Draft,
+     * or reinstate a suspended destination to Draft (Objective 3, D3). The
+     * allowed targets depend on the record's current status
+     * (Listing::statusChangeOptions()) — a destination is never set straight
+     * back to Published here. Publishing is only ever
+     * App\Services\ListingPublishWorkflow::publish(), gated by
+     * App\Policies\ListingPolicy::publish() (P1 — only the PTO publishes).
      */
-    public function updateStatus(Request $objRequest, Listing $listing): RedirectResponse
+    public function updateStatus(Request $objRequest, Listing $listing, ListingPublishWorkflow $objWorkflow): RedirectResponse
     {
-        $arrAllowedStatuses = $listing->lst_category === 'destinations'
-            ? ['Active', 'Suspended', 'Archived']
-            : ['Suspended', 'Archived'];
+        abort_unless($objRequest->user()->can('archive', $listing), 403);
 
         $arrData = $objRequest->validate([
-            'status' => ['required', 'string', Rule::in($arrAllowedStatuses)],
+            'status' => ['required', 'string', Rule::in($listing->statusChangeOptions())],
             'reason' => ['required', 'string', 'max:500'],
+        ], [
+            'status.in' => 'That status change is not allowed from the listing\'s current status.',
         ]);
 
-        $arrBefore = $listing->getOriginal();
-
         try {
-            $listing->update(['lst_status' => $arrData['status']]);
-        } catch (\Throwable $objException) {
-            Log::error('Failed to update PTO directory listing status.', ['exception' => $objException, 'listing_id' => $listing->lst_id]);
-
-            return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
+            $objWorkflow->changeStatus($objRequest->user(), $listing, $arrData['status'], $arrData['reason']);
+        } catch (ValidationException $objException) {
+            return back()->with('toast', $objException->validator->errors()->first())->with('toast_tone', 'danger');
         }
 
-        OperationLogger::updated(
-            $objRequest->user(),
-            'establishment',
-            $listing->lst_id,
-            $listing->mun_id,
-            $listing->lst_id,
-            OperationLogger::diff($arrBefore, $listing),
-            $arrData['reason'],
-        );
+        $strToast = $arrData['status'] === 'DRAFT'
+            ? "{$listing->lst_name} is back in Draft. It must be submitted and approved again before it is public."
+            : "{$listing->lst_name} is now {$arrData['status']}.";
 
-        return back()->with('toast', "{$listing->lst_name} is now {$arrData['status']}.");
+        return back()->with('toast', $strToast);
+    }
+
+    /**
+     * "Submit for review": Draft (or Returned for Correction) -> Pending
+     * Review for a destination the PTO manages (Objective 3, D10) — the
+     * same step an LGU takes for its own destinations
+     * (Lgu\DirectoryController::submitToPto()). Never publishes; the PTO
+     * then decides with "Approve & Publish" on the review screen.
+     */
+    public function submitForReview(Request $objRequest, Listing $listing, ListingPublishWorkflow $objWorkflow): RedirectResponse
+    {
+        abort_unless($objRequest->user()->can('submit', $listing), 403);
+
+        try {
+            $objWorkflow->submitToPto($objRequest->user(), $listing);
+        } catch (ValidationException $objException) {
+            return back()->with('toast', $objException->validator->errors()->first())->with('toast_tone', 'danger');
+        }
+
+        return back()->with('toast', "{$listing->lst_name} is now Pending Review. Approve & Publish it from the review screen when it is ready.");
     }
 
     /**
@@ -226,20 +255,34 @@ class DirectoryController extends PtoController
     {
         $objCategory = Category::query()->find($objRequest->input('cat_id'));
         $blnIsGuide = Listing::isTourGuideType($objRequest->input('type'));
+        $blnIsDestination = $objCategory?->isDestinationCategory() ?? false;
+
+        // Summary comment: destination-only fields (Objective 3) are read
+        // only for the Tourist Destinations category, under their own names
+        // so the hidden establishment Type select can never collide with them.
+        $arrDestinationRules = $blnIsDestination
+            ? ['destination_type' => SaveAttractionRequest::destinationTypeRules(), ...SaveAttractionRequest::visitorFieldRules()]
+            : [];
 
         // Summary comment: the establishment detail rules (including R13's
         // Category -> Type check) are shared with the LGU form; PTO adds the
         // unrestricted category and its municipality picker.
         $arrData = $objRequest->validate([
             ...SaveEstablishmentRequest::listingFieldRules($objCategory, $blnIsGuide),
+            ...$arrDestinationRules,
             'cat_id' => ['required', 'integer', 'exists:tbl_categories,cat_id'],
             'municipality' => ['required', 'string', Rule::in(Municipality::query()->pluck('mun_name'))],
         ]);
 
+        $arrDestinationFields = $blnIsDestination
+            ? ['lst_visitor_information' => $arrData['visitor_information'] ?? null, 'lst_entrance_fee' => $arrData['entrance_fee'] ?? null]
+            : [];
+
         return [
+            ...$arrDestinationFields,
             'lst_name' => $arrData['name'],
             'cat_id' => $arrData['cat_id'],
-            'lst_type' => $arrData['type'] ?? null,
+            'lst_type' => $blnIsDestination ? ($arrData['destination_type'] ?? null) : ($arrData['type'] ?? null),
             'lst_owner_name' => $arrData['owner_name'] ?? null,
             'lst_municipality' => $arrData['municipality'],
             'lst_barangay' => $arrData['barangay'] ?? null,
@@ -257,6 +300,25 @@ class DirectoryController extends PtoController
         ];
     }
 
+    /**
+     * The managing level chosen for a destination-only record (LGU or PTO,
+     * D10). Left empty it stays null, which reads as LGU-managed — the same
+     * as every destination created before managing levels existed. Always
+     * null for an establishment, which has no managing level.
+     */
+    private function _validatedManagingLevel(Request $objRequest, string $strCategory): ?ManagingLevel
+    {
+        if ($strCategory !== 'destinations') {
+            return null;
+        }
+
+        $arrData = $objRequest->validate([
+            'managing_level' => ['nullable', Rule::enum(ManagingLevel::class)],
+        ]);
+
+        return isset($arrData['managing_level']) ? ManagingLevel::from($arrData['managing_level']) : null;
+    }
+
     private function municipalityIdByName(string $strMunicipality): ?int
     {
         return Municipality::query()->where('mun_name', $strMunicipality)->value('mun_id');
@@ -270,19 +332,5 @@ class DirectoryController extends PtoController
     private function legacyCategorySlug(int $intCategoryId): string
     {
         return Category::query()->find($intCategoryId)?->legacySlug() ?? 'others';
-    }
-
-    private function uniqueListingSlug(string $strName): string
-    {
-        $strBase = Str::slug($strName) ?: 'listing';
-        $strSlug = $strBase;
-        $intSuffix = 2;
-
-        while (Listing::query()->where('lst_slug', $strSlug)->exists()) {
-            $strSlug = "{$strBase}-{$intSuffix}";
-            $intSuffix++;
-        }
-
-        return $strSlug;
     }
 }

@@ -98,6 +98,9 @@ class AttractionsController extends LguController
     public function edit(Request $request, Listing $listing): View
     {
         $this->_authorizeOwnAttraction($request, $listing);
+        // A PTO-managed destination is view-only for the LGU (D10);
+        // the denial is security-logged by Gate::after.
+        abort_unless($request->user()->can('update', $listing), 403);
 
         $listing->load('establishmentImages');
 
