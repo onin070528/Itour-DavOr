@@ -200,7 +200,9 @@
                                                     <span>{{ $valueLabel }}</span>
                                                     <span class="font-semibold">{{ number_format($value) }} <span class="text-xs font-normal text-sand-500">({{ $percentOf($value, $visitors['total']) }}%)</span></span>
                                                 </div>
-                                                <div class="mt-1 h-2 rounded-full bg-sand-100"><div class="h-2 rounded-full bg-primary-700" style="width: {{ $percentOf($value, $visitors['total']) }}%"></div></div>
+                                                <div class="mt-1 h-2 rounded-full bg-sand-100">
+                                                    <div class="h-2 rounded-full bg-primary-700" @style(['width' => $percentOf($value, $visitors['total']) . '%'])></div>
+                                                </div>
                                             </li>
                                         @endforeach
                                     </ul>
