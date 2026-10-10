@@ -109,7 +109,7 @@ test('LGU can create, update, and archive its own destination, each recording an
 
     test()->actingAs($lgu)->post(route('lgu.directory.destinations.store'), [
         'name' => 'Dahican Beach',
-        'barangay' => 'Dahican',
+        'barangay' => 'Brgy. Dahican',
     ])->assertSessionHasNoErrors();
     $listing = Listing::query()->where('lst_name', 'Dahican Beach')->first();
 
@@ -118,7 +118,7 @@ test('LGU can create, update, and archive its own destination, each recording an
     // that had just created the row.
     test()->actingAs($lgu)->put(route('lgu.directory.destinations.update', $listing), [
         'name' => 'Dahican Beach',
-        'barangay' => 'New Barangay',
+        'barangay' => 'Brgy. Badas',
     ])->assertSessionHasNoErrors();
 
     test()->actingAs($lgu)->patch(route('lgu.directory.destinations.archive', $listing))->assertSessionHasNoErrors();
@@ -182,7 +182,7 @@ test('editing an establishment\'s info records an update operation log with mask
         'lst_category' => 'accommodation',
         'lst_municipality' => 'City of Mati',
         'mun_id' => $mati->mun_id,
-        'lst_barangay' => 'Poblacion',
+        'lst_barangay' => 'Brgy. Central',
         'lst_owner_name' => 'Juan Dela Cruz',
         'lst_contact_phone' => '09171234567',
         'lst_email' => 'old@matifixtureinn.test',

@@ -12,8 +12,170 @@ const ROLE_ESTABLISHMENT = 'establishment';
 document.addEventListener('DOMContentLoaded', function ()
 {
     initUserAccountForm();
+    initBusinessHoursToggle();
+    initEntryTypeToggle();
     initAccountCreatedPanel();
 });
+
+/**
+ * LGU Accounts modal: "Establishment" or "Destination". Both use the same
+ * form; choosing Destination renames the "Establishment" wording, swaps the
+ * category for the fixed "Tourist Destinations", relaxes the owner/phone/
+ * email requirements (no login account is created) and posts to the Tourism
+ * Directory's destination route instead of the account route.
+ * The chooser is only offered when adding; editing is always an
+ * establishment account.
+ */
+function initEntryTypeToggle()
+{
+    var objForm = document.getElementById('user-form');
+    var objChooser = objForm ? objForm.querySelector('[data-entry-type-chooser]') : null;
+
+    if (!objForm || !objChooser)
+    {
+        return;
+    }
+
+    var objModal = objForm.closest('[data-modal]');
+    var objTitle = objModal ? objModal.querySelector('h2') : null;
+    var objHint = objChooser.querySelector('[data-entry-type-hint]');
+    var arrHints = {
+        establishment: 'Creates the establishment and its login account. It is listed under Tourism Directory → Establishments.',
+        destination: 'Adds a tourist destination (no login account is created). It is listed under Tourism Directory → Destinations.'
+    };
+
+    var applyType = function (strType)
+    {
+        var blnIsDestination = strType === 'destination';
+
+        // Same form for both; only a few spots differ by type.
+        objForm.querySelectorAll('[data-type-only]').forEach(function (objSection)
+        {
+            var blnShow = objSection.dataset.typeOnly === strType;
+
+            objSection.hidden = !blnShow;
+            objSection.querySelectorAll('input, select, textarea').forEach(function (objField)
+            {
+                objField.disabled = !blnShow;
+            });
+        });
+        objForm.querySelectorAll('[data-text-' + strType + ']').forEach(function (objText)
+        {
+            objText.textContent = objText.getAttribute('data-text-' + strType);
+        });
+        objForm.querySelectorAll('[data-placeholder-' + strType + ']').forEach(function (objField)
+        {
+            objField.placeholder = objField.getAttribute('data-placeholder-' + strType);
+        });
+
+        objForm.querySelectorAll('[data-required-for]').forEach(function (objField)
+        {
+            objField.required = objField.dataset.requiredFor === strType;
+        });
+        objForm.querySelectorAll('[data-required-mark]').forEach(function (objMark)
+        {
+            objMark.hidden = blnIsDestination;
+        });
+        objForm.querySelectorAll('[data-entry-type-legend]').forEach(function (objLabel)
+        {
+            objLabel.textContent = blnIsDestination ? 'Destination' : 'Establishment';
+        });
+
+        objForm.action = blnIsDestination ? objForm.dataset.destinationAction : objForm.dataset.defaultAction;
+
+        if (objHint)
+        {
+            objHint.textContent = arrHints[strType];
+        }
+
+        // Disabling establishment-only fields can also disable the closing
+        // time; re-sync it with the chosen opening time.
+        var objOpen = objForm.elements.namedItem('hoursOpen');
+
+        if (!blnIsDestination && objOpen)
+        {
+            objOpen.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+    };
+
+    objChooser.addEventListener('change', function ()
+    {
+        var objChecked = objChooser.querySelector('input[name="entryType"]:checked');
+
+        applyType(objChecked ? objChecked.value : 'establishment');
+    });
+
+    objForm.addEventListener('reset', function ()
+    {
+        setTimeout(function () { applyType('establishment'); }, 0);
+    });
+
+    document.querySelectorAll('[data-modal-open="user-form-modal"]').forEach(function (objTrigger)
+    {
+        objTrigger.addEventListener('click', function ()
+        {
+            var blnIsEdit = objTrigger.hasAttribute('data-edit-trigger');
+
+            objChooser.hidden = blnIsEdit;
+            objChooser.querySelector('input[value="establishment"]').checked = true;
+
+            if (objTitle)
+            {
+                objTitle.textContent = blnIsEdit ? 'Edit Establishment' : 'Add Establishment or Destination';
+            }
+
+            // Runs after dashboard.js has reset/filled the form for this click.
+            setTimeout(function ()
+            {
+                var strAction = objForm.action;
+
+                applyType('establishment');
+
+                if (blnIsEdit)
+                {
+                    objForm.action = strAction;
+                }
+            }, 0);
+        });
+    });
+}
+
+/**
+ * Disables (and clears) the Closing time select while "Open 24 hours" is
+ * the chosen opening time. Re-syncs on change, on form reset (the Add
+ * trigger resets the form) and after an Edit trigger fills the fields.
+ */
+function initBusinessHoursToggle()
+{
+    var objForm = document.getElementById('user-form');
+    var objOpen = objForm ? objForm.elements.namedItem('hoursOpen') : null;
+    var objClose = objForm ? objForm.elements.namedItem('hoursClose') : null;
+
+    if (!objOpen || !objClose)
+    {
+        return;
+    }
+
+    var syncClosingTime = function ()
+    {
+        var blnIs24Hours = objOpen.value === '24h';
+
+        if (blnIs24Hours)
+        {
+            objClose.value = '';
+        }
+
+        objClose.disabled = blnIs24Hours;
+        objClose.classList.toggle('opacity-50', blnIs24Hours);
+        objClose.classList.toggle('cursor-not-allowed', blnIs24Hours);
+    };
+
+    objOpen.addEventListener('change', syncClosingTime);
+    objForm.addEventListener('reset', function ()
+    {
+        setTimeout(syncClosingTime, 0);
+    });
+}
 
 /**
  * Wires up the Add/Edit User modal: the Municipality field hides for

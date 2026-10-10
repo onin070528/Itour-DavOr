@@ -230,7 +230,7 @@ function establishmentFormPayload(array $overrides = []): array
     return [
         'name' => 'Mati Fixture Inn',
         'category' => 'accommodation',
-        'barangay' => 'Dahican',
+        'barangay' => 'Brgy. Dahican',
         'ownerName' => 'Juan Dela Cruz',
         'contactPhone' => '09171234567',
         'email' => 'frontdesk@matifixtureinn.test',
@@ -264,7 +264,7 @@ test('LGU can register an establishment and its account in its own municipality'
     expect($listing)->not->toBeNull();
     expect($listing->lst_name)->toBe('Mati Fixture Inn');
     expect($listing->lst_category)->toBe('accommodation');
-    expect($listing->lst_barangay)->toBe('Dahican');
+    expect($listing->lst_barangay)->toBe('Brgy. Dahican');
     expect($listing->lst_owner_name)->toBe('Juan Dela Cruz');
     expect($listing->lst_contact_phone)->toBe('09171234567');
     expect($listing->mun_id)->toBe($mati->mun_id);

@@ -45,13 +45,14 @@ class UsersController extends LguController
     {
         $objUsers = User::query()
             ->visibleTo($objRequest->user())
-            ->with('establishment')
+            ->with('establishment.establishmentImages')
             ->orderBy('usr_name')
             ->get();
 
-        return $this->renderLgu($objRequest, 'lgu.users', 'users', 'Users', [
+        return $this->renderLgu($objRequest, 'lgu.users', 'users', 'Accounts', [
             'users' => $objUsers,
             'categories' => $this->establishmentCategories(),
+            'barangays' => TourismCatalog::barangaysFor($objRequest->user()->usr_organization_subtitle),
         ]);
     }
 
@@ -206,26 +207,14 @@ class UsersController extends LguController
         $arrData = $objRequest->validate([
             'name' => ['required', 'string', 'max:255'],
             'category' => ['required', 'string', Rule::in(array_column($this->establishmentCategories(), 'slug'))],
-            'barangay' => ['required', 'string', 'max:255'],
+            'barangay' => ['required', 'string', Rule::in(TourismCatalog::barangaysFor($objRequest->user()->usr_organization_subtitle))],
             'ownerName' => ['required', 'string', 'max:255'],
             'contactPhone' => ['required', 'string', 'max:50'],
             'email' => ['required', 'email', 'max:255', $objUniqueEmail],
-            'hoursDays' => ['nullable', 'required_with:hoursOpen', Rule::in(array_keys(BusinessHours::days()))],
-            'hoursOpen' => ['nullable', 'required_with:hoursDays', Rule::in([...array_keys(BusinessHours::times()), BusinessHours::OPEN_24_HOURS])],
-            'hoursClose' => [
-                'nullable',
-                Rule::requiredIf(fn (): bool => $objRequest->filled('hoursOpen') && $objRequest->input('hoursOpen') !== BusinessHours::OPEN_24_HOURS),
-                Rule::in(array_keys(BusinessHours::times())),
-                'different:hoursOpen',
-            ],
+            ...BusinessHours::validationRules($objRequest),
             'website' => ['nullable', 'url', 'max:255'],
             'description' => ['nullable', 'string', 'max:2000'],
-        ], [
-            'hoursDays.required_with' => 'Choose which days the establishment is open.',
-            'hoursOpen.required_with' => 'Choose an opening time.',
-            'hoursClose.required' => 'Choose a closing time.',
-            'hoursClose.different' => 'The closing time must be different from the opening time.',
-        ]);
+        ], BusinessHours::validationMessages());
 
         return [
             'listing' => [

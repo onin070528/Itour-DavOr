@@ -56,7 +56,7 @@ test('LGU registering an establishment creates it as DRAFT, not publicly visible
         'name' => 'New Resort',
         'email' => 'new-resort@example.test',
         'category' => 'accommodation',
-        'barangay' => 'Dahican',
+        'barangay' => 'Brgy. Dahican',
         'ownerName' => 'Juan Dela Cruz',
         'contactPhone' => '09171234567',
     ])->assertSessionHasNoErrors();

@@ -12,9 +12,14 @@
 
 namespace App\Support;
 
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+
 class BusinessHours
 {
     public const OPEN_24_HOURS = '24h';
+
+    private const EARLIEST_OPENING_MINUTES = 6 * 60;
 
     /**
      * @return array<string, string>
@@ -30,7 +35,8 @@ class BusinessHours
     }
 
     /**
-     * Every half hour of the day, keyed by 24-hour "HH:MM".
+     * Every half hour from 6:00 AM to 11:30 PM, keyed by 24-hour "HH:MM".
+     * Overnight operations use the "Open 24 hours" option instead.
      *
      * @return array<string, string>
      */
@@ -38,12 +44,45 @@ class BusinessHours
     {
         $arrTimes = [];
 
-        for ($intMinutes = 0; $intMinutes < 24 * 60; $intMinutes += 30) {
+        for ($intMinutes = self::EARLIEST_OPENING_MINUTES; $intMinutes < 24 * 60; $intMinutes += 30) {
             $strKey = sprintf('%02d:%02d', intdiv($intMinutes, 60), $intMinutes % 60);
             $arrTimes[$strKey] = date('g:i A', strtotime($strKey));
         }
 
         return $arrTimes;
+    }
+
+    /**
+     * Validation rules for the three business-hours dropdowns, shared by
+     * every form that has them (LGU Accounts: establishment and destination).
+     *
+     * @return array<string, array<int, mixed>>
+     */
+    public static function validationRules(Request $objRequest): array
+    {
+        return [
+            'hoursDays' => ['nullable', 'required_with:hoursOpen', Rule::in(array_keys(self::days()))],
+            'hoursOpen' => ['nullable', 'required_with:hoursDays', Rule::in([...array_keys(self::times()), self::OPEN_24_HOURS])],
+            'hoursClose' => [
+                'nullable',
+                Rule::requiredIf(fn (): bool => $objRequest->filled('hoursOpen') && $objRequest->input('hoursOpen') !== self::OPEN_24_HOURS),
+                Rule::in(array_keys(self::times())),
+                'different:hoursOpen',
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function validationMessages(): array
+    {
+        return [
+            'hoursDays.required_with' => 'Choose which days it is open.',
+            'hoursOpen.required_with' => 'Choose an opening time.',
+            'hoursClose.required' => 'Choose a closing time.',
+            'hoursClose.different' => 'The closing time must be different from the opening time.',
+        ];
     }
 
     /**

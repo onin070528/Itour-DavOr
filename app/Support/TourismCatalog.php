@@ -111,6 +111,57 @@ class TourismCatalog
     }
 
     /**
+     * The barangays of each of the province's 11 municipalities, per the
+     * Wikipedia "Barangays" sections (PSA-based). Names are bare; use
+     * barangaysFor() for the "Brgy. X" form stored on listings.
+     *
+     * @return array<string, array<int, string>>
+     */
+    public static function barangays(): array
+    {
+        return [
+            'Boston' => ['Caatihan', 'Cabasagan', 'Carmen', 'Cauwayanan', 'Poblacion', 'San Jose', 'Sibajay', 'Simulao'],
+            'Cateel' => ['Abihod', 'Alegria', 'Aliwagwag', 'Aragon', 'Baybay', 'Maglahus', 'Mainit', 'Malibago', 'San Alfonso', 'San Antonio', 'San Miguel', 'San Rafael', 'San Vicente', 'Santa Filomena', 'Taytayan', 'Poblacion'],
+            'Baganga' => ['Baculin', 'Ban-ao', 'Batawan', 'Batiano', 'Binondo', 'Bobonao', 'Campawan', 'Central', 'Dapnan', 'Kinablangan', 'Lambajon', 'Lucod', 'Mahan-ub', 'Mikit', 'Salingcomot', 'San Isidro', 'San Victor', 'Saoquigue'],
+            'Caraga' => ['Alvar', 'Caningag', 'Don Leon Balante', 'Lamiawan', 'Manorigao', 'Mercedes', 'Palma Gil', 'Pichon', 'Poblacion', 'San Antonio', 'San Jose', 'San Luis', 'San Miguel', 'San Pedro', 'Santa Fe', 'Santiago', 'P.M. Sobrecarey'],
+            'Manay' => ['Capasnan', 'Cayawan', 'Central', 'Concepcion', 'Del Pilar', 'Guza', 'Holy Cross', 'Lambog', 'Mabini', 'Manreza', 'New Taokanga', 'Old Macopa', 'Rizal', 'San Fermin', 'San Ignacio', 'San Isidro', 'Zaragosa'],
+            'City of Mati' => ['Badas', 'Bobon', 'Buso', 'Cabuaya', 'Central', 'Culian', 'Dahican', 'Danao', 'Dawan', 'Don Enrique Lopez', 'Don Martin Marundan', 'Don Salvador Lopez Sr.', 'Langka', 'Lawigan', 'Libudon', 'Luban', 'Macambol', 'Mamali', 'Matiao', 'Mayo', 'Sainz', 'Sanghay', 'Tagabakid', 'Tagbinonga', 'Taguibo', 'Tamisan'],
+            'Tarragona' => ['Cabagayan', 'Central', 'Dadong', 'Jovellar', 'Limot', 'Lucatan', 'Maganda', 'Ompao', 'Tomoaong', 'Tubaon'],
+            'San Isidro' => ['Baon', 'Batobato', 'Bitaogan', 'Cambaleon', 'Dugmanon', 'Iba', 'La Union', 'Lapu-lapu', 'Maag', 'Manikling', 'Maputi', 'San Miguel', 'San Roque', 'Santo Rosario', 'Sudlon', 'Talisay'],
+            'Governor Generoso' => ['Anitap', 'Crispin Dela Cruz', 'Don Aurelio Chicote', 'Lavigan', 'Luzon', 'Magdug', 'Manuel Roxas', 'Montserrat', 'Nangan', 'Oregon', 'Poblacion', 'Pundaguitan', 'Sergio Osmeña', 'Surop', 'Tagabebe', 'Tamban', 'Tandang Sora', 'Tibanban', 'Tiblawan', 'Upper Tibanban'],
+            'Lupon' => ['Bagumbayan', 'Cabadiangan', 'Calapagan', 'Cocornon', 'Corporacion', 'Don Mariano Marcos', 'Ilangay', 'Langka', 'Lantawan', 'Limbahan', 'Macangao', 'Magsaysay', 'Mahayahay', 'Maragatas', 'Marayag', 'New Visayas', 'Poblacion', 'San Isidro', 'San Jose', 'Tagboa', 'Tagugpo'],
+            'Banaybanay' => ['Cabangcalan', 'Caganganan', 'Calubihan', 'Causwagan', 'Mahayag', 'Maputi', 'Mogbongcogon', 'Panikian', 'Pintatagan', 'Piso Proper', 'Poblacion', 'Punta Linao', 'Rang-ay', 'San Vicente'],
+        ];
+    }
+
+    /**
+     * The "Brgy. X" values for one municipality's dropdown (and validation);
+     * empty for an unknown municipality.
+     *
+     * @return array<int, string>
+     */
+    public static function barangaysFor(string $strMunicipality): array
+    {
+        return array_map(
+            fn (string $strName) => "Brgy. {$strName}",
+            self::barangays()[$strMunicipality] ?? []
+        );
+    }
+
+    /**
+     * The municipal tourism office's display name — "City of Mati" →
+     * "Mati City Tourism Office", "Cateel" → "Cateel Tourism Office".
+     */
+    public static function tourismOfficeName(string $strMunicipality): string
+    {
+        if (str_starts_with($strMunicipality, 'City of ')) {
+            return substr($strMunicipality, 8).' City Tourism Office';
+        }
+
+        return "{$strMunicipality} Tourism Office";
+    }
+
+    /**
      * Every destination and tourism establishment, in one unified shape,
      * read from the real `tbl_listings` table (App\Models\Listing) — the DB
      * rows are seeded verbatim from self::seedData() by ListingSeeder, so

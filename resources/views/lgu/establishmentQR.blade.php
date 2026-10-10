@@ -216,6 +216,13 @@
                     <p class="mt-4 font-display text-base font-bold text-sand-900">Registration Submitted</p>
                     <p class="mt-1 text-sm text-sand-600">Thanks! Your visit to {{ $establishmentName }} has been logged.</p>
 
+                    @if (! empty($feedbackUrl))
+                        <a href="{{ $feedbackUrl }}" class="mt-4 inline-flex items-center gap-2 rounded-sm bg-primary-700 px-5 py-2.5 text-sm font-semibold text-sand-0 hover:bg-primary-900">
+                            <i class="ti ti-message-2" aria-hidden="true"></i>
+                            Share your experience
+                        </a>
+                    @endif
+
                     <button type="button" id="qr-form-reset" class="mt-6 rounded-sm border border-sand-300 px-5 py-2.5 text-sm font-semibold text-sand-800 hover:border-primary-300">
                         Register Another Group
                     </button>

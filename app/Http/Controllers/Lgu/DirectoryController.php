@@ -17,12 +17,15 @@ use App\Http\Controllers\Concerns\ManagesDestinationListings;
 use App\Models\EstablishmentImage;
 use App\Models\Listing;
 use App\Services\ListingPublishWorkflow;
+use App\Support\BusinessHours;
 use App\Support\LguMockData;
 use App\Support\OperationLogger;
+use App\Support\TourismCatalog;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
@@ -42,12 +45,74 @@ class DirectoryController extends LguController
         return $this->renderLgu($objRequest, 'lgu.directory.destinations', 'directory.destinations', 'Destinations', [
             'municipality' => $objMunicipality,
             'destinations' => LguMockData::destinations($objMunicipality),
+            'barangays' => TourismCatalog::barangaysFor($objMunicipality),
+            'contactOffice' => TourismCatalog::tourismOfficeName($objMunicipality),
         ]);
+    }
+
+    /**
+     * Same fields as the shared validation, but the barangay must belong to
+     * the LGU's own municipality and the contact office is always that
+     * municipality's tourism office (the form's field is locked).
+     *
+     * @return array<string, mixed>
+     */
+    private function _validatedLguDestinationFields(Request $objRequest): array
+    {
+        $strMunicipality = $objRequest->user()->usr_organization_subtitle;
+
+        $objRequest->validate([
+            'barangay' => ['required', 'string', Rule::in(TourismCatalog::barangaysFor($strMunicipality))],
+        ]);
+
+        $arrFields = $this->validatedDestinationFields($objRequest);
+        $arrFields['lst_contact_office'] = TourismCatalog::tourismOfficeName($strMunicipality);
+
+        return [...$arrFields, ...$this->_validatedOptionalDestinationFields($objRequest)];
+    }
+
+    /**
+     * The Accounts form (same layout as the establishment form) also sends
+     * business hours, a contact person, a public email and a website. They
+     * are optional and only applied when sent, so the Destinations
+     * directory's own Edit modal (which has none of them) never blanks
+     * what was saved from the Accounts form.
+     *
+     * @return array<string, mixed>
+     */
+    private function _validatedOptionalDestinationFields(Request $objRequest): array
+    {
+        $arrData = $objRequest->validate([
+            'ownerName' => ['nullable', 'string', 'max:255'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'website' => ['nullable', 'url', 'max:255'],
+            ...BusinessHours::validationRules($objRequest),
+        ], BusinessHours::validationMessages());
+
+        $arrFields = [];
+
+        if ($objRequest->has('ownerName')) {
+            $arrFields['lst_owner_name'] = $arrData['ownerName'] ?? null;
+        }
+
+        if ($objRequest->has('email')) {
+            $arrFields['lst_email'] = $arrData['email'] ?? null;
+        }
+
+        if ($objRequest->has('website')) {
+            $arrFields['lst_website'] = $arrData['website'] ?? null;
+        }
+
+        if ($objRequest->has('hoursOpen')) {
+            $arrFields['lst_hours'] = BusinessHours::format($arrData['hoursDays'] ?? null, $arrData['hoursOpen'] ?? null, $arrData['hoursClose'] ?? null);
+        }
+
+        return $arrFields;
     }
 
     public function storeDestination(Request $objRequest): RedirectResponse
     {
-        $arrFields = $this->validatedDestinationFields($objRequest);
+        $arrFields = $this->_validatedLguDestinationFields($objRequest);
         $objLgu = $objRequest->user();
         $objMunicipality = $objLgu->usr_organization_subtitle;
 
@@ -73,7 +138,7 @@ class DirectoryController extends LguController
         $this->authorizeOwnMunicipality($objRequest, $listing);
         abort_if($listing->lst_category !== 'destinations', 404);
 
-        $arrFields = $this->validatedDestinationFields($objRequest);
+        $arrFields = $this->_validatedLguDestinationFields($objRequest);
         $arrBefore = $listing->getOriginal();
 
         try {

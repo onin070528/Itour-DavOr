@@ -21,6 +21,7 @@ use App\Http\Controllers\Establishment\ProfileController as EstablishmentProfile
 use App\Http\Controllers\Establishment\SettingsController as EstablishmentSettingsController;
 use App\Http\Controllers\EstablishmentImageFileController;
 use App\Http\Controllers\ExploreController;
+use App\Http\Controllers\FeedbackController as PublicFeedbackController;
 use App\Http\Controllers\HotlinesController;
 use App\Http\Controllers\LandingController;
 use App\Http\Controllers\Lgu\AuditLogsController as LguAuditLogsController;
@@ -50,6 +51,7 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', [LandingController::class, 'index'])->name('home');
 Route::get('/explore', [ExploreController::class, 'index'])->name('explore');
 Route::get('/listings/{listing}', [ListingDetailController::class, 'show'])->name('listings.show');
+Route::post('/listings/{listing}/feedback', [PublicFeedbackController::class, 'store'])->middleware('throttle:5,1')->name('listings.feedback.store');
 Route::get('/hotlines', [HotlinesController::class, 'index'])->name('hotlines');
 Route::get('/verify-report', [ReportVerificationController::class, 'show'])->name('reports.verify');
 Route::get('/privacy', [PrivacyController::class, 'show'])->name('privacy');
@@ -255,8 +257,9 @@ Route::middleware(['auth', 'role:establishment'])->prefix('establishment')->name
     Route::prefix('images')->name('images.')->group(function () {
         // Photos merged into the Establishment Profile page — any direct
         // link to the old page permanently redirects there, scrolled to
-        // the photos section.
-        Route::redirect('/', '/establishment/profile#photos', 301)->name('index');
+        // the photos section. GET-only: Route::redirect() answers every
+        // HTTP method and would swallow the upload POST to the same URL.
+        Route::get('/', fn () => redirect('/establishment/profile#photos', 301))->name('index');
         Route::post('/', [EstablishmentImagesController::class, 'store'])->middleware('throttle:establishment-image-upload')->name('store');
         Route::post('/{image}/replace', [EstablishmentImagesController::class, 'replaceImage'])->middleware('throttle:establishment-image-upload')->name('replace');
         Route::patch('/{image}/remove', [EstablishmentImagesController::class, 'removeImage'])->name('remove');

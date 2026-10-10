@@ -212,7 +212,7 @@ test('LGU cannot assign an establishment to another municipality — municipalit
     test()->actingAs($lgu)->post(route('lgu.users.store'), [
         'name' => 'Cross-Municipality Inn',
         'category' => 'accommodation',
-        'barangay' => 'Dahican',
+        'barangay' => 'Brgy. Dahican',
         'ownerName' => 'Juan Dela Cruz',
         'contactPhone' => '09171234567',
         'email' => 'cross-municipality@example.test',
@@ -242,7 +242,7 @@ test('LGU registering an establishment also gets a passphrase and must_change_pa
     test()->actingAs($lgu)->post(route('lgu.users.store'), [
         'name' => 'LGU-Registered Inn',
         'category' => 'accommodation',
-        'barangay' => 'Dahican',
+        'barangay' => 'Brgy. Dahican',
         'ownerName' => 'Juan Dela Cruz',
         'contactPhone' => '09171234567',
         'email' => 'lgu-registered@example.test',

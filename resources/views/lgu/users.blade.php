@@ -1,7 +1,7 @@
 {{--
     iTOUR — Davao Oriental Tourism Information System
 
-    Purpose: LGU Users page — register establishments and manage their accounts.
+    Purpose: LGU Accounts page — register establishments (with their login accounts) and destinations, and manage the accounts.
     Programmer/s: iTOUR Development Team
     Copyright (c) 2026 iTOUR Development Team. All rights reserved.
 --}}
@@ -11,13 +11,13 @@
 
 <x-layouts.dashboard :user="$user" :nav-sections="$navSections" :page-title="$pageTitle" account-heading="System" :settings-href="route('lgu.settings')">
     <x-dashboard.page-header
-        title="Users"
-        :description="'Establishment accounts registered in '.$municipality.'.'"
+        title="Accounts"
+        :description="'Establishment accounts and destinations registered in '.$municipality.'.'"
     >
         <x-slot:actions>
             <button type="button" data-modal-open="user-form-modal" class="inline-flex items-center gap-2 rounded-sm bg-primary-700 px-4 py-2.5 text-sm font-semibold text-sand-0 hover:bg-primary-900">
                 <i class="ti ti-plus" aria-hidden="true"></i>
-                Add Establishment
+                Add New
             </button>
         </x-slot:actions>
     </x-dashboard.page-header>
@@ -39,9 +39,6 @@
                 <option value="Active">Active</option>
                 <option value="Inactive">Inactive</option>
             </select>
-            <button type="button" data-filter-reset class="rounded-sm border border-sand-300 px-3 py-2.5 text-sm font-semibold text-sand-700 hover:border-primary-300">
-                Reset
-            </button>
         </div>
 
         <p class="mt-3 text-xs text-sand-500"><span data-result-count>{{ $users->count() }}</span> of {{ $users->count() }} accounts</p>
@@ -109,6 +106,13 @@
                                     <div data-dropdown-menu class="absolute right-0 z-10 mt-1 hidden w-44 rounded-md border border-sand-200 bg-sand-0 py-1 shadow-md">
                                         <button
                                             type="button"
+                                            data-modal-open="user-view-{{ $u->usr_id }}"
+                                            class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-sand-700 hover:bg-sand-50"
+                                        >
+                                            <i class="ti ti-eye" aria-hidden="true"></i> View
+                                        </button>
+                                        <button
+                                            type="button"
                                             data-modal-open="user-form-modal"
                                             data-edit-trigger="user-form-modal"
                                             data-edit-values="{{ $editValues }}"
@@ -166,24 +170,117 @@
         <div data-pagination class="mt-4 flex items-center justify-center gap-1"></div>
     </div>
 
-    <x-dashboard.modal id="user-form-modal" title="Establishment Information" max-width="max-w-2xl">
+    {{-- Read-only "View" details — every establishment and account field in one place. --}}
+    @foreach ($users as $u)
+        @php
+            $listing = $u->establishment;
+            $viewName = $listing?->lst_name ?? $u->usr_organization_name;
+            $listingStatusLabel = match ($listing?->lst_status) {
+                'DRAFT' => 'Draft',
+                'FOR_LGU_REVIEW' => 'Waiting for LGU Review',
+                'FOR_PTO_REVIEW' => 'For PTO Review',
+                'PUBLISHED' => 'Published',
+                'UNPUBLISHED' => 'Unpublished',
+                default => $listing?->lst_status,
+            };
+            $photoCounts = $listing
+                ? $listing->establishmentImages->countBy(fn ($image) => $image->img_status->value)
+                : collect();
+            $viewRows = [
+                'Establishment' => [
+                    'Name' => $viewName,
+                    'Category' => $listing ? \App\Support\TourismCatalog::categoryLabel($listing->lst_category) : null,
+                    'Type' => $listing?->lst_type,
+                    'Barangay' => $listing?->lst_barangay,
+                    'Municipality' => $listing?->lst_municipality,
+                    'Business Hours' => $listing?->lst_hours,
+                    'Contact Number' => $listing?->lst_contact_phone,
+                    'Contact Email' => $listing?->lst_email,
+                    'Website / Facebook Page' => $listing?->lst_website,
+                    'License Number' => $listing?->lst_license_number,
+                    'Accreditation' => $listing?->lst_accreditation_status,
+                    'Listing Status' => $listingStatusLabel,
+                    'Description' => $listing?->lst_description,
+                ],
+                'Account' => [
+                    'Owner / Manager' => $listing?->lst_owner_name ?? $u->usr_name,
+                    'Login Email' => $u->usr_email,
+                    'Account Status' => $u->usr_status,
+                    'Registered' => $u->usr_created_at?->format('M j, Y g:i A'),
+                    'Last Sign-in' => $u->usr_last_login_at?->format('M j, Y g:i A') ?? 'Never signed in',
+                ],
+            ];
+        @endphp
+        <x-dashboard.modal id="user-view-{{ $u->usr_id }}" :title="$viewName" max-width="max-w-2xl">
+            <div class="flex flex-col gap-5">
+                @foreach ($viewRows as $sectionTitle => $rows)
+                    <div>
+                        <h3 class="mb-2 text-xs font-semibold tracking-wide text-sand-500 uppercase">{{ $sectionTitle }}</h3>
+                        <dl class="grid gap-3 text-sm sm:grid-cols-2">
+                            @foreach ($rows as $label => $value)
+                                <div @class(['sm:col-span-2' => $label === 'Description'])>
+                                    <dt class="text-xs font-semibold text-sand-500">{{ $label }}</dt>
+                                    <dd class="break-words text-sand-800">{{ filled($value) ? $value : '—' }}</dd>
+                                </div>
+                            @endforeach
+                        </dl>
+                    </div>
+                @endforeach
+
+                <div>
+                    <h3 class="mb-2 text-xs font-semibold tracking-wide text-sand-500 uppercase">Photos</h3>
+                    <p class="text-sm text-sand-800">
+                        {{ $photoCounts->get('PUBLISHED', 0) }} published ·
+                        {{ $photoCounts->get('PENDING', 0) }} waiting for approval ·
+                        {{ $photoCounts->get('REJECTED', 0) }} returned
+                    </p>
+                </div>
+            </div>
+
+            <x-slot:footer>
+                <button type="button" data-modal-close class="rounded-sm border border-sand-300 bg-sand-0 px-4 py-2.5 text-sm font-semibold text-sand-800 hover:border-primary-300">Close</button>
+            </x-slot:footer>
+        </x-dashboard.modal>
+    @endforeach
+
+    <x-dashboard.modal id="user-form-modal" title="Add Establishment or Destination" max-width="max-w-2xl">
         <form
             id="user-form"
             method="POST"
             action="{{ route('lgu.users.store') }}"
             data-default-action="{{ route('lgu.users.store') }}"
+            data-destination-action="{{ route('lgu.directory.destinations.store') }}"
             data-default-method="POST"
             class="flex flex-col gap-5"
         >
             @csrf
+            <div data-entry-type-chooser class="flex flex-col gap-2">
+                <span class="text-xs font-semibold text-sand-700">What are you adding?</span>
+                <div class="grid grid-cols-2 gap-3">
+                    <label class="flex cursor-pointer items-center gap-2 rounded-sm border border-sand-300 px-3 py-2.5 text-sm text-sand-800 has-[:checked]:border-primary-700 has-[:checked]:bg-primary-50">
+                        <input type="radio" name="entryType" value="establishment" checked class="h-4 w-4 text-primary-700 focus:ring-primary-500">
+                        <span><i class="ti ti-building-store" aria-hidden="true"></i> Establishment</span>
+                    </label>
+                    <label class="flex cursor-pointer items-center gap-2 rounded-sm border border-sand-300 px-3 py-2.5 text-sm text-sand-800 has-[:checked]:border-primary-700 has-[:checked]:bg-primary-50">
+                        <input type="radio" name="entryType" value="destination" class="h-4 w-4 text-primary-700 focus:ring-primary-500">
+                        <span><i class="ti ti-map-pin" aria-hidden="true"></i> Destination</span>
+                    </label>
+                </div>
+                <p data-entry-type-hint class="text-xs text-sand-500">Creates the establishment and its login account. It is listed under Tourism Directory → Establishments.</p>
+            </div>
+
             <fieldset class="flex flex-col gap-4">
-                <legend class="mb-3 text-xs font-semibold tracking-wide text-sand-500 uppercase">Establishment Details</legend>
+                <legend class="mb-3 text-xs font-semibold tracking-wide text-sand-500 uppercase"><span data-entry-type-legend>Establishment</span> Details</legend>
                 <div>
-                    <label for="establishment-name" class="mb-1 block text-xs font-semibold text-sand-700">Establishment Name <span class="text-danger" aria-hidden="true">*</span></label>
-                    <input id="establishment-name" name="name" type="text" required maxlength="255" placeholder="e.g. Dahican Surf Resort" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                    <label for="establishment-name" class="mb-1 block text-xs font-semibold text-sand-700"><span data-entry-type-legend>Establishment</span> Name <span class="text-danger" aria-hidden="true">*</span></label>
+                    <input id="establishment-name" name="name" type="text" required maxlength="255" placeholder="e.g. Dahican Surf Resort" data-placeholder-establishment="e.g. Dahican Surf Resort" data-placeholder-destination="e.g. Hamiguitan Range Wildlife Sanctuary" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
                 </div>
                 <div class="grid gap-4 sm:grid-cols-2">
-                    <div>
+                    <div data-type-only="destination" hidden>
+                        <label for="establishment-category-fixed" class="mb-1 block text-xs font-semibold text-sand-700">Category</label>
+                        <input id="establishment-category-fixed" type="text" value="Tourist Destinations" disabled class="w-full rounded-sm border border-sand-200 bg-sand-100 px-3 py-2 text-sm text-sand-500">
+                    </div>
+                    <div data-type-only="establishment">
                         <label for="establishment-category" class="mb-1 block text-xs font-semibold text-sand-700">Category <span class="text-danger" aria-hidden="true">*</span></label>
                         <select id="establishment-category" name="category" required class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
                             <option value="">Select a category...</option>
@@ -194,8 +291,13 @@
                     </div>
                     <div>
                         <label for="establishment-barangay" class="mb-1 block text-xs font-semibold text-sand-700">Barangay <span class="text-danger" aria-hidden="true">*</span></label>
-                        <input id="establishment-barangay" name="barangay" type="text" required maxlength="255" placeholder="e.g. Dahican" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
-                        <p class="mt-1 text-xs text-sand-500">Located in {{ $municipality }}.</p>
+                        <select id="establishment-barangay" name="barangay" required class="w-full rounded-sm border border-sand-300 bg-sand-0 px-3 py-2 text-sm">
+                            <option value="" disabled selected>Select barangay</option>
+                            @foreach ($barangays as $strBarangay)
+                                <option value="{{ $strBarangay }}">{{ $strBarangay }}</option>
+                            @endforeach
+                        </select>
+                        <p class="mt-1 text-xs text-sand-500">All {{ count($barangays) }} barangays of {{ $municipality }}.</p>
                     </div>
                 </div>
                 <div>
@@ -221,31 +323,31 @@
                             @endforeach
                         </select>
                     </div>
-                    <p class="mt-1 text-xs text-sand-500">Leave the closing time blank for "Open 24 hours".</p>
+                    <p class="mt-1 text-xs text-sand-500">The closing time is unavailable when "Open 24 hours" is selected.</p>
                 </div>
                 <div>
                     <label for="establishment-description" class="mb-1 block text-xs font-semibold text-sand-700">Description</label>
-                    <textarea id="establishment-description" name="description" rows="3" maxlength="2000" placeholder="Short description of the establishment and its services" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm"></textarea>
+                    <textarea id="establishment-description" name="description" rows="3" maxlength="2000" placeholder="Short description of the establishment and its services" data-placeholder-establishment="Short description of the establishment and its services" data-placeholder-destination="Short description of the destination and its attractions" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm"></textarea>
                 </div>
             </fieldset>
 
             <fieldset class="flex flex-col gap-4 border-t border-sand-200 pt-4">
-                <legend class="mb-3 text-xs font-semibold tracking-wide text-sand-500 uppercase">Contact &amp; Account</legend>
+                <legend class="mb-3 text-xs font-semibold tracking-wide text-sand-500 uppercase">Contact <span data-type-only="establishment">&amp; Account</span></legend>
                 <div class="grid gap-4 sm:grid-cols-2">
                     <div>
-                        <label for="establishment-owner" class="mb-1 block text-xs font-semibold text-sand-700">Owner / Manager Name <span class="text-danger" aria-hidden="true">*</span></label>
-                        <input id="establishment-owner" name="ownerName" type="text" required maxlength="255" placeholder="e.g. Juan Dela Cruz" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                        <label for="establishment-owner" class="mb-1 block text-xs font-semibold text-sand-700">Owner / Manager Name <span data-required-mark class="text-danger" aria-hidden="true">*</span></label>
+                        <input id="establishment-owner" name="ownerName" type="text" data-required-for="establishment" required maxlength="255" placeholder="e.g. Juan Dela Cruz" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
                     </div>
                     <div>
-                        <label for="establishment-phone" class="mb-1 block text-xs font-semibold text-sand-700">Contact Number <span class="text-danger" aria-hidden="true">*</span></label>
-                        <input id="establishment-phone" name="contactPhone" type="tel" required maxlength="50" placeholder="e.g. 0917 123 4567" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                        <label for="establishment-phone" class="mb-1 block text-xs font-semibold text-sand-700">Contact Number <span data-required-mark class="text-danger" aria-hidden="true">*</span></label>
+                        <input id="establishment-phone" name="contactPhone" type="tel" data-required-for="establishment" required maxlength="50" placeholder="e.g. 0917 123 4567" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
                     </div>
                 </div>
                 <div class="grid gap-4 sm:grid-cols-2">
                     <div>
-                        <label for="establishment-email" class="mb-1 block text-xs font-semibold text-sand-700">Email <span class="text-danger" aria-hidden="true">*</span></label>
-                        <input id="establishment-email" name="email" type="email" required maxlength="255" placeholder="e.g. frontdesk@example.com" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
-                        <p class="mt-1 text-xs text-sand-500">Used to sign in to the establishment's iTOUR account.</p>
+                        <label for="establishment-email" class="mb-1 block text-xs font-semibold text-sand-700">Email <span data-required-mark class="text-danger" aria-hidden="true">*</span></label>
+                        <input id="establishment-email" name="email" type="email" data-required-for="establishment" required maxlength="255" placeholder="e.g. frontdesk@example.com" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                        <p data-text-establishment="Used to sign in to the establishment's iTOUR account." data-text-destination="Public contact email. A destination has no login account." class="mt-1 text-xs text-sand-500">Used to sign in to the establishment's iTOUR account.</p>
                     </div>
                     <div>
                         <label for="establishment-website" class="mb-1 block text-xs font-semibold text-sand-700">Website / Facebook Page</label>

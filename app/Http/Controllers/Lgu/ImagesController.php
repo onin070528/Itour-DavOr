@@ -23,7 +23,6 @@ use App\Services\EstablishmentImageReviewer;
 use App\Services\EstablishmentImageUploader;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
 use Illuminate\View\View;
 
 class ImagesController extends LguController
@@ -32,11 +31,8 @@ class ImagesController extends LguController
     use ReviewsEstablishmentImageQueue;
 
     /**
-     * Photos page: "All photos" (upload-on-behalf — same minimal form as
-     * every role: one or more photos, the ownership checkbox, an optional
-     * credit field, first choosing which eligible establishment it's for
-     * per I1) and "Waiting for approval" (the merged former Photo
-     * Approvals queue) as two tabs on one page.
+     * Photos page: approval queue only — establishments upload their own
+     * photos from their accounts and the LGU approves or returns them.
      */
     public function index(Request $objRequest): View
     {
@@ -51,7 +47,6 @@ class ImagesController extends LguController
             ->get();
 
         return $this->renderLgu($objRequest, 'lgu.images.index', 'images.index', 'Photos', [
-            'listings' => $this->_eligibleListings($objRequest),
             'cards' => $this->_queueCards($objQueuedImages),
         ]);
     }
@@ -85,12 +80,12 @@ class ImagesController extends LguController
     }
 
     /**
-     * The old, separate Photo Approvals page no longer exists — it's the
-     * "Waiting for approval" tab on the merged Photos page now.
+     * The old, separate Photo Approvals page no longer exists — the Photos
+     * page is the approval queue now.
      */
     public function queue(): RedirectResponse
     {
-        return redirect()->route('lgu.images.index', ['tab' => 'approval']);
+        return redirect()->route('lgu.images.index');
     }
 
     /**
@@ -156,21 +151,5 @@ class ImagesController extends LguController
         $arrResult = $objReviewer->returnBatch($objRequest->user(), $listing, $arrData['image_ids'], $arrData['reason']);
 
         return back()->with('toast', $this->_batchOutcomeMessage($arrResult, 'returned'));
-    }
-
-    /**
-     * @return Collection<int, Listing>
-     */
-    private function _eligibleListings(Request $objRequest): Collection
-    {
-        $objUser = $objRequest->user();
-
-        return Listing::query()
-            ->where('mun_id', $objUser->mun_id)
-            ->where(function ($objQuery) {
-                $objQuery->whereDoesntHave('establishmentUser')->orWhere('lst_reporting_mode', 'PAPER_LGU');
-            })
-            ->orderBy('lst_name')
-            ->get();
     }
 }

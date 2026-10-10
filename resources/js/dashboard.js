@@ -419,7 +419,10 @@ function initEditTriggers() {
             const values = JSON.parse(trigger.dataset.editValues || '{}');
             Object.entries(values).forEach(([key, value]) => {
                 const field = form.elements.namedItem(key);
-                if (field) field.value = value;
+                if (field) {
+                    field.value = value;
+                    field.dispatchEvent(new Event('change', { bubbles: true }));
+                }
             });
 
             if (trigger.dataset.editAction) {

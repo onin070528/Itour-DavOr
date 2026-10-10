@@ -98,5 +98,54 @@
                 </div>
             </div>
         @endif
+
+        {{-- Public feedback form. Sentiment is analyzed on submit (App\Services\SentimentAnalyzer) and shown to the LGU/PTO only. --}}
+        @if ($listing->isPubliclyVisible())
+            <div id="feedback" class="mt-8 border-t border-sand-200 pt-6">
+                @if (session('toast'))
+                    <p role="status" @class(['mb-4 max-w-xl rounded-md px-4 py-3 text-sm font-medium', 'bg-success-bg text-success' => session('toast_tone', 'success') === 'success', 'bg-danger-bg text-danger' => session('toast_tone', 'success') !== 'success'])>{{ session('toast') }}</p>
+                @endif
+                <h2 class="font-display text-lg font-bold text-sand-900">Share your experience</h2>
+                <p class="mt-1 text-sm text-sand-600">Tell us about your visit to {{ $listing->lst_name }}. Your feedback helps the local tourism office improve.</p>
+
+                <form method="POST" action="{{ route('listings.feedback.store', $listing) }}" class="mt-4 flex max-w-xl flex-col gap-4">
+                    @csrf
+                    <fieldset>
+                        <legend class="mb-1 text-xs font-semibold text-sand-700">Your rating <span class="text-danger" aria-hidden="true">*</span></legend>
+                        <div class="flex flex-wrap gap-2">
+                            @foreach ([1 => 'Poor', 2 => 'Fair', 3 => 'Good', 4 => 'Very good', 5 => 'Excellent'] as $intStars => $strRatingLabel)
+                                <label class="flex cursor-pointer items-center gap-1.5 rounded-sm border border-sand-300 px-3 py-2 text-sm text-sand-800 has-[:checked]:border-primary-700 has-[:checked]:bg-primary-50 has-[:checked]:font-semibold">
+                                    <input type="radio" name="rating" value="{{ $intStars }}" required @checked((int) old('rating') === $intStars) class="h-4 w-4 text-primary-700 focus:ring-primary-500">
+                                    {{ $intStars }} <i class="ti ti-star text-accent-500" aria-hidden="true"></i> {{ $strRatingLabel }}
+                                </label>
+                            @endforeach
+                        </div>
+                        @error('rating')
+                            <p class="mt-1 text-xs text-danger">{{ $message }}</p>
+                        @enderror
+                    </fieldset>
+
+                    <div>
+                        <label for="feedback-comment" class="mb-1 block text-xs font-semibold text-sand-700">Your comment <span class="text-danger" aria-hidden="true">*</span></label>
+                        <textarea id="feedback-comment" name="comment" rows="4" required minlength="5" maxlength="1000" placeholder="What did you like? What could be better? (English, Filipino or Bisaya)" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">{{ old('comment') }}</textarea>
+                        @error('comment')
+                            <p class="mt-1 text-xs text-danger">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <div>
+                        <label for="feedback-name" class="mb-1 block text-xs font-semibold text-sand-700">Your name (optional)</label>
+                        <input id="feedback-name" name="name" type="text" maxlength="60" value="{{ old('name') }}" placeholder="Leave blank to stay anonymous" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                        @error('name')
+                            <p class="mt-1 text-xs text-danger">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <button type="submit" class="self-start rounded-sm bg-primary-700 px-5 py-2.5 text-sm font-semibold text-sand-0 hover:bg-primary-900">
+                        Send Feedback
+                    </button>
+                </form>
+            </div>
+        @endif
     </div>
 </x-layouts.public>

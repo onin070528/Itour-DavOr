@@ -57,6 +57,7 @@ class CheckinController extends Controller
             'countries' => config('countries'),
             'checkinAction' => route('checkin.store', $establishment),
             'refusalMessage' => null,
+            'feedbackUrl' => $objListing->isPubliclyVisible() ? route('listings.show', $objListing).'#feedback' : null,
         ]);
     }
 

@@ -109,7 +109,7 @@ test('a newly registered establishment account cannot sign in with a default pas
     $this->actingAs($lgu)->post(route('lgu.users.store'), [
         'name' => 'First Login Inn',
         'category' => 'accommodation',
-        'barangay' => 'Dahican',
+        'barangay' => 'Brgy. Dahican',
         'ownerName' => 'Maria Santos',
         'contactPhone' => '09170000000',
         'email' => 'owner@firstlogininn.test',

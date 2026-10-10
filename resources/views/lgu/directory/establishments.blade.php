@@ -49,9 +49,6 @@
                 <option value="PUBLISHED">Published</option>
                 <option value="UNPUBLISHED">Unpublished</option>
             </select>
-            <button type="button" data-filter-reset class="rounded-sm border border-sand-300 px-3 py-2.5 text-sm font-semibold text-sand-700 hover:border-primary-300">
-                Reset
-            </button>
         </div>
 
         @if (count($listings))

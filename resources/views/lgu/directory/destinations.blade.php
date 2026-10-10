@@ -1,7 +1,7 @@
 {{--
     iTOUR — Davao Oriental Tourism Information System
 
-    Purpose: LGU Destinations directory — add, edit and archive.
+    Purpose: LGU Destinations directory — view, edit and archive (new destinations are added from the Accounts page).
     Programmer/s: iTOUR Development Team
     Copyright (c) 2026 iTOUR Development Team. All rights reserved.
 --}}
@@ -9,14 +9,7 @@
     <x-dashboard.page-header
         title="Destinations"
         description="Manage tourism destinations in {{ $municipality }}."
-    >
-        <x-slot:actions>
-            <button type="button" data-modal-open="destination-form-modal" class="inline-flex items-center gap-2 rounded-sm bg-primary-700 px-4 py-2.5 text-sm font-semibold text-sand-0 hover:bg-primary-900">
-                <i class="ti ti-plus" aria-hidden="true"></i>
-                Add Destination
-            </button>
-        </x-slot:actions>
-    </x-dashboard.page-header>
+    />
 
     <div data-filterable-table class="mt-6">
         <div class="rounded-md border border-sand-200 bg-sand-0 p-4">
@@ -34,7 +27,6 @@
                             'name' => $d['name'],
                             'barangay' => $d['barangay'],
                             'description' => $d['description'],
-                            'contactOffice' => $d['contactOffice'],
                             'contactPhone' => $d['contactPhone'],
                         ]);
                     @endphp
@@ -110,17 +102,11 @@
             class="{{ count($destinations) ? 'hidden' : '' }} mt-4"
             icon="ti-map-search"
             title="No destinations in {{ $municipality }} yet"
-            description="Use Add Destination to register your municipality's first tourism destination."
-        >
-            <x-slot:action>
-                <button type="button" data-modal-open="destination-form-modal" class="rounded-sm bg-primary-700 px-4 py-2 text-sm font-semibold text-sand-0 hover:bg-primary-900">
-                    Add Destination
-                </button>
-            </x-slot:action>
-        </x-dashboard.empty-state>
+            description="Add destinations from Accounts (Management) by choosing Destination."
+        />
     </div>
 
-    {{-- Shared Add / Edit modal. Municipality is fixed to this account's assignment. --}}
+    {{-- Edit modal (adding is done from the Accounts page). Municipality is fixed to this account's assignment. --}}
     <x-dashboard.modal id="destination-form-modal" title="Destination">
         <form
             id="destination-form"
@@ -143,7 +129,12 @@
                 </div>
                 <div>
                     <label class="mb-1 block text-xs font-semibold text-sand-700">Barangay / Location <span class="text-danger" aria-hidden="true">*</span></label>
-                    <input name="barangay" type="text" required class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                    <select name="barangay" required class="w-full rounded-sm border border-sand-300 bg-sand-0 px-3 py-2 text-sm">
+                        <option value="" disabled selected>Select barangay</option>
+                        @foreach ($barangays as $strBarangay)
+                            <option value="{{ $strBarangay }}">{{ $strBarangay }}</option>
+                        @endforeach
+                    </select>
                 </div>
             </div>
             <div>
@@ -153,7 +144,7 @@
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="mb-1 block text-xs font-semibold text-sand-700">Contact Office</label>
-                    <input name="contactOffice" type="text" value="{{ $user->usr_organization_name }}" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                    <input name="contactOffice" type="text" value="{{ $contactOffice }}" readonly tabindex="-1" aria-readonly="true" class="pointer-events-none w-full cursor-not-allowed rounded-sm border border-sand-200 bg-sand-100 px-3 py-2 text-sm text-sand-500">
                 </div>
                 <div>
                     <label class="mb-1 block text-xs font-semibold text-sand-700">Contact Phone</label>

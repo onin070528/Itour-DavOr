@@ -97,6 +97,11 @@ class DashboardNavigation
                 ]),
                 $item('images.index', 'ti-camera', 'Photos', 'lgu.images.index', $intImageApprovalCount ?: null),
             ],
+            'Management' => [
+                // Renamed from "Establishment Accounts" — the route (lgu.users) is
+                // unchanged, only the label.
+                $item('users', 'ti-users-group', 'Accounts', 'lgu.users'),
+            ],
             'Reports' => [
                 $item('monthlyReports', 'ti-calendar-event', 'Monthly Reports', 'lgu.monthlyReports.index'),
             ],
@@ -105,11 +110,6 @@ class DashboardNavigation
                     $item('feedback.index', 'ti-messages', 'All Feedback', 'lgu.feedback.index'),
                     $item('feedback.analytics', 'ti-heart-handshake', 'Experience Analytics', 'lgu.feedback.analytics'),
                 ]),
-            ],
-            'Management' => [
-                // Renamed from "Establishments" — the route (lgu.users) is
-                // unchanged, only the label.
-                $item('users', 'ti-users-group', 'Establishment Accounts', 'lgu.users'),
             ],
             'Administration' => [
                 // Not named in the new role list, but kept reachable — no

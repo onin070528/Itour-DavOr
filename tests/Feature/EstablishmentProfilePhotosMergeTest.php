@@ -17,6 +17,7 @@ use App\Models\Listing;
 use App\Models\Municipality;
 use App\Models\OperationLog;
 use App\Models\User;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
 
 function mergeCategoryFixture(): Category
@@ -234,4 +235,21 @@ test('View QR Code still works', function () {
 
     test()->actingAs($user)->get(route('establishment.profile'))->assertOk()->assertSee('View QR Code');
     test()->actingAs($user)->get(route('establishment.qr'))->assertOk();
+});
+
+test('an establishment photo upload posted to the old Photos URL is stored as Pending for LGU approval, not redirected away', function () {
+    $listing = mergeListingFixture();
+    $user = mergeEstablishmentUserFixture($listing);
+
+    $response = test()->actingAs($user)->post(route('establishment.images.store'), [
+        'listing_id' => $listing->lst_id,
+        'photos' => [UploadedFile::fake()->image('front.jpg', 1600, 1200)],
+        'ownership_declared' => '1',
+    ]);
+
+    $response->assertStatus(302)->assertSessionHasNoErrors();
+
+    $image = EstablishmentImage::query()->where('lst_id', $listing->lst_id)->firstOrFail();
+    expect($image->img_status)->toBe(ImageStatus::Pending)
+        ->and($image->img_source_role)->toBe(ImageSourceRole::Establishment);
 });

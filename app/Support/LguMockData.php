@@ -10,7 +10,9 @@
 
 namespace App\Support;
 
+use App\Models\Feedback;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 /**
@@ -62,16 +64,32 @@ class LguMockData
     }
 
     /**
+     * Real tourist feedback (tbl_feedback) about destinations and
+     * establishments in this municipality, newest first — each row already
+     * carries the sentiment computed at submission by
+     * App\Services\SentimentAnalyzer.
+     *
      * @return array<int, array<string, mixed>>
      */
     public static function feedback(string $strMunicipality): array
     {
-        $objSubjects = collect(self::destinations($strMunicipality))->pluck('name')
-            ->merge(collect(self::establishments($strMunicipality))->pluck('name'));
-
-        return collect(PtoMockData::feedback())
-            ->whereIn('subject', $objSubjects)
-            ->values()
+        return Feedback::query()
+            ->forMunicipality($strMunicipality)
+            ->with('listing:lst_id,lst_name')
+            ->orderByDesc('fbk_created_at')
+            ->orderByDesc('fbk_id')
+            ->get()
+            ->map(fn (Feedback $objFeedback) => [
+                'id' => 'FB-'.$objFeedback->fbk_id,
+                'name' => $objFeedback->fbk_name ?: 'Anonymous',
+                'subject' => $objFeedback->listing->lst_name,
+                'date' => $objFeedback->fbk_created_at->toDateString(),
+                'language' => $objFeedback->fbk_language,
+                'sentiment' => $objFeedback->fbk_sentiment,
+                'polarity' => $objFeedback->fbk_polarity,
+                'rating' => $objFeedback->fbk_rating,
+                'text' => $objFeedback->fbk_text,
+            ])
             ->all();
     }
 
@@ -125,20 +143,52 @@ class LguMockData
     }
 
     /**
-     * Positive-sentiment share over time. Nudged by a small, deterministic
-     * per-municipality offset so every LGU doesn't see an identical trend.
+     * Share (%) of Positive feedback over time, from the real feedback:
+     * the last 7 days, the last 4 weeks and the last 12 months. A period
+     * with no feedback shows 0.
      *
      * @return array<string, array<int, array{label: string, value: int}>>
      */
     public static function sentimentTrend(string $strMunicipality): array
     {
-        $intOffset = (crc32($strMunicipality) % 11) - 5;
+        $objRows = Feedback::query()
+            ->forMunicipality($strMunicipality)
+            ->where('fbk_created_at', '>=', now()->subYear()->startOfMonth())
+            ->get(['fbk_sentiment', 'fbk_created_at']);
 
-        return collect(PtoMockData::sentimentTrend())
-            ->map(fn (array $arrSeries) => collect($arrSeries)
-                ->map(fn (array $arrPoint) => ['label' => $arrPoint['label'], 'value' => max(0, min(100, $arrPoint['value'] + $intOffset))])
-                ->all())
-            ->all();
+        $fnPositiveShare = fn (Collection $objBucket): int => $objBucket->isEmpty()
+            ? 0
+            : (int) round(($objBucket->where('fbk_sentiment', 'Positive')->count() / $objBucket->count()) * 100);
+
+        $arrWeek = [];
+        for ($intDaysAgo = 6; $intDaysAgo >= 0; $intDaysAgo--) {
+            $objDay = now()->subDays($intDaysAgo);
+            $arrWeek[] = [
+                'label' => $objDay->format('D'),
+                'value' => $fnPositiveShare($objRows->filter(fn (Feedback $objRow) => $objRow->fbk_created_at->isSameDay($objDay))),
+            ];
+        }
+
+        $arrMonth = [];
+        for ($intWeeksAgo = 3; $intWeeksAgo >= 0; $intWeeksAgo--) {
+            $objEnd = now()->subWeeks($intWeeksAgo)->endOfDay();
+            $objStart = $objEnd->copy()->subDays(6)->startOfDay();
+            $arrMonth[] = [
+                'label' => 'Wk '.(4 - $intWeeksAgo),
+                'value' => $fnPositiveShare($objRows->filter(fn (Feedback $objRow) => $objRow->fbk_created_at->between($objStart, $objEnd))),
+            ];
+        }
+
+        $arrYear = [];
+        for ($intMonthsAgo = 11; $intMonthsAgo >= 0; $intMonthsAgo--) {
+            $objMonth = now()->startOfMonth()->subMonths($intMonthsAgo);
+            $arrYear[] = [
+                'label' => $objMonth->format('M'),
+                'value' => $fnPositiveShare($objRows->filter(fn (Feedback $objRow) => $objRow->fbk_created_at->isSameMonth($objMonth))),
+            ];
+        }
+
+        return ['week' => $arrWeek, 'month' => $arrMonth, 'year' => $arrYear];
     }
 
     /**
