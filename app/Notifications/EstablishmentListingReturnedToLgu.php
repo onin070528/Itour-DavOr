@@ -19,9 +19,14 @@ class EstablishmentListingReturnedToLgu extends Notification
 {
     use Queueable;
 
+    /**
+     * $blnIsChangeRequest: the return concerns held changes to a Published
+     * listing (which stays live), not a new destination listing request.
+     */
     public function __construct(
         private readonly Listing $objListing,
         private readonly string $strReason,
+        private readonly bool $blnIsChangeRequest = false,
     ) {}
 
     /**
@@ -37,11 +42,17 @@ class EstablishmentListingReturnedToLgu extends Notification
      */
     public function toDatabase(object $objNotifiable): array
     {
+        $strSubject = $this->blnIsChangeRequest
+            ? "PTO returned the changes to \"{$this->objListing->lst_name}\""
+            : "PTO returned \"{$this->objListing->lst_name}\"";
+
         return [
             'listing_id' => $this->objListing->lst_id,
             'listing_name' => $this->objListing->lst_name,
             'reason' => $this->strReason,
-            'message' => "PTO returned \"{$this->objListing->lst_name}\": {$this->strReason}",
+            'message' => "{$strSubject}: {$this->strReason}",
+            // Relative, so the bell only ever redirects within iTOUR.
+            'url' => $this->objListing->lguDetailsPath(),
         ];
     }
 }

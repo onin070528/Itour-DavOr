@@ -11,8 +11,10 @@
 
 namespace App\Http\Controllers\Establishment;
 
+use App\Services\FeedbackAnalyticsService;
 use App\Support\EstablishmentMockData;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\View\View;
 
 class DashboardController extends EstablishmentController
@@ -20,15 +22,17 @@ class DashboardController extends EstablishmentController
     /**
      * The Establishment landing page: how this establishment is performing.
      */
-    public function index(Request $objRequest): View
+    public function index(Request $objRequest, FeedbackAnalyticsService $objAnalytics): View
     {
         $strName = $objRequest->user()->usr_organization_name;
+        // Feedback numbers are real (Objective 4): this account's own listing only.
+        $objFeedback = $objAnalytics->scopedQuery($objRequest->user());
 
         return $this->renderEstablishment($objRequest, 'establishment.dashboard', 'dashboard', 'Dashboard', [
-            'summary' => EstablishmentMockData::dashboardSummary($strName),
+            'summary' => $objAnalytics->withFeedbackCards(EstablishmentMockData::dashboardSummary($strName), $objFeedback),
             'arrivalTrend' => EstablishmentMockData::arrivalTrend($strName),
             'classificationBreakdown' => EstablishmentMockData::classificationBreakdown($strName),
-            'sentiment' => EstablishmentMockData::sentimentBreakdown($strName),
+            'sentiment' => Arr::only($objAnalytics->sentimentSummary($objFeedback), ['positive', 'neutral', 'negative']),
             'recentActivity' => array_slice(EstablishmentMockData::recentActivity($strName), 0, 6),
         ]);
     }

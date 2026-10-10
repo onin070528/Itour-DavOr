@@ -26,6 +26,14 @@ class UserSeeder extends Seeder
      *
      * All demo accounts use the password "password" — change these before
      * any non-local deployment.
+     *
+     * Every LGU account here, and the PTO account, is seeded Inactive: the
+     *
+     * official accounts are the tourism.*@itourdavor.gov.ph ones from
+     * RbacDemoAccountSeeder, and the database allows only one active LGU
+     * account per municipality (users_one_active_lgu_per_municipality_unique).
+     * Inactive keeps these rows (and the report history that references
+     * them) without letting them sign in.
      */
     public function run(): void
     {
@@ -38,7 +46,7 @@ class UserSeeder extends Seeder
                 'usr_role' => UserRole::PtoAdministrator,
                 'usr_organization_name' => 'Provincial Tourism Office',
                 'usr_organization_subtitle' => 'Province of Davao Oriental',
-                'usr_status' => 'Active',
+                'usr_status' => 'Inactive',
                 'usr_last_login_at' => Carbon::parse('2026-08-22'),
             ]
         );
@@ -52,7 +60,7 @@ class UserSeeder extends Seeder
                 'usr_role' => UserRole::Lgu,
                 'usr_organization_name' => 'Mati City Tourism Office',
                 'usr_organization_subtitle' => 'City of Mati',
-                'usr_status' => 'Active',
+                'usr_status' => 'Inactive',
                 'usr_last_login_at' => Carbon::parse('2026-08-22'),
             ]
         );
@@ -88,16 +96,18 @@ class UserSeeder extends Seeder
             // mock's single "assignment" value verbatim — documented in
             // Pto\UsersController as the same mapping real account creation
             // uses, not a one-off guess for seed data.
+            $objRole = $objRoleByTitle[$arrRow['role']] ?? UserRole::Lgu;
+
             User::query()->updateOrCreate(
                 ['usr_email' => $arrRow['email']],
                 [
                     'usr_name' => $arrRow['name'],
                     'usr_password' => 'password',
                     'usr_email_verified_at' => now(),
-                    'usr_role' => $objRoleByTitle[$arrRow['role']] ?? UserRole::Lgu,
+                    'usr_role' => $objRole,
                     'usr_organization_name' => $arrRow['assignment'],
                     'usr_organization_subtitle' => $arrRow['assignment'],
-                    'usr_status' => $arrRow['status'],
+                    'usr_status' => $objRole === UserRole::Lgu ? 'Inactive' : $arrRow['status'],
                     'usr_last_login_at' => Carbon::parse($arrRow['lastActive']),
                 ]
             );

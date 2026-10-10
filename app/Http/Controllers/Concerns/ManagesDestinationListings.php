@@ -4,7 +4,8 @@
  * iTOUR — Davao Oriental Tourism Information System
  *
  * Purpose: Shared Add/Edit/Archive Destination logic used by the LGU and PTO
- * directory controllers (validation, creation, and unique slug generation).
+ * directory controllers (validation and unique slug generation). Creating an
+ * LGU destination goes through App\Services\AttractionRecordService.
  * Programmer/s: iTOUR Development Team
  * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
  */
@@ -14,7 +15,6 @@ namespace App\Http\Controllers\Concerns;
 use App\Models\Listing;
 use App\Support\TourismCatalog;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 /**
@@ -39,47 +39,17 @@ trait ManagesDestinationListings
         ]);
 
         return [
-            'lst_name' => $arrData['name'],
-            'lst_barangay' => $arrData['barangay'],
-            'lst_description' => $arrData['description'] ?? null,
-            'lst_contact_office' => $arrData['contactOffice'] ?? null,
-            'lst_contact_phone' => $arrData['contactPhone'] ?? null,
+            'name' => $arrData['name'],
+            'barangay' => $arrData['barangay'],
+            'description' => $arrData['description'] ?? null,
+            'contact_office' => $arrData['contactOffice'] ?? null,
+            'contact_phone' => $arrData['contactPhone'] ?? null,
         ];
-    }
-
-    /**
-     * $intMunicipalityId is the real FK (App\Models\Municipality) — the caller
-     * resolves it (LGU: its own account's mun_id, already a
-     * reliable FK; PTO: looked up from the submitted municipality name)
-     * since only the caller knows which is trustworthy for its form.
-     * Left null here, it's null on the row too, which then fails the
-     * municipality-scoped access checks (Lgu\DirectoryController::
-     * authorizeOwnMunicipality) — always pass it.
-     */
-    protected function createDestination(array $arrFields, string $strMunicipality, ?int $intMunicipalityId): Listing
-    {
-        return Listing::query()->create([
-            ...$arrFields,
-            'lst_slug' => $this->uniqueDestinationSlug($arrFields['lst_name']),
-            'lst_category' => 'destinations',
-            'lst_municipality' => $strMunicipality,
-            'mun_id' => $intMunicipalityId,
-            'lst_status' => 'Active',
-        ]);
     }
 
     protected function uniqueDestinationSlug(string $strName): string
     {
-        $strBase = Str::slug($strName) ?: 'destination';
-        $strSlug = $strBase;
-        $intSuffix = 2;
-
-        while (Listing::query()->where('lst_slug', $strSlug)->exists()) {
-            $strSlug = "{$strBase}-{$intSuffix}";
-            $intSuffix++;
-        }
-
-        return $strSlug;
+        return Listing::uniqueSlug($strName);
     }
 
     /**

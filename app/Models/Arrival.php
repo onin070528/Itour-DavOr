@@ -26,7 +26,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 #[Table('tbl_arrivals', key: 'arr_id')]
 #[Fillable([
-    'lst_id', 'mar_id', 'arr_source', 'arr_date', 'arr_visitor_name', 'arr_visitor_contact',
+    'lst_id', 'mar_id', 'arr_source', 'recorded_by', 'arr_date', 'arr_visitor_name', 'arr_visitor_contact',
     'arr_gender', 'arr_classification', 'arr_visit_type', 'arr_remarks', 'arr_party_male',
     'arr_party_female', 'arr_party_adults', 'arr_party_children', 'arr_party_seniors',
     'arr_party_local', 'arr_party_foreign', 'arr_party_size', 'arr_status',
@@ -51,6 +51,15 @@ class Arrival extends Model
     {
         return $this->belongsTo(Listing::class, 'lst_id', 'lst_id');
     }
+
+    /**
+     * The establishment user who encoded this arrival at the front desk —
+     * null for QR self-check-in rows (the tourist has no account).
+     */
+    public function recorder(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'recorded_by', 'usr_id');
+    } // end recorder
 
     /**
      * The digitally-submitted monthly report this row was aggregated into,

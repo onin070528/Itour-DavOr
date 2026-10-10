@@ -11,6 +11,7 @@
 namespace App\Policies;
 
 use App\Enums\ImageSourceRole;
+use App\Enums\ReportingMethod;
 use App\Enums\UserRole;
 use App\Models\EstablishmentImage;
 use App\Models\Listing;
@@ -27,7 +28,7 @@ class ImagePolicy
      * I1: who may upload a photo for $objListing. Establishment users may
      * only upload for their own linked listing. LGU may upload on behalf
      * only within their own municipality, and only for a listing with no
-     * linked account or with reporting_mode PAPER_LGU. PTO may upload for
+     * linked account or whose reporting method is Manual/Paper. PTO may upload for
      * any listing.
      */
     public function uploadFor(User $objUser, Listing $objListing): bool
@@ -40,7 +41,8 @@ class ImagePolicy
                 && $this->isEstablishmentEditWindowOpen($objListing),
             UserRole::Lgu => $objUser->mun_id !== null
                 && $objUser->mun_id === $objListing->mun_id
-                && ($objListing->establishmentUser === null || $objListing->lst_reporting_mode === 'PAPER_LGU'),
+                && ! $objListing->isManagedByPto()
+                && ($objListing->establishmentUser === null || $objListing->reportingMethod() === ReportingMethod::ManualPaper),
             UserRole::PtoAdministrator => true,
             default => false,
         };
@@ -106,11 +108,13 @@ class ImagePolicy
         return match ($objUser->usr_role) {
             // Same editable window as uploadFor() above — LGU/PTO keep
             // managing photos regardless of status, their own review work
-            // is unaffected.
+            // is unaffected. An LGU never manages a PTO-managed
+            // destination's photos (Objective 3, D10).
             UserRole::Establishment => $objUser->lst_id === $objListing->lst_id
                 && $this->isEstablishmentEditWindowOpen($objListing),
             UserRole::Lgu => $objUser->mun_id !== null
-                && $objUser->mun_id === $objListing->mun_id,
+                && $objUser->mun_id === $objListing->mun_id
+                && ! $objListing->isManagedByPto(),
             UserRole::PtoAdministrator => true,
             default => false,
         };

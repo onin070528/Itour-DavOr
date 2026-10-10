@@ -15,7 +15,7 @@ namespace App\Support;
 use App\Models\User;
 
 /**
- * Every role's sidebar is built from the same six-section vocabulary — Main,
+ * Every role's sidebar is built from the same section vocabulary — Main,
  * Work, Reports, Feedback, Management, Administration — in that fixed
  * order; a role that has nothing for a section simply never adds to it, and
  * sections() drops any section left empty. Photos and the old, separate
@@ -149,7 +149,7 @@ class DashboardNavigation
                 $item('establishment.qr', 'ti-qrcode', 'QR Codes', 'establishment.qr'),
             ],
             'Reports' => [
-                $item('arrivals.monthly', 'ti-calendar-event', 'Monthly Report', 'establishment.arrivals.monthly'),
+                $item('arrivals.monthly', 'ti-calendar-event', 'Monthly Reports', 'establishment.arrivals.monthly'),
             ],
             'Feedback' => [
                 $group('feedback', 'ti-message-2', 'Feedback & Reviews', [

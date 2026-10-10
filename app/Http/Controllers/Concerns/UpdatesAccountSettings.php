@@ -88,7 +88,11 @@ trait UpdatesAccountSettings
         $objUser = $objRequest->user();
 
         try {
-            $objUser->update(['usr_password' => $arrData['password']]);
+            $objUser->forceFill([
+                'usr_password' => $arrData['password'],
+                'usr_must_change_password' => false,
+                'usr_password_changed_at' => now(),
+            ])->save();
         } catch (\Throwable $objException) {
             Log::error('Failed to update account password.', ['exception' => $objException, 'usr_id' => $objUser->usr_id]);
 

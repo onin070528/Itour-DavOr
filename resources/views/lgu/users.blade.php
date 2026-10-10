@@ -28,10 +28,10 @@
                 <i class="ti ti-search text-sand-500" aria-hidden="true"></i>
                 <input data-filter-input type="search" placeholder="Search by establishment or destination, owner, email, or barangay..." class="w-full border-0 bg-transparent text-sm text-sand-900 placeholder:text-sand-500 focus:outline-none">
             </div>
-            <select data-filter-select data-filter-key="category" class="rounded-sm border border-sand-300 bg-sand-50 px-3 py-2.5 text-sm text-sand-700">
+            <select data-filter-select data-filter-key="category-id" class="rounded-sm border border-sand-300 bg-sand-50 px-3 py-2.5 text-sm text-sand-700">
                 <option value="">All Categories</option>
-                @foreach ($categories as $category)
-                    <option value="{{ $category['slug'] }}">{{ $category['label'] }}</option>
+                @foreach ($filterCategories as $category)
+                    <option value="{{ $category->cat_id }}">{{ $category->cat_name }}</option>
                 @endforeach
             </select>
             <select data-filter-select data-filter-key="status" class="rounded-sm border border-sand-300 bg-sand-50 px-3 py-2.5 text-sm text-sand-700">
@@ -49,7 +49,7 @@
                     <tr class="border-b border-sand-200 bg-sand-50 text-left text-xs font-semibold tracking-wide text-sand-500 uppercase">
                         <th class="px-4 py-3">Establishment / Destination</th>
                         <th class="px-4 py-3">Barangay</th>
-                        <th class="px-4 py-3">Owner / Manager</th>
+                        <th class="px-4 py-3">Account Holder</th>
                         <th class="px-4 py-3">Contact</th>
                         <th class="px-4 py-3">Status</th>
                         <th class="px-4 py-3"></th>
@@ -59,38 +59,26 @@
                     @foreach ($users as $u)
                         @php
                             $listing = $u->establishment;
-                            $hours = \App\Support\BusinessHours::parse($listing?->lst_hours);
-                            $editValues = json_encode([
-                                'name' => $listing?->lst_name ?? $u->usr_organization_name,
-                                'category' => $listing?->lst_category,
-                                'barangay' => $listing?->lst_barangay,
-                                'ownerName' => $listing?->lst_owner_name ?? $u->usr_name,
-                                'contactPhone' => $listing?->lst_contact_phone,
-                                'email' => $u->usr_email,
-                                'hoursDays' => $hours['days'] ?? '',
-                                'hoursOpen' => $hours['opens'] ?? '',
-                                'hoursClose' => $hours['closes'] ?? '',
-                                'website' => $listing?->lst_website,
-                                'description' => $listing?->lst_description,
-                            ]);
+                            $editValues = json_encode(['name' => $u->usr_name, 'email' => $u->usr_email]);
                             $establishmentName = $listing?->lst_name ?? $u->usr_organization_name;
-                            $ownerName = $listing?->lst_owner_name ?? $u->usr_name;
                         @endphp
                         <tr
                             data-row
                             data-status="{{ $u->usr_status }}"
-                            data-category="{{ $listing?->lst_category }}"
-                            data-search-text="{{ strtolower($establishmentName.' '.$ownerName.' '.$u->usr_email.' '.$listing?->lst_barangay) }}"
+                            data-category-id="{{ $listing?->cat_id }}"
+                            data-search-text="{{ strtolower($establishmentName.' '.$u->usr_name.' '.$u->usr_email.' '.$listing?->lst_barangay) }}"
                             class="hover:bg-sand-50"
                         >
                             <td class="px-4 py-3">
-                                <p class="font-medium text-sand-900">{{ $establishmentName }}</p>
                                 @if ($listing)
-                                    <p class="text-xs text-sand-500">{{ \App\Support\TourismCatalog::categoryLabel($listing->lst_category) }}</p>
+                                    <a href="{{ route('lgu.directory.establishments.show', $listing) }}" class="font-medium text-sand-900 hover:text-primary-700">{{ $establishmentName }}</a>
+                                    <p class="text-xs text-sand-500">{{ $listing->categoryName() }} · {{ $listing->reportingMethod()->label() }}</p>
+                                @else
+                                    <p class="font-medium text-sand-900">{{ $establishmentName }}</p>
                                 @endif
                             </td>
-                            <td class="px-4 py-3 text-sand-700">{{ $listing?->lst_barangay ?? '—' }}</td>
-                            <td class="px-4 py-3 text-sand-700">{{ $ownerName }}</td>
+                            <td class="px-4 py-3 text-sand-700">{{ $listing?->lst_barangay ?: '—' }}</td>
+                            <td class="px-4 py-3 text-sand-700">{{ $u->usr_name }}</td>
                             <td class="px-4 py-3">
                                 <p class="text-sand-700">{{ $u->usr_email }}</p>
                                 @if ($listing?->lst_contact_phone)
@@ -110,7 +98,7 @@
                                     <button type="button" data-dropdown-toggle class="text-sand-500 hover:text-sand-800">
                                         <i class="ti ti-dots-vertical" aria-hidden="true"></i>
                                     </button>
-                                    <div data-dropdown-menu class="absolute right-0 z-10 mt-1 hidden w-44 rounded-md border border-sand-200 bg-sand-0 py-1 shadow-md">
+                                    <div data-dropdown-menu class="absolute right-0 z-10 mt-1 hidden w-48 rounded-md border border-sand-200 bg-sand-0 py-1 shadow-md">
                                         <button
                                             type="button"
                                             data-modal-open="user-form-modal"
@@ -119,8 +107,13 @@
                                             data-edit-action="{{ route('lgu.users.update', $u->usr_id) }}"
                                             class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-sand-700 hover:bg-sand-50"
                                         >
-                                            <i class="ti ti-pencil" aria-hidden="true"></i> Edit
+                                            <i class="ti ti-pencil" aria-hidden="true"></i> Edit Account
                                         </button>
+                                        @if ($listing)
+                                            <a href="{{ route('lgu.directory.establishments.show', $listing) }}" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-sand-700 hover:bg-sand-50">
+                                                <i class="ti ti-building-store" aria-hidden="true"></i> Open Establishment
+                                            </a>
+                                        @endif
                                         <form method="POST" action="{{ route('lgu.users.toggleStatus', $u->usr_id) }}">
                                             @csrf
                                             @method('PATCH')
@@ -129,7 +122,7 @@
                                                     type="button"
                                                     data-confirm-trigger
                                                     data-confirm-title="Disable {{ $u->usr_name }}?"
-                                                    data-confirm-message="They will immediately lose access to their iTOUR account."
+                                                    data-confirm-message="They will immediately lose access to their iTOUR account, and QR check-in stops."
                                                     data-confirm-label="Disable Account"
                                                     data-confirm-tone="danger"
                                                     class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-danger hover:bg-danger-bg"
@@ -161,10 +154,10 @@
 
         <x-dashboard.empty-state
             data-empty-state
-            class="hidden mt-3"
+            class="{{ $users->isNotEmpty() ? 'hidden' : '' }} mt-3"
             icon="ti-users"
-            title="No users match your filters"
-            description="Try a different status."
+            title="{{ $users->isNotEmpty() ? 'No accounts match your filters' : 'No establishment accounts yet' }}"
+            description="{{ $users->isNotEmpty() ? 'Try a different status or category.' : 'Open an establishment under Establishments and choose Activate Online iTOUR account.' }}"
         />
 
         <div data-pagination class="mt-4 flex items-center justify-center gap-1"></div>
@@ -280,7 +273,7 @@
                 <div class="grid gap-4 sm:grid-cols-2">
                     <div data-type-only="destination" hidden>
                         <label for="establishment-category-fixed" class="mb-1 block text-xs font-semibold text-sand-700">Category</label>
-                        <input id="establishment-category-fixed" type="text" value="Tourist Destinations" disabled class="w-full rounded-sm border border-sand-200 bg-sand-100 px-3 py-2 text-sm text-sand-500">
+                        <input id="establishment-category-fixed" type="text" value="{{ $municipality }} Tourist Spot" readonly aria-readonly="true" class="w-full rounded-sm border border-sand-200 bg-sand-100 px-3 py-2 text-sm text-sand-500">
                     </div>
                     <div data-type-only="establishment">
                         <label for="establishment-category" class="mb-1 block text-xs font-semibold text-sand-700">Category <span class="text-danger" aria-hidden="true">*</span></label>
@@ -361,57 +354,14 @@
         </form>
 
         <x-slot:footer>
-            <button type="button" data-modal-close class="rounded-sm border border-sand-300 bg-sand-0 px-4 py-2.5 text-sm font-semibold text-sand-800 hover:border-primary-300">Cancel</button>
-            <button type="submit" form="user-form" class="rounded-sm bg-primary-700 px-4 py-2 text-sm font-semibold text-sand-0 hover:bg-primary-900">
-                Save
-            </button>
+            <button type="button" data-modal-close class="btn-secondary">Cancel</button>
+            <button type="submit" form="user-form" class="btn-primary">Save</button>
         </x-slot:footer>
     </x-dashboard.modal>
 
-    {{--
-        One-time account-created confirmation panel — same shape and JS
-        hook (resources/js/user_account.js) as the PTO Add User page.
-    --}}
+    {{-- One-time account-created confirmation panel, opened by user_account.js. --}}
     @if (session('accountCreated'))
-        @php($accountCreated = session('accountCreated'))
-        <x-dashboard.modal id="account-created-modal" title="Account Created">
-            <div class="flex flex-col gap-3">
-                <dl class="flex flex-col gap-2 text-sm">
-                    <div><dt class="text-xs font-semibold text-sand-500 uppercase">Name</dt><dd class="text-sand-800">{{ $accountCreated['name'] }}</dd></div>
-                    <div><dt class="text-xs font-semibold text-sand-500 uppercase">Role</dt><dd class="text-sand-800">{{ $accountCreated['role'] }}</dd></div>
-                    <div><dt class="text-xs font-semibold text-sand-500 uppercase">Municipality</dt><dd class="text-sand-800">{{ $accountCreated['municipality'] }}</dd></div>
-                </dl>
-
-                <div class="rounded-md border border-sand-300 bg-sand-50 p-3">
-                    <p class="text-xs font-semibold text-sand-700">Temporary Password</p>
-                    <div class="mt-1.5 flex items-center justify-between gap-2">
-                        <span id="account-created-passphrase" class="font-mono text-sm text-sand-900">{{ $accountCreated['passphrase'] }}</span>
-                        <button type="button" id="account-created-copy" class="shrink-0 rounded-sm border border-sand-300 bg-sand-0 px-2.5 py-1 text-xs font-semibold text-sand-800 hover:border-primary-300">Copy</button>
-                    </div>
-                </div>
-
-                <p class="text-xs text-sand-500">This password will not be shown again.</p>
-
-                <p id="account-created-email-status" @class(['rounded-sm px-3 py-2 text-xs', 'bg-warning-bg text-warning' => ! $accountCreated['emailSent'], 'hidden' => $accountCreated['emailSent']])>
-                    Email could not be sent. Please give the temporary password to the user directly.
-                </p>
-            </div>
-
-            <x-slot:footer>
-                @unless ($accountCreated['emailSent'])
-                    <button
-                        type="button"
-                        id="account-created-resend"
-                        data-user-id="{{ $accountCreated['userId'] }}"
-                        data-resend-url="{{ route('lgu.users.resendWelcomeEmail') }}"
-                        class="rounded-sm border border-sand-300 bg-sand-0 px-4 py-2.5 text-sm font-semibold text-sand-800 hover:border-primary-300"
-                    >
-                        Send Welcome Email
-                    </button>
-                @endunless
-                <button type="button" data-modal-close class="rounded-sm bg-primary-700 px-4 py-2 text-sm font-semibold text-sand-0 hover:bg-primary-900">Done</button>
-            </x-slot:footer>
-        </x-dashboard.modal>
+        <x-dashboard.account-created-modal :account="session('accountCreated')" :resend-url="route('lgu.users.resendWelcomeEmail')" />
     @endif
 
     @vite(['resources/js/user_account.js'])

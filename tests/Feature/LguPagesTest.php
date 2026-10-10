@@ -37,12 +37,10 @@ test('every LGU page renders for a municipality with data', function (string $ro
     test()->actingAs($user)->get(route($routeName))->assertOk();
 })->with([
     'lgu.dashboard',
-    'lgu.directory.destinations',
     'lgu.directory.establishments',
     'lgu.monthlyReports.index',
     'lgu.feedback.index',
     'lgu.feedback.analytics',
-    'lgu.images.index',
     'lgu.settings',
     'lgu.users',
 ]);
@@ -53,12 +51,10 @@ test('every LGU page renders for a municipality with no mock data (empty states)
     test()->actingAs($user)->get(route($routeName))->assertOk();
 })->with([
     'lgu.dashboard',
-    'lgu.directory.destinations',
     'lgu.directory.establishments',
     'lgu.monthlyReports.index',
     'lgu.feedback.index',
     'lgu.feedback.analytics',
-    'lgu.images.index',
     'lgu.settings',
     'lgu.users',
 ]);
@@ -68,6 +64,30 @@ test('the old Photo Approvals URL redirects to the Photos page', function () {
 
     test()->actingAs($user)->get(route('lgu.images.queue'))
         ->assertRedirect(route('lgu.images.index'));
+});
+
+test('the old Destinations URL redirects to the unified Attractions view', function () {
+    $user = actingAsLgu('City of Mati');
+
+    test()->actingAs($user)->get(route('lgu.directory.destinations'))
+        ->assertRedirect(route('lgu.directory.establishments', ['view' => 'attractions']));
+});
+
+test('the LGU sidebar uses the unified Phase 7 navigation', function () {
+    $user = actingAsLgu('City of Mati');
+
+    test()->actingAs($user)->get(route('lgu.settings'))
+        ->assertOk()
+        ->assertSee('Tourism Directory')
+        ->assertSee('Establishments')
+        ->assertSee('Attractions')
+        ->assertSee('Tourist Feedback')
+        ->assertSee('Tourism Reports')
+        ->assertSee('Manual Entry')
+        ->assertSee('Establishment Accounts')
+        ->assertSee('Audit Logs')
+        ->assertDontSee('>Destinations<', false)
+        ->assertDontSee('>Photos<', false);
 });
 
 test('the dashboard only shows data scoped to the LGU\'s own municipality', function () {

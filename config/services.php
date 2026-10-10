@@ -47,6 +47,26 @@ return [
         'token' => env('MAPBOX_SECRET_KEY'),
     ],
 
+    // Objective 4: used ONLY to translate tourist feedback into English
+    // (App\Services\OpenAiTranslationService). Sentiment, issue detection,
+    // and recommendations never call it.
+    'openai' => [
+        'api_key' => env('OPENAI_API_KEY'),
+        'base_url' => 'https://api.openai.com/v1',
+        'translation_model' => env('OPENAI_TRANSLATION_MODEL', 'gpt-4.1-mini'),
+    ],
+
+    // Objective 4: the free-tier alternative translation provider, used only
+    // when TRANSLATION_PROVIDER=gemini (App\Services\GeminiTranslationService).
+    // Same single purpose as 'openai' above: tourist feedback into English.
+    // The Flash-Lite alias answers in about a second; the full Flash models
+    // can take over a minute, longer than the translation timeout.
+    'gemini' => [
+        'api_key' => env('GEMINI_API_KEY'),
+        'base_url' => 'https://generativelanguage.googleapis.com/v1beta',
+        'translation_model' => env('GEMINI_TRANSLATION_MODEL', 'gemini-flash-lite-latest'),
+    ],
+
     'turnstile' => [
         'site_key' => env('TURNSTILE_SITE_KEY'),
         'secret_key' => env('TURNSTILE_SECRET_KEY'),

@@ -5,9 +5,10 @@
     Programmer/s: iTOUR Development Team
     Copyright (c) 2026 iTOUR Development Team. All rights reserved.
 --}}
-@props(['id', 'title', 'maxWidth' => 'max-w-lg', 'confirmOutsideClose' => false])
+@props(['id', 'title', 'maxWidth' => 'max-w-lg', 'confirmOutsideClose' => false, 'open' => false])
 
-<div id="{{ $id }}" data-modal @if ($confirmOutsideClose) data-confirm-outside-close @endif class="fixed inset-0 z-50 hidden">
+{{-- `open` renders the modal already visible, e.g. to show validation errors after a redirect. --}}
+<div id="{{ $id }}" data-modal @if ($confirmOutsideClose) data-confirm-outside-close @endif @class(['fixed inset-0 z-50', 'hidden' => ! $open])>
     <div data-modal-backdrop class="flex min-h-full items-center justify-center bg-sand-900/50 p-4">
         <div class="w-full {{ $maxWidth }} rounded-lg bg-sand-0 shadow-md">
             <div class="flex items-center justify-between border-b border-sand-200 px-5 py-4">

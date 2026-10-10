@@ -93,6 +93,58 @@
     }
 }
 
+/**
+ * Dashboard form, panel, and button classes — the exact utility
+ * combinations the dashboards already use, named once so new pages
+ * (e.g. LGU Establishments) don't repeat long class strings. Existing pages
+ * keep their inline utilities; convert them only when a page is touched.
+ */
+@layer components {
+    .dashboard-panel {
+        @apply rounded-md border border-sand-200 bg-sand-0 p-5;
+    }
+
+    .dashboard-panel-title {
+        @apply font-display text-base font-bold text-sand-900;
+    }
+
+    .form-label {
+        @apply mb-1 block text-xs font-semibold text-sand-700;
+    }
+
+    .form-input {
+        @apply w-full rounded-sm border border-sand-300 bg-sand-0 px-3 py-2 text-sm text-sand-900 disabled:cursor-not-allowed disabled:bg-sand-100 disabled:text-sand-500;
+    }
+
+    .form-hint {
+        @apply mt-1 text-xs text-sand-500;
+    }
+
+    .form-error {
+        @apply mt-1 text-xs text-danger;
+    }
+
+    .btn-primary {
+        @apply inline-flex items-center gap-2 rounded-sm bg-primary-700 px-4 py-2.5 text-sm font-semibold text-sand-0 hover:bg-primary-900;
+    }
+
+    .btn-secondary {
+        @apply inline-flex items-center gap-2 rounded-sm border border-sand-300 bg-sand-0 px-4 py-2.5 text-sm font-semibold text-sand-800 hover:border-primary-300;
+    }
+
+    .btn-small {
+        @apply inline-flex items-center gap-1.5 rounded-sm border border-sand-300 px-3 py-1.5 text-xs font-semibold text-sand-800 hover:border-primary-300;
+    }
+
+    .detail-term {
+        @apply text-xs font-semibold text-sand-500 uppercase;
+    }
+
+    .detail-value {
+        @apply mt-0.5 text-sm text-sand-800;
+    }
+}
+
 @layer utilities {
     /* For horizontally-scrollable single-row chip/pill lists (e.g. the hero
        category pills) — scrolls on overflow without showing a scrollbar. */

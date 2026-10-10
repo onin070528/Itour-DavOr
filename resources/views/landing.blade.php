@@ -104,26 +104,6 @@
         </div>
     </section>
 
-    <x-near-you-section :places="$nearbyPlaces" />
-
-    {{-- Tourist Experience / Reviews --}}
-    <section id="reviews" class="mx-auto max-w-[1200px] px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
-        <x-section-heading
-            eyebrow="Tourist Reviews"
-            description="Authentic multilingual feedback helps future travelers and improves tourism services."
-            action-label="Read all reviews"
-            action-href="#"
-        >
-            Stories from the road
-        </x-section-heading>
-
-        <div class="mt-10 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
-            @foreach (array_slice($reviews, 0, 3) as $review)
-                <x-review-card :review="$review" />
-            @endforeach
-        </div>
-    </section>
-
     {{-- Behind iTOUR --}}
     <section id="about" class="mx-auto max-w-[1200px] px-4 py-16 sm:px-6 lg:px-8">
         <div class="flex h-11 w-11 items-center justify-center rounded-md bg-primary-100">

@@ -9,7 +9,7 @@
     $statusTone = fn ($status) => match ($status) {
         'Active', 'PUBLISHED' => 'success',
         'FOR_LGU_REVIEW' => 'info',
-        'Pending Review', 'DRAFT', 'FOR_PTO_REVIEW', 'UNPUBLISHED' => 'warning',
+        'Pending Review', 'DRAFT', 'FOR_PTO_REVIEW', 'FOR_CORRECTION', 'UNPUBLISHED' => 'warning',
         'Suspended', 'Inactive' => 'danger',
         default => 'neutral',
     };
@@ -17,6 +17,7 @@
         'DRAFT' => 'Draft',
         'FOR_LGU_REVIEW' => 'Waiting for LGU Review',
         'FOR_PTO_REVIEW' => 'For PTO Review',
+        'FOR_CORRECTION' => 'Returned to LGU',
         'PUBLISHED' => 'Published',
         'UNPUBLISHED' => 'Unpublished',
         default => $status,
@@ -36,12 +37,15 @@
         ])
         ->values();
     $unplottedCount = $listings->count() - $plottedListings->count();
+    // Establishments and destination-only records alike go through the PTO review (Objective 3, D3).
+    $intReviewCount = $listings->filter(fn ($listing) => $listing->isAwaitingPtoDecision())->count();
 @endphp
 
-@push('head')
+{{-- Same key as the location picker's push, so Mapbox GL loads once per page. --}}
+@pushOnce('head', 'mapbox-gl')
     <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/v3.7.0/mapbox-gl.css">
     <script src="https://api.mapbox.com/mapbox-gl-js/v3.7.0/mapbox-gl.js"></script>
-@endpush
+@endPushOnce
 
 <x-layouts.dashboard :user="$user" :nav-sections="$navSections" :page-title="$pageTitle" account-heading="System" :settings-href="route('pto.settings')">
     <x-dashboard.page-header
@@ -55,6 +59,13 @@
             </button>
         </x-slot:actions>
     </x-dashboard.page-header>
+
+    @if ($intReviewCount > 0)
+        <div class="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-md border border-warning/30 bg-warning-bg px-4 py-3 text-sm text-warning">
+            <p class="flex items-center gap-2 font-semibold"><i class="ti ti-clipboard-list" aria-hidden="true"></i> {{ $intReviewCount }} destination {{ \Illuminate\Support\Str::plural('listing', $intReviewCount) }} waiting for your review.</p>
+            <a href="{{ route('pto.destinationReviews.index') }}" class="rounded-sm bg-primary-700 px-3 py-1.5 text-xs font-semibold text-sand-0 hover:bg-primary-900">Review listings</a>
+        </div>
+    @endif
 
     <div class="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-[240px_1fr]">
         {{-- Categories panel: data-driven from tblcategories — adding/renaming a
@@ -101,6 +112,7 @@
                         <option value="DRAFT">Draft</option>
                         <option value="FOR_LGU_REVIEW">Waiting for LGU Review</option>
                         <option value="FOR_PTO_REVIEW">For PTO Review</option>
+                        <option value="FOR_CORRECTION">Returned to LGU</option>
                         <option value="PUBLISHED">Published</option>
                         <option value="UNPUBLISHED">Unpublished</option>
                         <option value="Suspended">Suspended</option>
@@ -138,11 +150,16 @@
                             @foreach ($listings as $listing)
                                 @php
                                     $isGuide = $listing->isTourGuide();
-                                    $isQrEnabled = $listing->isQrEnabled();
+                                    $isDestination = $listing->isDestinationOnly();
                                     $editValues = [
                                         'name' => $listing->lst_name,
                                         'cat_id' => $listing->cat_id,
-                                        'type' => $listing->lst_type,
+                                        // A destination's lst_type is its destination type, kept off the establishment Type select.
+                                        'type' => $isDestination ? '' : $listing->lst_type,
+                                        'destination_type' => $isDestination ? $listing->lst_type : '',
+                                        'managing_level' => $isDestination ? $listing->managingLevel()->value : '',
+                                        'visitor_information' => $isDestination ? $listing->lst_visitor_information : '',
+                                        'entrance_fee' => $isDestination ? $listing->lst_entrance_fee : '',
                                         'owner_name' => $listing->lst_owner_name,
                                         'municipality' => $listing->lst_municipality,
                                         'barangay' => $listing->lst_barangay,
@@ -179,22 +196,7 @@
                                     <td class="px-4 py-3 text-sand-700">{{ $listing->lst_contact_phone }}</td>
                                     <td class="px-4 py-3"><x-dashboard.status-badge :tone="$statusTone($listing->lst_status)">{{ $listing->lst_status }}</x-dashboard.status-badge></td>
                                     <td class="px-4 py-3">
-                                        @if ($isQrEnabled || $listing->isFeedbackQrEnabled())
-                                            <div class="flex flex-wrap gap-1">
-                                                @if ($isQrEnabled)
-                                                    <button type="button" data-modal-open="qr-view-{{ $listing->lst_id }}" class="rounded-sm border border-sand-300 px-2.5 py-1 text-xs font-semibold text-sand-800 hover:border-primary-300">
-                                                        <i class="ti ti-qrcode" aria-hidden="true"></i> Arrival
-                                                    </button>
-                                                @endif
-                                                @if ($listing->isFeedbackQrEnabled())
-                                                    <button type="button" data-modal-open="feedback-qr-view-{{ $listing->lst_id }}" class="rounded-sm border border-sand-300 px-2.5 py-1 text-xs font-semibold text-sand-800 hover:border-primary-300">
-                                                        <i class="ti ti-message-2" aria-hidden="true"></i> Feedback
-                                                    </button>
-                                                @endif
-                                            </div>
-                                        @else
-                                            <span class="text-xs text-sand-400">No QR</span>
-                                        @endif
+                                        <x-dashboard.qr-cell :listing="$listing" />
                                     </td>
                                     <td class="px-4 py-3 text-sand-700">{{ $listing->publishedPhotoLastUpdatedAt()?->format('M j, Y') ?? '—' }}</td>
                                     <td class="px-4 py-3 text-right">
@@ -213,6 +215,11 @@
                                                     <a href="{{ route('listings.show', $listing) }}" target="_blank" rel="noopener" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-sand-700 hover:bg-sand-50">
                                                         <i class="ti ti-external-link" aria-hidden="true"></i> Preview as Public
                                                     </a>
+                                                    @if ($listing->isAwaitingPtoDecision())
+                                                        <a href="{{ route('pto.destinationReviews.show', $listing) }}" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-primary-700 hover:bg-sand-50">
+                                                            <i class="ti ti-clipboard-check" aria-hidden="true"></i> Review Listing
+                                                        </a>
+                                                    @endif
                                                     @if ($listing->lst_status === 'FOR_PTO_REVIEW')
                                                         <form method="POST" action="{{ route('pto.directory.publish', $listing) }}">
                                                             @csrf
@@ -236,6 +243,30 @@
                                                         <button type="button" data-modal-open="unpublish-{{ $listing->lst_id }}" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-danger hover:bg-danger-bg">
                                                             <i class="ti ti-eye-off" aria-hidden="true"></i> Unpublish
                                                         </button>
+                                                    @endif
+                                                @else
+                                                    {{-- Destination-only records (Objective 3, D3/D10): reviewed on the review screen; a PTO-managed Draft is moved into review by the PTO. --}}
+                                                    @if ($listing->isAwaitingPtoDecision())
+                                                        <a href="{{ route('pto.destinationReviews.show', $listing) }}" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-primary-700 hover:bg-sand-50">
+                                                            <i class="ti ti-clipboard-check" aria-hidden="true"></i> Review Listing
+                                                        </a>
+                                                    @endif
+                                                    @if ($listing->isManagedByPto() && in_array($listing->lst_status, ['DRAFT', \App\Models\Listing::STATUS_FOR_CORRECTION], true))
+                                                        <form method="POST" action="{{ route('pto.directory.submit', $listing) }}">
+                                                            @csrf
+                                                            @method('PATCH')
+                                                            <button
+                                                                type="button"
+                                                                data-confirm-trigger
+                                                                data-confirm-title="Submit {{ $listing->lst_name }} for review?"
+                                                                data-confirm-message="It moves to Pending Review. It is not public until you Approve &amp; Publish it on the review screen."
+                                                                data-confirm-label="Submit for review"
+                                                                data-confirm-tone="success"
+                                                                class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-sand-700 hover:bg-sand-50"
+                                                            >
+                                                                <i class="ti ti-send" aria-hidden="true"></i> Submit for Review
+                                                            </button>
+                                                        </form>
                                                     @endif
                                                 @endunless
                                                 <button
@@ -280,6 +311,9 @@
                             @else
                                 <div><dt class="text-xs font-semibold text-sand-500 uppercase">Owner</dt><dd class="text-sand-800">{{ $listing->lst_owner_name }}</dd></div>
                                 <div><dt class="text-xs font-semibold text-sand-500 uppercase">Location</dt><dd class="text-sand-800">{{ $listing->lst_barangay }}, {{ $listing->lst_municipality }}</dd></div>
+                                @if ($listing->isDestinationOnly() && $listing->lst_accreditation_status)
+                                    <div><dt class="text-xs font-semibold text-sand-500 uppercase">Accreditation Status</dt><dd class="text-sand-800">{{ $listing->lst_accreditation_status }}</dd></div>
+                                @endif
                             @endif
                             <div><dt class="text-xs font-semibold text-sand-500 uppercase">Contact</dt><dd class="text-sand-800">{{ $listing->lst_contact_office }} · {{ $listing->lst_contact_phone }}</dd></div>
                             <div><dt class="text-xs font-semibold text-sand-500 uppercase">Status</dt><dd><x-dashboard.status-badge :tone="$statusTone($listing->lst_status)">{{ $statusLabel($listing->lst_status) }}</x-dashboard.status-badge></dd></div>
@@ -319,40 +353,8 @@
                         </x-dashboard.modal>
                     @endif
 
-                    @if ($listing->isFeedbackQrEnabled())
-                        <x-dashboard.modal id="feedback-qr-view-{{ $listing->lst_id }}" title="{{ $listing->lst_name }} Feedback QR Code">
-                            <div data-qr-mount class="mx-auto flex h-56 w-56 items-center justify-center rounded-md border border-sand-200 bg-sand-0 p-3 [&>svg]:h-full [&>svg]:w-full">
-                                {!! \SimpleSoftwareIO\QrCode\Facades\QrCode::format('svg')->size(220)->margin(1)->generate(route('feedback.form', ['listing' => $listing->lst_uuid])) !!}
-                            </div>
-                            <p class="mt-3 text-center text-xs text-sand-500">Visitors scan this after their experience to give feedback on {{ $listing->lst_name }}.</p>
-
-                            <x-slot:footer>
-                                <button type="button" data-qr-print class="rounded-sm border border-sand-300 bg-sand-0 px-4 py-2.5 text-sm font-semibold text-sand-800 hover:border-primary-300">
-                                    <i class="ti ti-printer" aria-hidden="true"></i> Print
-                                </button>
-                                <button type="button" data-qr-download data-qr-filename="{{ $listing->lst_slug }}-feedback-qr.svg" class="rounded-sm bg-primary-700 px-4 py-2.5 text-sm font-semibold text-sand-0 hover:bg-primary-900">
-                                    <i class="ti ti-download" aria-hidden="true"></i> Download
-                                </button>
-                            </x-slot:footer>
-                        </x-dashboard.modal>
-                    @endif
-                    @if ($listing->isQrEnabled())
-                        <x-dashboard.modal id="qr-view-{{ $listing->lst_id }}" title="{{ $listing->lst_name }} QR Code">
-                            <div data-qr-mount class="mx-auto flex h-56 w-56 items-center justify-center rounded-md border border-sand-200 bg-sand-0 p-3 [&>svg]:h-full [&>svg]:w-full">
-                                {!! \SimpleSoftwareIO\QrCode\Facades\QrCode::format('svg')->size(220)->margin(1)->generate(route('lgu.establishmentQr', ['establishment' => $listing->lst_uuid])) !!}
-                            </div>
-                            <p class="mt-3 text-center text-xs text-sand-500">Tourists scan this to register their arrival at {{ $listing->lst_name }}.</p>
-
-                            <x-slot:footer>
-                                <button type="button" data-qr-print class="rounded-sm border border-sand-300 bg-sand-0 px-4 py-2.5 text-sm font-semibold text-sand-800 hover:border-primary-300">
-                                    <i class="ti ti-printer" aria-hidden="true"></i> Print
-                                </button>
-                                <button type="button" data-qr-download data-qr-filename="{{ $listing->lst_slug }}-qr.svg" class="rounded-sm bg-primary-700 px-4 py-2.5 text-sm font-semibold text-sand-0 hover:bg-primary-900">
-                                    <i class="ti ti-download" aria-hidden="true"></i> Download
-                                </button>
-                            </x-slot:footer>
-                        </x-dashboard.modal>
-                    @endif
+                    {{-- PTO is read-only for QR codes: view, print, download — no on/off switch. --}}
+                    <x-dashboard.qr-modal :listing="$listing" />
                 @endforeach
 
                 <x-dashboard.empty-state
@@ -372,7 +374,7 @@
                         <div
                             id="tourism-map"
                             class="h-full w-full"
-                            data-mapbox-token="{{ config('services.mapbox.token') }}"
+                            data-mapbox-token="{{ \App\Support\MapboxToken::browserToken() }}"
                             data-mapbox-center-lat="7.0"
                             data-mapbox-center-lng="126.3"
                         ></div>
@@ -430,13 +432,41 @@
                         @endforeach
                     </select>
                 </div>
-                <div data-show-when="travel" class="hidden">
-                    <label class="mb-1 block text-xs font-semibold text-sand-700">Type</label>
-                    <select name="type" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
-                        <option value="">—</option>
-                        <option value="Tour Operator">Tour Operator</option>
-                        <option value="Tour Guide">Tour Guide</option>
-                    </select>
+                <div data-show-when="establishment" class="hidden">
+                    <label class="mb-1 block text-xs font-semibold text-sand-700">Type <span class="text-danger" aria-hidden="true">*</span></label>
+                    <x-dashboard.establishment-type-select :categories="$categories" />
+                </div>
+            </div>
+
+            {{-- Destination-only fields (Objective 3): shown only for Tourist Destinations and ignored by the server otherwise. --}}
+            <div data-show-when="destination" class="hidden flex flex-col gap-3">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="mb-1 block text-xs font-semibold text-sand-700">Destination Type</label>
+                        <select name="destination_type" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                            <option value="">Not set</option>
+                            @foreach (config('tourism_directory.destination_types') as $strDestinationType)
+                                <option value="{{ $strDestinationType }}">{{ $strDestinationType }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-semibold text-sand-700">Managed By</label>
+                        <select name="managing_level" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                            @foreach (\App\Enums\ManagingLevel::cases() as $objManagingLevel)
+                                <option value="{{ $objManagingLevel->value }}">{{ $objManagingLevel->label() }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+                <p class="text-xs text-sand-500">The LGU of the municipality edits and submits an LGU-managed destination; a PTO-managed one is edited and submitted by the PTO. The Contact Office below is shown as the destination's managing office.</p>
+                <div>
+                    <label class="mb-1 block text-xs font-semibold text-sand-700">Visitor Information</label>
+                    <textarea name="visitor_information" rows="3" maxlength="5000" placeholder="Permits, what to bring, safety reminders" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm"></textarea>
+                </div>
+                <div>
+                    <label class="mb-1 block text-xs font-semibold text-sand-700">Entrance Fee</label>
+                    <input name="entrance_fee" type="text" maxlength="255" placeholder="e.g. PHP 50 adults, PHP 20 children" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
                 </div>
             </div>
 
@@ -445,14 +475,15 @@
                 <input name="category_note" type="text" placeholder="Describe this category" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
             </div>
 
-            <div data-show-when="guide" class="hidden grid grid-cols-2 gap-3">
-                <div>
+            <div data-show-when="guide-or-destination" class="hidden grid grid-cols-2 gap-3">
+                <div data-show-when="guide" class="hidden">
                     <label class="mb-1 block text-xs font-semibold text-sand-700">License No. <span class="text-danger" aria-hidden="true">*</span></label>
                     <input name="license_number" type="text" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
                 </div>
-                <div>
+                {{-- The one existing accreditation field (lst_accreditation_status), for a tour guide or a destination. --}}
+                <div data-show-when="guide-or-destination" class="hidden">
                     <label class="mb-1 block text-xs font-semibold text-sand-700">Accreditation Status</label>
-                    <input name="accreditation_status" type="text" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                    <input name="accreditation_status" type="text" maxlength="255" placeholder="e.g. DOT Accredited" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
                 </div>
             </div>
 
@@ -479,13 +510,15 @@
             <div data-hide-when="guide" class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="mb-1 block text-xs font-semibold text-sand-700">Latitude</label>
-                    <input name="lat" type="text" inputmode="decimal" placeholder="e.g. 6.9578" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                    <input id="listing-form-lat" name="lat" type="text" inputmode="decimal" placeholder="e.g. 6.9578" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
                 </div>
                 <div>
                     <label class="mb-1 block text-xs font-semibold text-sand-700">Longitude</label>
-                    <input name="lng" type="text" inputmode="decimal" placeholder="e.g. 126.2478" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                    <input id="listing-form-lng" name="lng" type="text" inputmode="decimal" placeholder="e.g. 126.2478" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
                 </div>
             </div>
+
+            <x-dashboard.location-picker data-hide-when="guide" latitude-input="listing-form-lat" longitude-input="listing-form-lng" />
 
             <div>
                 <label class="mb-1 block text-xs font-semibold text-sand-700">Description</label>
@@ -525,17 +558,20 @@
         </x-slot:footer>
     </x-dashboard.modal>
 
-    {{-- Shared Change Status modal: activate/suspend always requires a reason, which OperationLogger writes to the audit trail. --}}
+    {{-- Shared Change Status modal: always requires a reason, which OperationLogger writes to the audit trail.
+         Which changes are allowed depends on the record's current status (Listing::statusChangeOptions()) and
+         is enforced on the server; nothing here publishes a record (Objective 3, D3). --}}
     <x-dashboard.modal id="status-form-modal" title="Change Status">
         <form id="status-form" method="POST" class="flex flex-col gap-4">
             @csrf
             <div>
                 <label class="mb-1 block text-xs font-semibold text-sand-700">Status <span class="text-danger" aria-hidden="true">*</span></label>
                 <select name="status" required class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
-                    <option value="Active">Active</option>
                     <option value="Suspended">Suspended</option>
                     <option value="Archived">Archived</option>
+                    <option value="DRAFT">Return to Draft (restore archived / reinstate suspended destination)</option>
                 </select>
+                <p class="mt-1 text-xs text-sand-500">A destination returned to Draft must be submitted and approved again before it is public. Archived destinations can only return to Draft; establishments can be suspended or archived.</p>
             </div>
             <div>
                 <label class="mb-1 block text-xs font-semibold text-sand-700">Reason <span class="text-danger" aria-hidden="true">*</span></label>

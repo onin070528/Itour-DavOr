@@ -3,21 +3,21 @@
 /**
  * iTOUR — Davao Oriental Tourism Information System
  *
- * Purpose: Factory — tourist feedback.
+ * Purpose: Factory — QR-form tourist feedback.
  * Programmer/s: iTOUR Development Team
  * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
  */
 
 namespace Database\Factories;
 
-use App\Models\Feedback;
 use App\Models\Listing;
+use App\Models\QrFeedback;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends Factory<Feedback>
+ * @extends Factory<QrFeedback>
  */
-class FeedbackFactory extends Factory
+class QrFeedbackFactory extends Factory
 {
     /**
      * @return array<string, mixed>

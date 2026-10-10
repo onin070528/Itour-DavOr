@@ -11,8 +11,8 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreFeedbackRequest;
-use App\Models\Feedback;
 use App\Models\Listing;
+use App\Models\QrFeedback;
 use App\Services\SentimentAnalyzer;
 use App\Support\Notifier;
 use Illuminate\Http\RedirectResponse;
@@ -25,10 +25,19 @@ class FeedbackController extends Controller
      * The formal feedback form reached by scanning a listing's own feedback
      * QR code. {listing} is the listing's lst_uuid — each destination or
      * establishment has its own feedback QR, separate from its check-in QR.
+     * An open listing's scan goes on to the public feedback form
+     * (TouristFeedbackController), which stores into the feedback analytics
+     * pipeline the LGU, PTO and establishment feedback pages read — so the
+     * QR codes already printed keep working. A closed listing still gets the
+     * "not accepting feedback" notice.
      */
-    public function show(string $listing): View
+    public function show(string $listing): View|RedirectResponse
     {
         $objListing = Listing::query()->where('lst_uuid', $listing)->firstOrFail();
+
+        if ($objListing->isFeedbackQrEnabled()) {
+            return redirect()->route('feedback.create', ['listing' => $objListing->lst_slug]);
+        }
 
         return view('feedback.form', [
             'listing' => $objListing,
@@ -74,7 +83,7 @@ class FeedbackController extends Controller
         $arrAspects = collect($arrData['aspects'] ?? [])->filter()->map(fn ($mixRating) => (int) $mixRating)->all();
 
         try {
-            Feedback::query()->create([
+            QrFeedback::query()->create([
                 'lst_id' => $objListing->lst_id,
                 'fbk_name' => filled($arrData['name'] ?? null) ? trim($arrData['name']) : null,
                 'fbk_email' => filled($arrData['email'] ?? null) ? trim($arrData['email']) : null,

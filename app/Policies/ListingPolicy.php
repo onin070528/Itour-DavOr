@@ -39,10 +39,43 @@ class ListingPolicy
     }
 
     /**
+     * Who may view/download/print a listing's check-in QR code: the
+     * establishment or destination account its own listing only, the LGU its
+     * own municipality's listings, the PTO every listing (read-only).
+     * Whether the listing
+     * actually has a usable QR right now is Listing::isAcceptingRegistrations()
+     * (checked separately, so out-of-scope users get 403, not 404).
+     */
+    public function viewQr(User $objUser, Listing $objListing): bool
+    {
+        return match ($objUser->usr_role) {
+            UserRole::PtoAdministrator => true,
+            UserRole::Lgu => $objListing->mun_id === $objUser->mun_id,
+            UserRole::Establishment => $objListing->lst_id === $objUser->lst_id,
+            default => false,
+        };
+    }
+
+    /**
+     * Who may switch a listing's QR check-in on or off (lst_is_qr_enabled):
+     * the establishment or destination account its own listing (e.g. while
+     * temporarily closed), the LGU its own municipality's listings. The PTO
+     * stays read-only for QR codes.
+     */
+    public function manageQr(User $objUser, Listing $objListing): bool
+    {
+        return match ($objUser->usr_role) {
+            UserRole::Lgu => $objListing->mun_id === $objUser->mun_id,
+            UserRole::Establishment => $objListing->lst_id === $objUser->lst_id,
+            default => false,
+        };
+    }
+
+    /**
      * Applies to both establishments and destinations — LGU may create
      * either, within its own municipality (the municipality itself is
      * assigned server-side from the account, not client input — see
-     * ManagesDestinationListings::createDestination()).
+     * App\Services\AttractionRecordService::create()).
      */
     public function create(User $objUser): bool
     {
@@ -57,12 +90,14 @@ class ListingPolicy
      * unaffected: their own review work is untouched by this status check.
      * Which *fields* an establishment may change (a "limited" edit per the
      * matrix) is enforced by the controller/validation, not this ability.
+     * An LGU may not edit a PTO-managed destination, even in its own
+     * municipality (Objective 3, D10).
      */
     public function update(User $objUser, Listing $objListing): bool
     {
         return match ($objUser->usr_role) {
             UserRole::PtoAdministrator => true,
-            UserRole::Lgu => $objListing->mun_id === $objUser->mun_id,
+            UserRole::Lgu => $objListing->mun_id === $objUser->mun_id && ! $objListing->isManagedByPto(),
             UserRole::Establishment => $objListing->lst_category !== 'destinations'
                 && $objListing->lst_id === $objUser->lst_id
                 && in_array($objListing->lst_status, ['DRAFT', 'UNPUBLISHED'], true),
@@ -80,17 +115,35 @@ class ListingPolicy
     }
 
     /**
-     * LGU only, own municipality, establishments only — submitting to PTO
-     * or returning to the establishment are both gated the same way (the
-     * LGU "owns" the listing while it's DRAFT/FOR_PTO_REVIEW/UNPUBLISHED).
-     * Controllers additionally check the current status before allowing a
-     * specific transition; this is the jurisdiction check alone.
+     * LGU only, own municipality — requesting a destination listing (or
+     * resubmitting it) and returning it to the establishment are gated the
+     * same way. Covers establishments and destination-only records alike:
+     * both go through the same PTO review (Phase 6). Controllers
+     * additionally check the current status before allowing a specific
+     * transition; this is the jurisdiction check alone. The managing level
+     * decides who moves a destination-only record into review: the LGU for
+     * an LGU-managed one, the PTO for a PTO-managed one (Objective 3, D10).
      */
     public function submit(User $objUser, Listing $objListing): bool
     {
-        return $objUser->usr_role === UserRole::Lgu
-            && $objListing->lst_category !== 'destinations'
-            && $objListing->mun_id === $objUser->mun_id;
+        return match ($objUser->usr_role) {
+            UserRole::Lgu => $objListing->mun_id !== null
+                && $objListing->mun_id === $objUser->mun_id
+                && ! $objListing->isManagedByPto(),
+            UserRole::PtoAdministrator => $objListing->isManagedByPto(),
+            default => false,
+        };
+    }
+
+    /**
+     * Suspend, archive, restore an archived record to Draft, or reinstate
+     * a suspended one to Draft — PTO only (Objective 3, D3). An LGU request
+     * is denied here, which Gate::after (AppServiceProvider) records through
+     * SecurityLogger::accessDenied().
+     */
+    public function archive(User $objUser, Listing $objListing): bool
+    {
+        return $objUser->usr_role === UserRole::PtoAdministrator;
     }
 
     /**
@@ -100,7 +153,8 @@ class ListingPolicy
      */
     public function publish(User $objUser, Listing $objListing): bool
     {
-        return $objUser->usr_role === UserRole::PtoAdministrator && $objListing->lst_category !== 'destinations';
+        // Establishments and destination-only records alike (Phase 6).
+        return $objUser->usr_role === UserRole::PtoAdministrator;
     }
 
     /**
@@ -114,5 +168,28 @@ class ListingPolicy
         return $objUser->usr_role === UserRole::Establishment
             && $objListing->lst_category !== 'destinations'
             && $objListing->lst_id === $objUser->lst_id;
+    }
+
+    /**
+     * Who may view a listing's tourist feedback analytics (Objective 4):
+     * the PTO every listing; the LGU listings in its own municipality; an
+     * establishment only its own linked listing. Stricter than view(),
+     * which also lets an establishment read destinations in its
+     * municipality — that never extends to feedback. A missing mun_id or
+     * lst_id denies. Keep in step with Feedback::scopeVisibleTo(). An LGU
+     * denial (a cross-municipality attempt) is recorded by Gate::after
+     * (AppServiceProvider) through SecurityLogger::accessDenied().
+     */
+    public function viewFeedback(User $objUser, Listing $objListing): bool
+    {
+        $blnIsOwnMunicipality = $objUser->mun_id !== null && $objListing->mun_id === $objUser->mun_id;
+        $blnIsOwnListing = $objUser->lst_id !== null && $objListing->lst_id === $objUser->lst_id;
+
+        return match ($objUser->usr_role) {
+            UserRole::PtoAdministrator => true,
+            UserRole::Lgu => $blnIsOwnMunicipality,
+            UserRole::Establishment => $blnIsOwnListing,
+            default => false,
+        };
     }
 }

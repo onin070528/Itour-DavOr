@@ -9,9 +9,9 @@
  */
 
 use App\Enums\UserRole;
-use App\Models\Feedback;
 use App\Models\Listing;
 use App\Models\Municipality;
+use App\Models\QrFeedback;
 use App\Models\User;
 use Illuminate\Support\Str;
 
@@ -48,7 +48,7 @@ test('a tourist can leave feedback on a public listing and its sentiment is stor
         'name' => 'Ana',
     ])->assertRedirect()->assertSessionHasNoErrors();
 
-    $objFeedback = Feedback::query()->firstOrFail();
+    $objFeedback = QrFeedback::query()->firstOrFail();
 
     expect($objFeedback->lst_id)->toBe($objListing->lst_id)
         ->and($objFeedback->fbk_sentiment)->toBe('Positive')
@@ -62,7 +62,7 @@ test('feedback needs a rating and a comment', function () {
     test()->post(route('listings.feedback.store', $objListing), ['comment' => 'ok'])
         ->assertSessionHasErrors(['rating', 'comment']);
 
-    expect(Feedback::query()->count())->toBe(0);
+    expect(QrFeedback::query()->count())->toBe(0);
 });
 
 test('feedback cannot be left on a listing that is not public', function () {
@@ -86,9 +86,9 @@ test("the LGU feedback pages show only its own municipality's feedback with the 
     $objBagangaListing = feedbackListingFixture('Baganga', 'BAG', ['lst_name' => 'Baganga Only Resort']);
     $objLgu = feedbackLguFixture($objMatiListing);
 
-    Feedback::factory()->create(['lst_id' => $objMatiListing->lst_id, 'fbk_text' => 'Mati visitor loved it']);
-    Feedback::factory()->negative()->create(['lst_id' => $objMatiListing->lst_id, 'fbk_text' => 'Mati visitor hated it']);
-    Feedback::factory()->create(['lst_id' => $objBagangaListing->lst_id, 'fbk_text' => 'Baganga visitor comment']);
+    QrFeedback::factory()->create(['lst_id' => $objMatiListing->lst_id, 'fbk_text' => 'Mati visitor loved it']);
+    QrFeedback::factory()->negative()->create(['lst_id' => $objMatiListing->lst_id, 'fbk_text' => 'Mati visitor hated it']);
+    QrFeedback::factory()->create(['lst_id' => $objBagangaListing->lst_id, 'fbk_text' => 'Baganga visitor comment']);
 
     test()->actingAs($objLgu)->get(route('lgu.feedback.index'))
         ->assertOk()

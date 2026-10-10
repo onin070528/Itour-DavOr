@@ -14,6 +14,7 @@
 namespace App\Http\Controllers\Concerns;
 
 use App\Models\Listing;
+use App\Support\SecurityLogger;
 use Illuminate\Http\Request;
 
 trait AuthorizesOwnMunicipality
@@ -25,9 +26,9 @@ trait AuthorizesOwnMunicipality
      */
     private function authorizeOwnMunicipality(Request $objRequest, Listing $objListing): void
     {
-        abort_unless(
-            $objListing->mun_id !== null && $objListing->mun_id === $objRequest->user()->mun_id,
-            403
-        );
+        if ($objListing->mun_id === null || $objListing->mun_id !== $objRequest->user()->mun_id) {
+            SecurityLogger::accessDenied($objRequest->user(), 'municipality_scope', Listing::class, $objListing->mun_id);
+            abort(403);
+        }
     }
 }

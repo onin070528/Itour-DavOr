@@ -52,9 +52,13 @@ class NewPasswordController extends Controller
                     ...$objRequest->only('password', 'password_confirmation', 'token'),
                 ],
                 function (User $objUser, string $strPassword): void {
+                    // The holder chose this password themselves, so a pending
+                    // first-login change is satisfied too.
                     $objUser->forceFill([
                         'usr_password' => $strPassword,
                         'usr_remember_token' => Str::random(60),
+                        'usr_must_change_password' => false,
+                        'usr_password_changed_at' => now(),
                     ])->save();
 
                     // Fires Illuminate\Auth\Events\PasswordReset, which

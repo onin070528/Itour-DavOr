@@ -12,12 +12,14 @@
 
 namespace App\Http\Controllers\Establishment;
 
+use App\Models\Category;
 use App\Models\Listing;
 use App\Models\OperationLog;
+use App\Rules\EstablishmentTypeBelongsToCategory;
 use App\Services\ListingPublishWorkflow;
+use App\Services\QrCodeService;
 use App\Support\ListingReadinessChecklist;
 use App\Support\OperationLogger;
-use App\Support\TourismCatalog;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -39,7 +41,7 @@ class ProfileController extends EstablishmentController
         return $this->renderEstablishment($objRequest, 'establishment.profile', 'establishment.profile', 'Establishment Profile', [
             'listing' => $objListing,
             'images' => $objListing->establishmentImages,
-            'categories' => TourismCatalog::categories(),
+            'categories' => Category::query()->active()->forEstablishments()->get(),
             'blnIsReadOnly' => $this->isReadOnly($objListing),
             'strStatusLabel' => $this->statusLabel($objListing),
             'strStatusTone' => $this->statusTone($objListing),
@@ -73,7 +75,7 @@ class ProfileController extends EstablishmentController
         $objListing = $this->ownListing($objRequest);
         abort_unless($objRequest->user()->can('update', $objListing), 403);
 
-        $arrData = $this->validateDetails($objRequest);
+        $arrData = $this->validateDetails($objRequest, $objListing);
 
         if (! $this->saveDetails($objRequest, $objListing, $arrData)) {
             return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
@@ -93,7 +95,7 @@ class ProfileController extends EstablishmentController
         abort_unless($objRequest->user()->can('update', $objListing), 403);
         abort_unless($objRequest->user()->can('submitToLgu', $objListing), 403);
 
-        $arrData = $this->validateDetails($objRequest);
+        $arrData = $this->validateDetails($objRequest, $objListing);
 
         if (! $this->saveDetails($objRequest, $objListing, $arrData)) {
             return back()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
@@ -117,13 +119,30 @@ class ProfileController extends EstablishmentController
     }
 
     /**
-     * @return array{name: string, category: string, address: string, description: ?string, phone: ?string, hours: ?string, email: ?string, website: ?string}
+     * Category -> Type uses the same single source and server-side rule as
+     * the LGU establishment form (config/establishment_categories.php,
+     * EstablishmentTypeBelongsToCategory). Fields stay optional so "Save
+     * draft" never blocks; when a category is chosen, its type is required.
+     * A type submitted on its own is checked against the current category.
+     *
+     * @return array{name: ?string, cat_id: ?int, type: ?string, address: ?string, description: ?string, phone: ?string, hours: ?string, email: ?string, website: ?string}
      */
-    private function validateDetails(Request $objRequest): array
+    private function validateDetails(Request $objRequest, Listing $objListing): array
     {
+        $objCategory = $objRequest->filled('cat_id')
+            ? Category::query()->forEstablishments()->find($objRequest->input('cat_id'))
+            : $objListing->categoryRecord;
+
         return $objRequest->validate([
             'name' => ['nullable', 'string', 'max:255'],
-            'category' => ['nullable', 'string', Rule::in(collect(TourismCatalog::categories())->pluck('slug')->reject(fn ($strSlug) => $strSlug === 'destinations'))],
+            'cat_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('tbl_categories', 'cat_id')
+                    ->where('cat_is_active', true)
+                    ->whereNot('cat_name', Category::DESTINATION_CATEGORY_NAME),
+            ],
+            'type' => ['nullable', 'required_with:cat_id', 'string', new EstablishmentTypeBelongsToCategory($objCategory)],
             'address' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'phone' => ['nullable', 'string', 'max:255'],
@@ -139,11 +158,15 @@ class ProfileController extends EstablishmentController
     private function saveDetails(Request $objRequest, Listing $objListing, array $arrData): bool
     {
         $arrBefore = $objListing->getOriginal();
+        $objCategory = isset($arrData['cat_id']) ? Category::query()->find($arrData['cat_id']) : null;
 
         try {
             $objListing->update([
                 'lst_name' => $arrData['name'] ?? $objListing->lst_name,
-                'lst_category' => $arrData['category'] ?? $objListing->lst_category,
+                // cat_id and the legacy `lst_category` slug always change together.
+                'cat_id' => $objCategory?->cat_id ?? $objListing->cat_id,
+                'lst_category' => $objCategory?->legacySlug() ?? $objListing->lst_category,
+                'lst_type' => $arrData['type'] ?? $objListing->lst_type,
                 'lst_barangay' => $arrData['address'] ?? $objListing->lst_barangay,
                 'lst_description' => $arrData['description'] ?? null,
                 'lst_contact_phone' => $arrData['phone'] ?? null,
@@ -189,6 +212,8 @@ class ProfileController extends EstablishmentController
             'DRAFT', 'UNPUBLISHED' => 'Draft',
             'FOR_LGU_REVIEW' => 'Waiting for LGU Review',
             'FOR_PTO_REVIEW' => 'Waiting for PTO',
+            // The PTO returned it to the LGU, which corrects and resubmits it.
+            'FOR_CORRECTION' => 'With your LGU for correction',
             'PUBLISHED' => 'Live',
             default => $objListing->lst_status,
         };
@@ -202,6 +227,7 @@ class ProfileController extends EstablishmentController
 
         return match ($objListing->lst_status) {
             'FOR_LGU_REVIEW', 'FOR_PTO_REVIEW' => 'info',
+            'FOR_CORRECTION' => 'warning',
             'PUBLISHED' => 'success',
             default => 'neutral',
         };
@@ -231,19 +257,30 @@ class ProfileController extends EstablishmentController
 
     /**
      * QR Code: the establishment-specific QR tourists scan to reach the
-     * arrival self-registration form. Encodes a unique check-in URL keyed
-     * on this establishment's directory listing id, so every establishment
-     * gets its own distinct, scannable code (rendered client-side — see
-     * resources/js/establishment.js).
+     * arrival self-registration form. Built by App\Services\QrCodeService
+     * from the listing's uuid check-in URL, so every establishment gets its
+     * own distinct, stable code. Shown only while the listing is accepting
+     * registrations (Listing::isAcceptingRegistrations()) — otherwise the
+     * page explains why instead of offering a code that would not work.
      */
-    public function qr(Request $objRequest): View
+    public function qr(Request $objRequest, QrCodeService $qrCodeService): View
     {
         abort_if($objRequest->user()->lst_id === null, 403, 'Your account is not linked to an establishment yet.');
         $objListing = $objRequest->user()->establishment()->firstOrFail();
+        $blnIsAcceptingRegistrations = $objListing->isAcceptingRegistrations();
 
         return $this->renderEstablishment($objRequest, 'establishment.qr', 'establishment.qr', 'QR Code', [
             'establishmentName' => $objListing->lst_name,
-            'checkinUrl' => $objListing->requiresArrivalRecords() ? route('lgu.establishmentQr', ['establishment' => $objListing->lst_uuid]) : null,
+            'isAcceptingRegistrations' => $blnIsAcceptingRegistrations,
+            'checkinUrl' => $blnIsAcceptingRegistrations ? $qrCodeService->buildCheckinUrl($objListing) : null,
+            'qrSvg' => $blnIsAcceptingRegistrations ? $qrCodeService->generateSvg($objListing) : null,
+            // The on/off switch only matters while everything else about the
+            // listing allows QR check-in (eligible category, Online iTOUR, active account).
+            'isQrSwitchedOff' => $objListing->isQrEnabled() && $objListing->lst_is_qr_enabled === false,
+            'canManageQr' => $objRequest->user()->can('manageQr', $objListing),
+            'qrStatusUrl' => route('qrCodes.updateStatus', $objListing),
+            'qrDownloadUrl' => route('qrCodes.download', $objListing),
+            'qrPosterUrl' => route('qrCodes.poster', $objListing),
             'feedbackUrl' => $objListing->isFeedbackQrEnabled() ? route('feedback.form', ['listing' => $objListing->lst_uuid]) : null,
         ]);
     }

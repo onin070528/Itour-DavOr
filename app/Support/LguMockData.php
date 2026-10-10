@@ -10,7 +10,7 @@
 
 namespace App\Support;
 
-use App\Models\Feedback;
+use App\Models\QrFeedback;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -73,13 +73,13 @@ class LguMockData
      */
     public static function feedback(string $strMunicipality): array
     {
-        return Feedback::query()
+        return QrFeedback::query()
             ->forMunicipality($strMunicipality)
             ->with('listing:lst_id,lst_name')
             ->orderByDesc('fbk_created_at')
             ->orderByDesc('fbk_id')
             ->get()
-            ->map(fn (Feedback $objFeedback) => [
+            ->map(fn (QrFeedback $objFeedback) => [
                 'id' => 'FB-'.$objFeedback->fbk_id,
                 'name' => $objFeedback->fbk_name ?: 'Anonymous',
                 'subject' => $objFeedback->listing->lst_name,
@@ -151,7 +151,7 @@ class LguMockData
      */
     public static function sentimentTrend(string $strMunicipality): array
     {
-        $objRows = Feedback::query()
+        $objRows = QrFeedback::query()
             ->forMunicipality($strMunicipality)
             ->where('fbk_created_at', '>=', now()->subYear()->startOfMonth())
             ->get(['fbk_sentiment', 'fbk_created_at']);
@@ -165,7 +165,7 @@ class LguMockData
             $objDay = now()->subDays($intDaysAgo);
             $arrWeek[] = [
                 'label' => $objDay->format('D'),
-                'value' => $fnPositiveShare($objRows->filter(fn (Feedback $objRow) => $objRow->fbk_created_at->isSameDay($objDay))),
+                'value' => $fnPositiveShare($objRows->filter(fn (QrFeedback $objRow) => $objRow->fbk_created_at->isSameDay($objDay))),
             ];
         }
 
@@ -175,7 +175,7 @@ class LguMockData
             $objStart = $objEnd->copy()->subDays(6)->startOfDay();
             $arrMonth[] = [
                 'label' => 'Wk '.(4 - $intWeeksAgo),
-                'value' => $fnPositiveShare($objRows->filter(fn (Feedback $objRow) => $objRow->fbk_created_at->between($objStart, $objEnd))),
+                'value' => $fnPositiveShare($objRows->filter(fn (QrFeedback $objRow) => $objRow->fbk_created_at->between($objStart, $objEnd))),
             ];
         }
 
@@ -184,7 +184,7 @@ class LguMockData
             $objMonth = now()->startOfMonth()->subMonths($intMonthsAgo);
             $arrYear[] = [
                 'label' => $objMonth->format('M'),
-                'value' => $fnPositiveShare($objRows->filter(fn (Feedback $objRow) => $objRow->fbk_created_at->isSameMonth($objMonth))),
+                'value' => $fnPositiveShare($objRows->filter(fn (QrFeedback $objRow) => $objRow->fbk_created_at->isSameMonth($objMonth))),
             ];
         }
 

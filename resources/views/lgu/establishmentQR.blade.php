@@ -10,15 +10,19 @@
     posted at a municipality's registered establishment (hence living next
     to the rest of the LGU views, but served without auth — the visitor
     filling this in is never logged in). $establishmentName is resolved by
-    CheckinController from the {establishment} id slug in the URL, which is
-    the same id every establishment's QR code encodes — one unique,
-    scannable link/code per establishment.
+    CheckinController from the {establishment} uuid in the URL — the same
+    uuid every establishment's QR code encodes (App\Services\QrCodeService).
 
-    Counters are wired up client-side in resources/js/app.js (initEstablishmentQrForm).
-    Submitting posts to CheckinController::store, which saves one arrival
-    row for this establishment (same table/fields as the staff-entered
-    arrival wizard under resources/views/establishment/arrivals/record.blade.php),
-    then shows a local success step rather than reloading the page.
+    Layout puts the headcount first: visit type, then the group headcount
+    (the main section, with a live total), then where the group is from,
+    then the lead visitor's details, with a sticky submit bar showing the
+    total. Same fields as staff Arrival Recording
+    (resources/views/establishment/arrivals/record.blade.php); both are
+    validated and saved by App\Services\ArrivalRecorder.
+
+    Counters and the submit are wired up client-side in resources/js/app.js
+    (initEstablishmentQrForm), which posts to CheckinController::store and
+    then shows the success step rather than reloading the page.
 --}}
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
@@ -34,7 +38,7 @@
 
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
-    <body class="min-h-screen bg-sand-50 px-4 py-8 text-sand-900 sm:py-12">
+    <body class="min-h-screen bg-sand-50 px-4 pt-8 text-sand-900 sm:pt-12">
         <div class="mx-auto flex max-w-md flex-col gap-4">
             {{-- Brand header --}}
             <div class="flex flex-col items-center text-center">
@@ -42,11 +46,11 @@
                 <p class="mt-0.5 text-[10px] font-semibold tracking-widest text-sand-400 uppercase">Davao Oriental</p>
                 <h1 class="mt-4 text-xl">Visitor Registration</h1>
                 <p class="mt-2 font-display text-lg font-bold text-primary-700">{{ $establishmentName }}</p>
-                <p class="mt-1 text-sm text-sand-600">You're checking in at this establishment.</p>
+                <p class="mt-1 text-sm text-sand-600">You're checking in at this establishment today.</p>
             </div>
 
             @if ($refusalMessage)
-                <div class="flex flex-col items-center rounded-md border border-sand-200 bg-sand-0 p-8 text-center shadow-sm">
+                <div class="mb-8 flex flex-col items-center rounded-md border border-sand-200 bg-sand-0 p-8 text-center shadow-sm">
                     <span class="flex h-14 w-14 items-center justify-center rounded-full bg-danger-bg text-danger">
                         <i class="ti ti-ban text-3xl" aria-hidden="true"></i>
                     </span>
@@ -63,133 +67,140 @@
 
                 {{-- Form step --}}
                 <div id="qr-form-step" class="flex flex-col gap-4">
-                    {{-- Your Details --}}
-                    <div class="rounded-md border border-sand-200 bg-sand-0 p-5 shadow-sm">
-                        <div class="flex items-center gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-700 text-sand-0">
-                                <i class="ti ti-user text-lg" aria-hidden="true"></i>
-                            </span>
-                            <div>
-                                <h2 class="font-display text-sm font-bold text-sand-900">Your Details</h2>
-                                <p class="text-xs text-sand-500">Tell us a bit about yourself.</p>
-                            </div>
+                    {{-- 1. Visit type --}}
+                    <fieldset class="rounded-md border border-sand-200 bg-sand-0 p-4 shadow-sm">
+                        <legend class="sr-only">Visit type</legend>
+                        <p class="text-xs font-semibold tracking-wide text-sand-500 uppercase">Visit Type</p>
+                        <div class="mt-2 grid grid-cols-2 gap-2">
+                            @foreach ([
+                                ['value' => 'Daytour', 'icon' => 'ti-sun', 'label' => 'Day Tour', 'caption' => 'Leaving today'],
+                                ['value' => 'Overnight', 'icon' => 'ti-moon', 'label' => 'Overnight', 'caption' => 'Staying the night'],
+                            ] as $visitType)
+                                <label class="cursor-pointer">
+                                    <input type="radio" name="visitType" value="{{ $visitType['value'] }}" class="peer sr-only" @checked($loop->first)>
+                                    <span class="flex items-center gap-2.5 rounded-md border-2 border-sand-200 px-3 py-2.5 transition-colors peer-checked:border-primary-700 peer-checked:bg-primary-100/50 peer-focus-visible:ring-2 peer-focus-visible:ring-primary-300">
+                                        <i class="ti {{ $visitType['icon'] }} text-xl text-primary-700" aria-hidden="true"></i>
+                                        <span class="leading-tight">
+                                            <span class="block text-sm font-bold text-sand-900">{{ $visitType['label'] }}</span>
+                                            <span class="block text-[11px] text-sand-500">{{ $visitType['caption'] }}</span>
+                                        </span>
+                                    </span>
+                                </label>
+                            @endforeach
                         </div>
 
-                        <div class="mt-4 flex flex-col gap-3">
-                            <div>
-                                <p class="mb-2 text-xs font-semibold text-sand-700">Visit Type</p>
-                                <div class="inline-flex rounded-md border border-sand-300 p-1" role="radiogroup" aria-label="Visit type">
-                                    @foreach (['Daytour' => '☀️ Daytour', 'Overnight' => '🌙 Overnight'] as $strType => $strTypeLabel)
-                                        <label class="cursor-pointer rounded-sm px-4 py-2 text-sm font-semibold text-sand-600 transition-colors has-[:checked]:bg-primary-700 has-[:checked]:text-sand-0">
-                                            <input type="radio" name="visitType" value="{{ $strType }}" @checked($strType === 'Daytour') class="sr-only">
-                                            {{ $strTypeLabel }}
-                                        </label>
-                                    @endforeach
-                                </div>
-                            </div>
-                            <div>
-                                <label for="qr-visit-date" class="mb-1 block text-xs font-semibold text-sand-700">Date</label>
-                                <input id="qr-visit-date" type="date" value="{{ now()->toDateString() }}" readonly class="w-full rounded-sm border border-sand-300 bg-sand-100 px-3 py-2 text-sm text-sand-700">
-                            </div>
-                            <div>
-                                <label for="qr-visitor-name" class="mb-1 block text-xs font-semibold text-sand-700">Full Name</label>
-                                <input id="qr-visitor-name" name="visitorName" type="text" required placeholder="e.g. Juan Dela Cruz" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none">
-                            </div>
-                            <div>
-                                <label for="qr-visitor-contact" class="mb-1 block text-xs font-semibold text-sand-700">Contact Number</label>
-                                <input id="qr-visitor-contact" name="visitorContact" type="tel" required placeholder="e.g. 0912 345 6789" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none">
-                            </div>
-                            <div>
-                                <label for="qr-remarks" class="mb-1 block text-xs font-semibold text-sand-700">Remarks <span class="font-normal text-sand-500">(optional)</span></label>
-                                <textarea id="qr-remarks" name="remarks" rows="2" maxlength="1000" placeholder="Anything you would like us to know" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none"></textarea>
-                            </div>
+                        {{-- Today's date, read-only: the server always stamps the arrival with today. --}}
+                        <div class="mt-3">
+                            <label for="qr-visit-date" class="mb-1 block text-xs font-semibold text-sand-700">Date</label>
+                            <input id="qr-visit-date" type="date" value="{{ now()->toDateString() }}" readonly class="w-full rounded-sm border border-sand-300 bg-sand-100 px-3 py-2 text-sm text-sand-700">
                         </div>
-                    </div>
+                    </fieldset>
 
-                    {{-- Your Travel Companions: a Local/International x Male/Female x
-                         Age-group matrix (12 granular counters, Local shown first). The
-                         Total Group Size card below derives Local/International/Total
-                         from these cells client-side (resources/js/app.js), and on submit
-                         they're also rolled back up into the flat
-                         male/female/adults/children/seniors/local/foreign fields the
-                         backend already expects — no schema change needed. --}}
-                    <div class="rounded-md border border-sand-200 bg-sand-0 p-5 shadow-sm">
-                        <div class="flex items-center gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-700 text-sand-0">
-                                <i class="ti ti-users text-lg" aria-hidden="true"></i>
-                            </span>
+                    {{-- 2. Group headcount — the main section. A Local/Foreign x
+                         Male/Female x Age-group matrix (12 counters); the JS
+                         rolls it up into the 7 flat totals the backend saves. --}}
+                    <div class="rounded-md border-2 border-primary-700 bg-sand-0 p-4 shadow-sm">
+                        <div class="flex items-start justify-between gap-3">
                             <div>
-                                <h2 class="font-display text-sm font-bold text-sand-900">Your Group</h2>
-                                <p class="text-xs text-sand-500">Tap (+) to add everyone in your group, including yourself.</p>
+                                <h2 class="font-display text-base font-bold text-sand-900">How many are in your group?</h2>
+                                <p class="mt-0.5 text-xs text-sand-500">Count everyone, <b>including yourself</b>.</p>
                             </div>
+                            <p class="shrink-0 rounded-md bg-primary-100 px-3 py-1.5 text-center leading-none">
+                                <span id="qr-total-value" class="block font-display text-2xl font-extrabold text-primary-900">0</span>
+                                <span class="text-[10px] font-semibold tracking-wide text-primary-700 uppercase">People</span>
+                            </p>
                         </div>
 
                         @foreach ([
-                            ['key' => 'local', 'icon' => 'ti-home', 'label' => 'Local / Domestic Guests'],
-                            ['key' => 'foreign', 'icon' => 'ti-world', 'label' => 'International / Foreign Guests'],
+                            ['key' => 'local', 'icon' => 'ti-home', 'label' => 'Local / Domestic', 'caption' => 'Living in the Philippines'],
+                            ['key' => 'foreign', 'icon' => 'ti-world', 'label' => 'Foreign', 'caption' => 'Living outside the Philippines'],
                         ] as $group)
-                            <div class="mt-5 border-t border-dashed border-sand-200 pt-4">
-                                <p class="flex items-center gap-1.5 text-xs font-semibold tracking-wide text-sand-500 uppercase">
-                                    <i class="ti {{ $group['icon'] }} text-sm" aria-hidden="true"></i>
-                                    {{ $group['label'] }}
-                                </p>
+                            <div class="mt-4">
+                                <div class="flex items-center justify-between">
+                                    <p class="flex items-center gap-1.5 text-sm font-bold text-sand-900">
+                                        <i class="ti {{ $group['icon'] }} text-base text-primary-700" aria-hidden="true"></i>
+                                        {{ $group['label'] }}
+                                        <span class="text-[11px] font-normal text-sand-500">· {{ $group['caption'] }}</span>
+                                    </p>
+                                    <span class="rounded-sm bg-sand-100 px-2 py-0.5 text-xs font-bold text-sand-700"><span id="qr-{{ $group['key'] }}-value">0</span></span>
+                                </div>
 
-                                <div class="mt-3 overflow-hidden rounded-sm border border-sand-200">
-                                    <div class="grid grid-cols-3 bg-sand-100 text-[10px] font-semibold tracking-wide text-sand-500 uppercase">
-                                        <span class="px-3 py-2">Age Group</span>
-                                        <span class="border-l border-sand-200 px-2 py-2 text-center">Male</span>
-                                        <span class="border-l border-sand-200 px-2 py-2 text-center">Female</span>
+                                <div class="mt-2 overflow-hidden rounded-sm border border-sand-200">
+                                    <div class="grid grid-cols-[1fr_auto_auto] bg-sand-100 text-[10px] font-semibold tracking-wide text-sand-500 uppercase">
+                                        <span class="px-3 py-1.5">Age Group</span>
+                                        <span class="w-[6.5rem] border-l border-sand-200 py-1.5 text-center">Male</span>
+                                        <span class="w-[6.5rem] border-l border-sand-200 py-1.5 text-center">Female</span>
                                     </div>
 
                                     @foreach ([
-                                        ['key' => 'adults', 'label' => 'Adults (18 to 59)'],
-                                        ['key' => 'children', 'label' => 'Kids (Under 18)'],
-                                        ['key' => 'seniors', 'label' => 'Seniors (60 & above)'],
+                                        ['key' => 'adults', 'label' => 'Adults', 'caption' => '18 to 59'],
+                                        ['key' => 'children', 'label' => 'Kids', 'caption' => 'Under 18'],
+                                        ['key' => 'seniors', 'label' => 'Seniors', 'caption' => '60 & above'],
                                     ] as $row)
-                                        <div class="grid grid-cols-3 items-center border-t border-sand-200">
-                                            <div class="px-3 py-2">
+                                        <div class="grid grid-cols-[1fr_auto_auto] items-center border-t border-sand-200">
+                                            <div class="px-3 py-2 leading-tight">
                                                 <p class="text-xs font-semibold text-sand-900">{{ $row['label'] }}</p>
+                                                <p class="text-[10px] text-sand-500">{{ $row['caption'] }}</p>
                                             </div>
-                                            <div class="flex justify-center border-l border-sand-200 py-2">
+                                            <div class="flex w-[6.5rem] justify-center border-l border-sand-200 py-2">
                                                 <x-lgu.qr-counter
                                                     compact
                                                     name="{{ $group['key'] }}-male-{{ $row['key'] }}"
-                                                    label="{{ $row['label'] }} · Male · {{ $group['label'] }}"
+                                                    label="{{ $row['label'] }} ({{ $row['caption'] }}) · Male · {{ $group['label'] }}"
                                                 />
                                             </div>
-                                            <div class="flex justify-center border-l border-sand-200 py-2">
+                                            <div class="flex w-[6.5rem] justify-center border-l border-sand-200 py-2">
                                                 <x-lgu.qr-counter
                                                     compact
                                                     name="{{ $group['key'] }}-female-{{ $row['key'] }}"
-                                                    label="{{ $row['label'] }} · Female · {{ $group['label'] }}"
+                                                    label="{{ $row['label'] }} ({{ $row['caption'] }}) · Female · {{ $group['label'] }}"
                                                 />
                                             </div>
                                         </div>
                                     @endforeach
                                 </div>
-
-                                @if ($group['key'] === 'local')
-                                    <div id="qr-local-origin-wrap" class="mt-4 border-t border-dashed border-sand-200 pt-4">
-                                        <label for="qr-local-origin-scope" class="mb-1 block text-xs font-semibold text-sand-700">Where are you from? <span class="font-normal text-sand-500">(optional)</span></label>
-                                        <select id="qr-local-origin-scope" name="localOriginScope" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none">
-                                            <option value="">Prefer not to say</option>
-                                            <option value="within_province">Within Davao Oriental</option>
-                                            <option value="outside_province">Outside Davao Oriental</option>
-                                        </select>
-
-                                        <div id="qr-local-origin-place-wrap" class="mt-3">
-                                            <label for="qr-local-origin-place" class="mb-1 block text-xs font-semibold text-sand-700">Home Province <span class="font-normal text-sand-500">(when outside Davao Oriental)</span></label>
-                                            <input id="qr-local-origin-place" name="localOriginPlace" type="text" list="province-options" placeholder="e.g. Davao del Sur" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none">
-                                        </div>
-                                    </div>
-                                @else
-                                    <div id="qr-foreign-country-wrap" class="mt-4 border-t border-dashed border-sand-200 pt-4">
-                                        <label for="qr-foreign-country" class="mb-1 block text-xs font-semibold text-sand-700">Home Country <span class="font-normal text-sand-500">(optional)</span></label>
-                                        <input id="qr-foreign-country" name="foreignCountry" type="text" list="country-options" placeholder="e.g. Japan" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none">
-                                    </div>
-                                @endif
                             </div>
                         @endforeach
+                    </div>
+
+                    {{-- 3. Where the group is from — appears once the group has someone in it --}}
+                    <div id="qr-origin-card" class="hidden rounded-md border border-sand-200 bg-sand-0 p-4 shadow-sm">
+                        <h2 class="font-display text-sm font-bold text-sand-900">Where is your group from? <span class="text-danger" aria-hidden="true">*</span></h2>
+
+                        <div id="qr-local-origin-wrap" class="mt-3 hidden">
+                            <p class="mb-1.5 text-xs font-semibold text-sand-700">Local / Domestic guests</p>
+                            <div class="flex flex-wrap gap-2" role="radiogroup" aria-label="Where local guests are from">
+                                @foreach ([
+                                    ['value' => 'within_province', 'label' => 'Within Davao Oriental'],
+                                    ['value' => 'outside_province', 'label' => 'Outside Davao Oriental'],
+                                ] as $scope)
+                                    <label class="cursor-pointer">
+                                        <input type="radio" name="localOriginScope" value="{{ $scope['value'] }}" class="peer sr-only">
+                                        <span class="inline-block rounded-full border border-sand-300 px-3 py-1.5 text-xs font-semibold text-sand-700 transition-colors peer-checked:border-primary-700 peer-checked:bg-primary-700 peer-checked:text-sand-0 peer-focus-visible:ring-2 peer-focus-visible:ring-primary-300">{{ $scope['label'] }}</span>
+                                    </label>
+                                @endforeach
+                            </div>
+
+                            <div id="qr-local-origin-municipality-wrap" class="mt-3 hidden">
+                                <label for="qr-local-origin-municipality" class="mb-1 block text-xs font-semibold text-sand-700">Municipality / City <span class="text-danger" aria-hidden="true">*</span></label>
+                                <select id="qr-local-origin-municipality" class="w-full rounded-sm border border-sand-300 bg-sand-0 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none">
+                                    <option value="">Select a municipality or city</option>
+                                    @foreach ($municipalities as $municipality)
+                                        <option value="{{ $municipality }}">{{ $municipality }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            <div id="qr-local-origin-place-wrap" class="mt-3 hidden">
+                                <label for="qr-local-origin-place" class="mb-1 block text-xs font-semibold text-sand-700">Home Province <span class="text-danger" aria-hidden="true">*</span></label>
+                                <input id="qr-local-origin-place" type="text" list="province-options" placeholder="e.g. Davao del Sur" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none">
+                            </div>
+                        </div>
+
+                        <div id="qr-foreign-country-wrap" class="mt-4 hidden">
+                            <label for="qr-foreign-country" class="mb-1 block text-xs font-semibold text-sand-700">Foreign guests · Home Country <span class="text-danger" aria-hidden="true">*</span></label>
+                            <input id="qr-foreign-country" type="text" list="country-options" placeholder="e.g. Japan" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none">
+                        </div>
 
                         <datalist id="province-options">
                             @foreach ($provinces as $province)
@@ -203,16 +214,24 @@
                         </datalist>
                     </div>
 
-                    {{-- Total Group Size --}}
-                    <div class="rounded-md border-2 border-primary-700 bg-primary-100/40 px-5 py-4">
-                        <p class="text-xs font-semibold tracking-wide text-primary-700 uppercase">Total Group Size</p>
-                        <div class="mt-1.5 flex items-center justify-between gap-3">
-                            <p id="qr-total-caption" class="text-sm text-sand-700">
-                                Local (<b id="qr-local-value">0</b>) + International (<b id="qr-foreign-value">0</b>)
-                            </p>
-                            <p class="shrink-0 font-display text-3xl font-extrabold text-primary-900">
-                                <span id="qr-total-value">0</span> <span class="text-sm font-semibold text-sand-500">People</span>
-                            </p>
+                    {{-- 4. Lead visitor --}}
+                    <div class="rounded-md border border-sand-200 bg-sand-0 p-4 shadow-sm">
+                        <h2 class="font-display text-sm font-bold text-sand-900">Your Details</h2>
+                        <p class="text-xs text-sand-500">The person filling in this form for the group.</p>
+
+                        <div class="mt-3 flex flex-col gap-3">
+                            <div>
+                                <label for="qr-visitor-name" class="mb-1 block text-xs font-semibold text-sand-700">Full Name <span class="font-normal text-sand-500">(optional)</span></label>
+                                <input id="qr-visitor-name" name="visitorName" type="text" maxlength="255" autocomplete="name" placeholder="e.g. Juan Dela Cruz" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none">
+                            </div>
+                            <div>
+                                <label for="qr-visitor-contact" class="mb-1 block text-xs font-semibold text-sand-700">Contact Number <span class="text-danger" aria-hidden="true">*</span></label>
+                                <input id="qr-visitor-contact" name="visitorContact" type="tel" required maxlength="255" autocomplete="tel" placeholder="e.g. 0912 345 6789" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none">
+                            </div>
+                            <div>
+                                <label for="qr-remarks" class="mb-1 block text-xs font-semibold text-sand-700">Remarks <span class="font-normal text-sand-500">(optional)</span></label>
+                                <textarea id="qr-remarks" name="remarks" rows="2" maxlength="1000" placeholder="Anything you would like us to know" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none"></textarea>
+                            </div>
                         </div>
                     </div>
 
@@ -221,25 +240,36 @@
                         See our <a href="{{ route('privacy') }}" target="_blank" rel="noopener" class="font-semibold text-primary-700 hover:text-primary-900">Privacy Notice</a>.
                     </p>
 
-                    <button type="submit" class="flex items-center justify-center gap-2 rounded-md bg-primary-700 px-5 py-3.5 text-sm font-semibold text-sand-0 shadow-md transition-colors hover:bg-primary-900">
-                        <i class="ti ti-clipboard-check text-lg" aria-hidden="true"></i>
-                        Submit Registration
-                    </button>
+                    {{-- Sticky submit bar: the total stays in view while scrolling --}}
+                    <div class="sticky bottom-0 -mx-4 border-t border-sand-200 bg-sand-50/95 px-4 pt-3 pb-4 backdrop-blur">
+                        <p id="qr-form-error" role="alert" class="mb-2 hidden rounded-sm bg-danger-bg px-3 py-2 text-sm text-danger"></p>
+                        <button type="submit" id="qr-submit" class="flex w-full items-center justify-center gap-2 rounded-md bg-primary-700 px-5 py-3.5 text-sm font-semibold text-sand-0 shadow-md transition-colors hover:bg-primary-900 disabled:cursor-not-allowed disabled:opacity-60">
+                            <i class="ti ti-clipboard-check text-lg" aria-hidden="true" data-submit-icon></i>
+                            <span data-submit-label>Submit Registration</span>
+                            <span class="rounded-sm bg-white/15 px-2 py-0.5 text-xs"><span id="qr-submit-total">0</span> people</span>
+                        </button>
+                    </div>
                 </div>
 
                 {{-- Success step --}}
-                <div id="qr-success-step" class="hidden flex-col items-center rounded-md border border-sand-200 bg-sand-0 p-8 text-center shadow-sm">
+                <div id="qr-success-step" class="mb-8 hidden flex-col items-center rounded-md border border-sand-200 bg-sand-0 p-8 text-center shadow-sm">
                     <span class="flex h-14 w-14 items-center justify-center rounded-full bg-success-bg text-success">
                         <i class="ti ti-circle-check text-3xl" aria-hidden="true"></i>
                     </span>
                     <p class="mt-4 font-display text-base font-bold text-sand-900">Registration Submitted</p>
                     <p class="mt-1 text-sm text-sand-600">Thanks! Your visit to {{ $establishmentName }} has been logged.</p>
+                    <p id="qr-success-summary" class="mt-3 rounded-sm bg-sand-50 px-3 py-1.5 text-sm font-semibold text-sand-800"></p>
 
-                    @if (! empty($feedbackUrl))
-                        <a href="{{ $feedbackUrl }}" class="mt-4 inline-flex items-center gap-2 rounded-sm bg-primary-700 px-5 py-2.5 text-sm font-semibold text-sand-0 hover:bg-primary-900">
-                            <i class="ti ti-message-2" aria-hidden="true"></i>
-                            Share your experience
-                        </a>
+                    {{-- Objective 4: only when this establishment accepts public
+                         feedback; the link carries the public slug only. --}}
+                    @if ($feedbackUrl ?? null)
+                        <div class="mt-6 w-full border-t border-sand-100 pt-5">
+                            <p class="text-sm text-sand-600">Enjoying your visit? Tell us how it went — it helps improve tourism in Davao Oriental.</p>
+                            <a href="{{ $feedbackUrl }}" class="btn-primary mt-3 justify-center">
+                                <i class="ti ti-message-2" aria-hidden="true"></i>
+                                Share Your Experience
+                            </a>
+                        </div>
                     @endif
 
                     <button type="button" id="qr-form-reset" class="mt-6 rounded-sm border border-sand-300 px-5 py-2.5 text-sm font-semibold text-sand-800 hover:border-primary-300">

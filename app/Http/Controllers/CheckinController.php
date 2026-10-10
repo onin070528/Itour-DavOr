@@ -11,43 +11,52 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\ArrivalOriginScope;
 use App\Enums\ArrivalSource;
 use App\Models\Listing;
+use App\Services\ArrivalRecorder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class CheckinController extends Controller
 {
+    /** Shown on the public page and returned by store() whenever a QR can't be used. */
+    public const NOT_ACCEPTING_MESSAGE = 'This establishment is not accepting registrations.';
+
     /**
      * Visitor self-registration form, reached by scanning the QR code
      * posted at a registered establishment. {establishment} is the
      * listing's uuid — the same id every establishment's QR code encodes
-     * (see Establishment\ProfileController::qr), so each establishment gets
-     * its own unique, stable check-in link that survives the listing's
-     * slug changing later.
+     * (see App\Services\QrCodeService), so each establishment gets its own
+     * unique, stable check-in link that survives the listing's slug
+     * changing later.
      *
      * Validates the QR identifier (a real, existing listing) and then
-     * Listing::isQrEnabled() before showing the form at all — a Tour Guide,
-     * an "Others" record, a suspended/inactive record, or a category with
-     * QR scanning switched off all show a refusal message instead, per the
-     * single QR rule.
+     * Listing::isAcceptingRegistrations() before showing the form at all —
+     * a destination, a Tour Guide, an "Others" record, a suspended/inactive
+     * record, a category or establishment with QR switched off, or an
+     * establishment with no linked account all show a refusal message
+     * instead.
+     *
+     * When the establishment also accepts public feedback
+     * (Listing::isAcceptingFeedback() — published, not a tour guide), the
+     * success step offers "Share Your Experience", linking to the public
+     * feedback form by the listing's public slug (never its id or this
+     * QR uuid). QR eligibility itself is unchanged.
      */
-    public function show(string $establishment): View
+    public function show(string $establishment, ArrivalRecorder $arrivalRecorder): View
     {
         $objListing = Listing::query()->where('lst_uuid', $establishment)->first();
 
         abort_if(! $objListing, 404);
 
-        if (! $objListing->isQrEnabled()) {
+        if (! $objListing->isAcceptingRegistrations()) {
             return view('lgu.establishmentQR', [
                 'establishmentName' => $objListing->lst_name,
                 'checkinAction' => null,
-                'refusalMessage' => 'This establishment is not accepting registrations.',
+                'refusalMessage' => self::NOT_ACCEPTING_MESSAGE,
             ]);
         }
 
@@ -55,96 +64,56 @@ class CheckinController extends Controller
             'establishmentName' => $objListing->lst_name,
             'provinces' => config('ph_provinces'),
             'countries' => config('countries'),
+            'municipalities' => $arrivalRecorder->getProvinceMunicipalityNames(),
             'checkinAction' => route('checkin.store', $establishment),
             'refusalMessage' => null,
+            'feedbackUrl' => $objListing->isAcceptingFeedback() ? route('feedback.create', ['listing' => $objListing->lst_slug]) : null,
         ]);
     }
 
     /**
      * Submits the self check-in form (called via fetch by
      * initEstablishmentQrForm() in resources/js/app.js, which then shows
-     * the existing JS-driven success step rather than reloading the page).
-     * Persists one `self_checkin` arrival row — a party, described by the
-     * counters on the form — against the scanned establishment.
+     * the JS-driven success step rather than reloading the page).
+     * Persists one `self_checkin` arrival row — one group: the lead visitor
+     * plus everyone with them as counts — with today's date and no encoder
+     * (the tourist has no account). Visit type, headcount, and origin are
+     * validated and saved exactly like staff Arrival Recording
+     * (App\Services\ArrivalRecorder); the QR form adds the required lead
+     * name/contact and the honeypot.
      */
-    public function store(Request $objRequest, string $establishment): JsonResponse
+    public function store(Request $objRequest, string $establishment, ArrivalRecorder $arrivalRecorder): JsonResponse
     {
         $objListing = Listing::query()->where('lst_uuid', $establishment)->firstOrFail();
 
-        // Defense in depth: show() already refuses the form, but the QR
-        // switch (Settings > Categories) or a status change could happen
-        // between the scan and the submit — never save in that case.
-        if (! $objListing->isQrEnabled()) {
-            return response()->json(['message' => 'This establishment is not accepting registrations.'], 422);
+        // Defense in depth: show() already refuses the form, but a QR switch
+        // or status change could happen between the scan and the submit —
+        // never save in that case.
+        if (! $objListing->isAcceptingRegistrations()) {
+            return response()->json(['message' => self::NOT_ACCEPTING_MESSAGE], 422);
         }
 
-        $arrData = Validator::make($objRequest->all(), [
+        // The shared rules make the name and contact optional; the public form
+        // asks for the contact number, so it is required here.
+        $arrData = Validator::make($objRequest->all(), array_merge($arrivalRecorder->getRules($objRequest), [
             // Honeypot: real visitors never see or fill this field (see
             // resources/views/lgu/establishmentQR.blade.php). A filled value
             // means a bot submitted the form, so the whole request fails
             // validation and nothing is saved.
             'website' => ['prohibited'],
-            'visitorName' => ['required', 'string', 'max:255'],
             'visitorContact' => ['required', 'string', 'max:255'],
-            'visitType' => ['nullable', Rule::in(['Daytour', 'Overnight'])],
-            'remarks' => ['nullable', 'string', 'max:1000'],
-            'male' => ['nullable', 'integer', 'min:0'],
-            'female' => ['nullable', 'integer', 'min:0'],
-            'adults' => ['nullable', 'integer', 'min:0'],
-            'children' => ['nullable', 'integer', 'min:0'],
-            'seniors' => ['nullable', 'integer', 'min:0'],
-            'local' => ['nullable', 'integer', 'min:0'],
-            'foreign' => ['nullable', 'integer', 'min:0'],
-            'localOriginScope' => [
-                'nullable',
-                Rule::enum(ArrivalOriginScope::class),
-                Rule::prohibitedIf((int) $objRequest->input('local', 0) <= 0),
-            ],
-            'localOriginPlace' => [
-                'nullable', 'string', 'max:100',
-                Rule::requiredIf($objRequest->input('localOriginScope') === ArrivalOriginScope::OutsideProvince->value),
-                Rule::prohibitedIf($objRequest->input('localOriginScope') !== ArrivalOriginScope::OutsideProvince->value),
-            ],
-            'foreignCountry' => [
-                'nullable', 'string', 'max:100',
-                Rule::prohibitedIf((int) $objRequest->input('foreign', 0) <= 0),
-            ],
-        ])->after(function ($objValidator) use ($objRequest) {
-            // Counting rule: the companion grid now includes the lead
-            // visitor (see resources/js/app.js's updateTotal()), so the
-            // group's total headcount is the grid sum itself — never 0.
-            $intTotal = (int) $objRequest->input('male', 0) + (int) $objRequest->input('female', 0);
-            if ($intTotal < 1) {
-                $objValidator->errors()->add('male', 'Add at least one guest to the headcount.');
-            }
-        })->validate();
-
-        $objCompanions = collect(['male', 'female', 'adults', 'children', 'seniors', 'local', 'foreign'])
-            ->mapWithKeys(fn ($key) => [$key => (int) ($arrData[$key] ?? 0)]);
+        ]), array_merge($arrivalRecorder->getMessages(), [
+            'visitorContact.required' => 'Please enter your contact number.',
+            'visitType.required' => 'Please choose Day Tour or Overnight.',
+            'website.prohibited' => 'Your registration could not be submitted.',
+        ]))
+            ->after(fn ($objValidator) => $arrivalRecorder->checkHeadcount($objValidator, $objRequest))
+            ->validate();
 
         try {
-            $objListing->arrivals()->create([
-                'arr_source' => ArrivalSource::SelfCheckin,
-                'arr_date' => now()->toDateString(),
-                'arr_visitor_name' => $arrData['visitorName'],
-                'arr_visitor_contact' => $arrData['visitorContact'],
-                'arr_visit_type' => $arrData['visitType'] ?? 'Daytour',
-                'arr_remarks' => $arrData['remarks'] ?? null,
-                'arr_party_male' => $objCompanions['male'],
-                'arr_party_female' => $objCompanions['female'],
-                'arr_party_adults' => $objCompanions['adults'],
-                'arr_party_children' => $objCompanions['children'],
-                'arr_party_seniors' => $objCompanions['seniors'],
-                'arr_party_local' => $objCompanions['local'],
-                'arr_party_foreign' => $objCompanions['foreign'],
-                'arr_party_size' => $objCompanions['male'] + $objCompanions['female'],
-                'arr_local_origin_scope' => $arrData['localOriginScope'] ?? null,
-                'arr_local_origin_place' => $arrData['localOriginPlace'] ?? null,
-                'arr_foreign_country' => $arrData['foreignCountry'] ?? null,
-                'arr_status' => 'Recorded',
-            ]);
+            $arrivalRecorder->record($objListing, $arrData, ArrivalSource::SelfCheckin, null, now()->toDateString());
         } catch (\Throwable $objException) {
-            Log::error('Failed to record self check-in.', ['exception' => $objException, 'establishment' => $establishment]);
+            Log::error('Failed to record self check-in.', ['exception' => $objException, 'listing_id' => $objListing->lst_id]);
 
             return response()->json(['message' => 'Something went wrong while submitting your check-in. Please try again.'], 500);
         }

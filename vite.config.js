@@ -1,8 +1,14 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import laravel from 'laravel-vite-plugin';
 import { bunny } from 'laravel-vite-plugin/fonts';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
+
+// Optional LAN testing (e.g. scanning a QR code with a phone on the same
+// Wi-Fi). When VITE_DEV_LAN_HOST is set to this PC's LAN IP in .env, the dev
+// server listens on all interfaces and public/hot advertises that IP instead
+// of localhost/[::1], which a phone cannot reach. Unset = default behavior.
+const strLanHost = loadEnv('development', process.cwd(), '').VITE_DEV_LAN_HOST;
 
 export default defineConfig({
     plugins: [
@@ -84,6 +90,11 @@ export default defineConfig({
         }),
     ],
     server: {
+        ...(strLanHost ? {
+            host: '0.0.0.0',
+            hmr: { host: strLanHost },
+            cors: true,
+        } : {}),
         watch: {
             ignored: ['**/storage/framework/views/**'],
         },

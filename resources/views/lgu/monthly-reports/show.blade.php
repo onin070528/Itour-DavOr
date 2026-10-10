@@ -7,13 +7,18 @@
 --}}
 @php
     $isVerified = $report->mar_status === \App\Enums\MonthlyReportStatus::Verified;
+    $isDraft = $report->mar_status === \App\Enums\MonthlyReportStatus::Draft;
+    $isForCorrection = $report->mar_status === \App\Enums\MonthlyReportStatus::ForCorrection;
     $isManualPaper = $report->mar_submission_source === \App\Enums\ReportSubmissionSource::ManualPaper;
+    $isSubmitted = $report->mar_status === \App\Enums\MonthlyReportStatus::Submitted;
+    $isSubmittedOrVerified = ! $isDraft && ! $isForCorrection;
+    $period = $report->mar_period_month->format('Y-m');
 @endphp
 
 <x-layouts.dashboard :user="$user" :nav-sections="$navSections" :page-title="$pageTitle" account-heading="System" :settings-href="route('lgu.settings')">
     <x-dashboard.page-header
         :title="$report->listing->lst_name.' — '.$report->mar_period_month->format('F Y')"
-        description="Monthly tourist-arrival report."
+        description="Establishment monthly tourist-arrival report — review it, then verify or return it for correction."
     >
         <x-slot:actions>
             @unless ($locked)
@@ -22,17 +27,48 @@
                     Edit / Correct
                 </a>
             @endunless
-            <a href="{{ route('lgu.monthlyReports.index', ['period' => $report->mar_period_month->format('Y-m')]) }}" class="inline-flex items-center gap-2 rounded-sm border border-sand-300 bg-sand-0 px-4 py-2.5 text-sm font-semibold text-sand-800 hover:border-primary-300">
-                <i class="ti ti-arrow-left" aria-hidden="true"></i>
-                Back to Monthly Reports
-            </a>
+            @can('editDraft', $report)
+                <a href="{{ route('lgu.monthlyReports.manualEntry', ['listing' => $report->listing, 'period' => $report->mar_period_month->format('Y-m')]) }}" class="inline-flex items-center gap-2 rounded-sm border border-sand-300 bg-sand-0 px-4 py-2.5 text-sm font-semibold text-sand-800 hover:border-primary-300">
+                    <i class="ti ti-edit" aria-hidden="true"></i>
+                    Edit Draft
+                </a>
+            @endcan
+            @if ($isManualPaper && $isDraft)
+                <a href="{{ route('lgu.monthlyReports.manualEntry.index', ['period' => $period]) }}" class="inline-flex items-center gap-2 rounded-sm border border-sand-300 bg-sand-0 px-4 py-2.5 text-sm font-semibold text-sand-800 hover:border-primary-300">
+                    <i class="ti ti-arrow-left" aria-hidden="true"></i>
+                    Back to Manual Entry
+                </a>
+            @else
+                <a href="{{ route('lgu.monthlyReports.index', ['period' => $period]) }}" class="inline-flex items-center gap-2 rounded-sm border border-sand-300 bg-sand-0 px-4 py-2.5 text-sm font-semibold text-sand-800 hover:border-primary-300">
+                    <i class="ti ti-arrow-left" aria-hidden="true"></i>
+                    Back to Establishment Reports
+                </a>
+            @endif
         </x-slot:actions>
     </x-dashboard.page-header>
 
-    @if ($locked)
+    @if ($locked && $isSubmittedOrVerified)
         <div class="mt-6 flex items-center gap-2 rounded-md border border-sand-300 bg-sand-100 px-4 py-3 text-sm font-semibold text-sand-700">
             <i class="ti ti-lock" aria-hidden="true"></i>
-            This report is part of a provincial report PTO has already approved, so it can no longer be corrected here.
+            This report is part of a municipal report already with PTO, so it can no longer be corrected here.
+        </div>
+    @endif
+
+    <x-dashboard.tabs sync="view" panel-host="#lgu-report-panels" :tabs="[
+        ['label' => 'Report Details', 'panel' => 'details', 'active' => $activeView === 'details', 'icon' => 'ti-list-details'],
+        ['label' => 'Report Preview', 'panel' => 'a4', 'active' => $activeView === 'a4', 'icon' => 'ti-file-description'],
+    ]" />
+
+    <div id="lgu-report-panels">
+    <div data-tab-panel="details" @class(['hidden' => $activeView !== 'details'])>
+    @if ($balanceErrors !== [])
+        <div class="mt-6 rounded-md border border-warning/30 bg-warning-bg px-4 py-3 text-sm text-warning">
+            <p class="font-semibold">Check these totals before verifying — PTO will not accept a municipal report whose columns don't add up:</p>
+            <ul class="mt-1 list-disc pl-5 text-xs">
+                @foreach ($balanceErrors as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
         </div>
     @endif
 
@@ -114,7 +150,13 @@
         <dl class="mt-5 grid grid-cols-1 gap-4 border-t border-sand-200 pt-5 sm:grid-cols-2">
             <div>
                 <dt class="text-xs font-semibold text-sand-500 uppercase">Submitted</dt>
-                <dd class="mt-1 text-sm text-sand-800">{{ $report->submitter->usr_name ?? '—' }} · {{ $report->mar_submitted_at->format('M j, Y g:i A') }}</dd>
+                <dd class="mt-1 text-sm text-sand-800">
+                    @if ($report->mar_submitted_at)
+                        {{ $report->submitter->usr_name ?? '—' }} · {{ $report->mar_submitted_at->format('M j, Y g:i A') }}
+                    @else
+                        Not yet submitted
+                    @endif
+                </dd>
             </div>
             @if ($report->mar_verified_at)
                 <div>
@@ -150,14 +192,65 @@
             </table>
         </div>
     @endif
+    </div>
+
+    {{-- Report Preview: the same official A4 layout used for printing and for the municipal report. --}}
+    <div data-tab-panel="a4" @class(['hidden' => $activeView !== 'a4'])>
+        <x-dashboard.report-preview-frame
+            frame-id="lgu-report-preview-frame"
+            :preview-url="route('lgu.monthlyReports.preview', $report)"
+            :pdf-url="route('lgu.monthlyReports.pdf', $report)"
+        />
+    </div>
+    </div>
 
     @if ($isVerified)
-        <div class="mt-6 flex items-center gap-2 rounded-md border border-success/20 bg-success-bg px-4 py-3 text-sm font-semibold text-success">
-            <i class="ti ti-circle-check" aria-hidden="true"></i>
-            This report has been verified.
+        <div class="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-md border border-success/20 bg-success-bg px-4 py-3 text-sm font-semibold text-success">
+            <span class="flex items-center gap-2"><i class="ti ti-circle-check" aria-hidden="true"></i> This report has been verified and counts toward the municipal report.</span>
+            <a href="{{ route('lgu.monthlyReports.municipal.show', $period) }}" class="text-xs font-semibold text-primary-700 hover:text-primary-900">View {{ $report->mar_period_month->format('F Y') }} Municipal Report</a>
         </div>
+    @elseif ($isForCorrection)
+        <div class="mt-6 rounded-md border border-danger/30 bg-danger-bg px-4 py-3 text-sm text-danger">
+            <p class="flex items-center gap-2 font-semibold"><i class="ti ti-arrow-back-up" aria-hidden="true"></i> Returned to the establishment for correction. Waiting for it to resubmit.</p>
+            <p class="mt-1">Remarks: {{ $report->mar_remarks ?: '—' }}</p>
+        </div>
+    @elseif ($isSubmitted)
+        @can('startReview', $report)
+            <div class="mt-6">
+                <form method="POST" action="{{ route('lgu.monthlyReports.review', $report) }}">
+                    @csrf
+                    @method('PATCH')
+                    <button type="submit" class="inline-flex items-center gap-2 rounded-sm bg-primary-700 px-4 py-2.5 text-sm font-semibold text-sand-0 hover:bg-primary-900">
+                        <i class="ti ti-eye-check" aria-hidden="true"></i>
+                        Start Review
+                    </button>
+                </form>
+            </div>
+        @endcan
+    @elseif ($isDraft)
+        @can('submit', $report)
+            <div class="mt-6 flex flex-wrap items-center gap-3">
+                <p class="w-full text-sm text-sand-600">This paper report is a draft. Check the Report Preview against the paper report, then submit it for review and verification.</p>
+                <form method="POST" action="{{ route('lgu.monthlyReports.submit', $report) }}">
+                    @csrf
+                    @method('PATCH')
+                    <button
+                        type="button"
+                        data-confirm-trigger
+                        data-confirm-title="Submit this encoded report?"
+                        data-confirm-message="Confirm the encoded numbers match the physical report. After submitting, the draft can no longer be edited and the report still needs to be verified."
+                        data-confirm-label="Submit"
+                        class="inline-flex items-center gap-2 rounded-sm bg-primary-700 px-4 py-2.5 text-sm font-semibold text-sand-0 hover:bg-primary-900"
+                    >
+                        <i class="ti ti-send" aria-hidden="true"></i>
+                        Submit
+                    </button>
+                </form>
+            </div>
+        @endcan
     @else
-        <div class="mt-6">
+        <div class="mt-6 flex flex-wrap items-center gap-3">
+            @can('verify', $report)
             <form method="POST" action="{{ route('lgu.monthlyReports.verify', $report) }}">
                 @csrf
                 @method('PATCH')
@@ -166,15 +259,42 @@
                     data-confirm-trigger
                     data-confirm-title="Verify this report?"
                     data-confirm-message="Confirm the encoded numbers match {{ $isManualPaper ? 'the physical report' : 'the recorded arrivals above' }} before verifying."
-                    data-confirm-label="Verify"
+                    data-confirm-label="Verify Report"
                     data-confirm-tone="success"
                     class="inline-flex items-center gap-2 rounded-sm bg-primary-700 px-4 py-2.5 text-sm font-semibold text-sand-0 hover:bg-primary-900"
                 >
                     <i class="ti ti-check" aria-hidden="true"></i>
-                    Verify
+                    Verify Report
                 </button>
             </form>
+            @endcan
+
+            @can('returnForCorrection', $report)
+                <button type="button" data-modal-open="return-report-modal" class="inline-flex items-center gap-2 rounded-sm border border-danger/30 px-4 py-2.5 text-sm font-semibold text-danger hover:bg-danger-bg">
+                    <i class="ti ti-arrow-back-up" aria-hidden="true"></i>
+                    Return for Correction
+                </button>
+            @endcan
         </div>
+
+        @can('returnForCorrection', $report)
+            <x-dashboard.modal id="return-report-modal" title="Return for Correction">
+                <form id="return-report-form" method="POST" action="{{ route('lgu.monthlyReports.return', $report) }}" class="flex flex-col gap-3">
+                    @csrf
+                    @method('PATCH')
+                    <p class="text-sm text-sand-700">The establishment will see these remarks, fix its arrival records, and resubmit the report.</p>
+                    <label for="return-remarks" class="text-xs font-semibold text-sand-700">Remarks <span class="text-danger" aria-hidden="true">*</span></label>
+                    <textarea id="return-remarks" name="remarks" rows="3" required maxlength="2000" placeholder="What needs to be corrected?" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">{{ old('remarks') }}</textarea>
+                    @error('remarks')
+                        <p class="text-xs text-danger">{{ $message }}</p>
+                    @enderror
+                </form>
+                <x-slot:footer>
+                    <button type="button" data-modal-close class="rounded-sm border border-sand-300 bg-sand-0 px-4 py-2.5 text-sm font-semibold text-sand-800 hover:border-primary-300">Cancel</button>
+                    <button type="submit" form="return-report-form" class="rounded-sm bg-danger px-4 py-2 text-sm font-semibold text-sand-0 hover:opacity-90">Return</button>
+                </x-slot:footer>
+            </x-dashboard.modal>
+        @endcan
     @endif
 
     @if ($history->isNotEmpty())

@@ -200,7 +200,7 @@ test('LGU cannot reach the PTO-only account-creation route to create a PTO or LG
     expect(User::query()->where('usr_email', 'sneaky-lgu-attempt@example.test')->exists())->toBeFalse();
 });
 
-test('LGU cannot assign an establishment to another municipality — municipality always comes from the LGU account itself', function () {
+test('LGU cannot assign an establishment account to another municipality — municipality always comes from the establishment itself', function () {
     $mati = accountCreationMunicipalityFixture('City of Mati', 'MATI');
     $baganga = accountCreationMunicipalityFixture('Baganga', 'BAG');
     $lgu = User::factory()->create([
@@ -223,14 +223,16 @@ test('LGU cannot assign an establishment to another municipality — municipalit
         // attempts the closest forgeable equivalent and confirms it's
         // ignored, not merely absent from the form.
         'municipality_id' => $baganga->mun_id,
+        'establishment_id' => $otherListing->lst_id,
     ])->assertRedirect()->assertSessionHasNoErrors();
 
     $created = User::query()->where('usr_email', 'cross-municipality@example.test')->first();
     expect($created->mun_id)->toBe($mati->mun_id);
-    expect($created->establishment->mun_id)->toBe($mati->mun_id);
+    expect($created->lst_id)->toBe($listing->lst_id);
+    expect($otherListing->fresh()->establishmentUser)->toBeNull();
 });
 
-test('LGU registering an establishment also gets a passphrase and must_change_password', function () {
+test('LGU activating an establishment account also gets a passphrase and must_change_password', function () {
     Mail::fake();
     $mati = accountCreationMunicipalityFixture('City of Mati', 'MATI');
     $lgu = User::factory()->create([

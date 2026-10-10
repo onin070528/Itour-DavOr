@@ -1,4 +1,6 @@
 import { registerSW } from 'virtual:pwa-register';
+import { initFindNearMe, requestCurrentPosition, requestNearbyPlaces } from './find_near_me';
+import { initTouristFeedbackForm } from './tourist_feedback_form';
 
 // Registers the service worker configured in vite.config.js (VitePWA) —
 // offline caching for the public Hotlines page only (see its runtimeCaching
@@ -8,77 +10,19 @@ registerSW({ immediate: true });
 document.addEventListener('DOMContentLoaded', () => {
     initMobileMenu();
     initPasswordToggle();
+    initPasswordChecklist();
     initLoginForm();
-    initExplorePage();
+    initExploreMap();
+    initListingDetailMap();
+    initFindNearMe();
     initNearbyMap();
     initListingDetailsModal();
     initExperiencesExploreAll();
     initChatbot();
     initEstablishmentQrForm();
-    initNavScrollSpy();
     initHeroCarousel();
+    initTouristFeedbackForm();
 });
-
-/**
- * Highlights "Home"/"Nearby"/"Reviews" in the topbar as the corresponding
- * same-page section scrolls into view — the landing page's only nav items
- * without their own route ("Explore"/"Hotlines" keep their server-rendered,
- * route-matched active state untouched; this never runs on pages that lack
- * the #near-you/#reviews sections, i.e. everywhere but the landing page).
- */
-function initNavScrollSpy() {
-    const spyLabels = ['Home', 'Nearby', 'Reviews'];
-    const navLinks = Array.from(document.querySelectorAll('[data-nav-link]'))
-        .filter((link) => spyLabels.includes(link.dataset.navLink));
-
-    if (!navLinks.length) return;
-
-    const sections = ['Nearby', 'Reviews']
-        .map((label) => ({ label, el: document.getElementById({ Nearby: 'near-you', Reviews: 'reviews' }[label]) }))
-        .filter((s) => s.el);
-
-    if (!sections.length) return;
-
-    function paint(activeLabel) {
-        navLinks.forEach((link) => {
-            const active = link.dataset.navLink === activeLabel;
-
-            if (link.dataset.navVariant === 'underline') {
-                link.classList.toggle('border-accent-500', active);
-                link.classList.toggle('text-primary-700', active);
-                link.classList.toggle('font-semibold', active);
-                link.classList.toggle('border-transparent', !active);
-                link.classList.toggle('text-sand-900', !active);
-            } else {
-                link.classList.toggle('bg-sand-100', active);
-                link.classList.toggle('text-primary-700', active);
-                link.classList.toggle('font-semibold', active);
-            }
-        });
-    }
-
-    const observer = new IntersectionObserver((entries) => {
-        const visible = entries
-            .filter((entry) => entry.isIntersecting)
-            .map((entry) => sections.find((s) => s.el === entry.target)?.label)
-            .filter(Boolean);
-
-        if (visible.length) {
-            // Lowest section currently in view wins when two overlap.
-            paint(visible[visible.length - 1]);
-            return;
-        }
-
-        // Nothing observed is intersecting: above the first section means
-        // Home is still the active "section"; below it (past the last
-        // section's bottom) leaves About as the closest match, since
-        // there's nothing further down the page to hand off to.
-        const aboveEverything = sections[0].el.getBoundingClientRect().top > 0;
-        paint(aboveEverything ? 'Home' : 'About');
-    }, { rootMargin: '-100px 0px -55% 0px', threshold: 0 });
-
-    sections.forEach((s) => observer.observe(s.el));
-}
 
 /**
  * Landing page hero background carousel: cross-fades between
@@ -193,6 +137,44 @@ function initPasswordToggle() {
 }
 
 /**
+ * Live password checklist (<x-auth.password-requirements>): ticks each rule
+ * as the user types in the input it describes. Mirrors Password::defaults()
+ * in AppServiceProvider — min 12 characters plus a letter, a number and a
+ * symbol, using the same Unicode classes as Laravel's Password rule. A
+ * visual guide only; the server validation stays the final authority.
+ */
+const PASSWORD_RULES = {
+    length: (value) => [...value].length >= 12,
+    letter: (value) => /\p{L}/u.test(value),
+    number: (value) => /\p{N}/u.test(value),
+    symbol: (value) => /[\p{Z}\p{S}\p{P}]/u.test(value),
+};
+
+function initPasswordChecklist() {
+    document.querySelectorAll('[data-password-checklist]').forEach((checklist) => {
+        const input = document.getElementById(checklist.dataset.passwordChecklist);
+        if (!input) return;
+
+        const items = checklist.querySelectorAll('[data-rule]');
+
+        const update = () => {
+            items.forEach((item) => {
+                const isMet = PASSWORD_RULES[item.dataset.rule]?.(input.value) ?? false;
+                item.dataset.met = String(isMet);
+                item.querySelector('[data-icon-met]')?.classList.toggle('hidden', !isMet);
+                item.querySelector('[data-icon-unmet]')?.classList.toggle('hidden', isMet);
+
+                const state = item.querySelector('[data-rule-state]');
+                if (state) state.textContent = isMet ? '(met)' : '(not met yet)';
+            });
+        };
+
+        input.addEventListener('input', update);
+        update();
+    });
+}
+
+/**
  * Login form (resources/views/auth/login.blade.php): inline client-side
  * validation (required + email format) surfaced in the same aria-live
  * region the server-rendered error uses, so the message styling and
@@ -262,446 +244,868 @@ function initLoginForm() {
 }
 
 /**
- * The consolidated /explore hub: Grid, Table, and Map views sharing one
- * filter state (search text, municipality, categories), all driven from a
- * single JSON payload embedded in the page — no full page reload on filter
- * or view changes.
+ * Marker colors per kind on the public maps — keep in step with
+ * resources/views/components/map-legend.blade.php. Maps only display
+ * places; every distance shown comes from the server (NearbySearchService).
  */
-function initExplorePage() {
-    const root = document.getElementById('explore-root');
-    const dataEl = document.getElementById('explore-data');
+const MAP_MARKER_COLORS = {
+    reference: '#b8442f',
+    destination: '#125d5a',
+    establishment: '#cb6e30',
+};
 
-    if (!root || !dataEl) {
+/**
+ * Reveals the public "Map can't be displayed right now." message inside the
+ * map's frame ([data-map-frame] > [data-map-fallback]).
+ */
+function showMapFallback(mapContainer) {
+    const fallback = mapContainer.closest('[data-map-frame]')?.querySelector('[data-map-fallback]');
+
+    if (fallback) {
+        fallback.hidden = false;
+    }
+}
+
+/**
+ * Logs map errors; a failure before the map has loaded (for example a
+ * rejected token or an unreachable style) also shows the fallback message.
+ * Later tile errors are only logged, so a working map is never covered.
+ */
+function watchMapLoadFailure(map, mapContainer, logPrefix) {
+    let isLoaded = false;
+
+    map.on('load', () => {
+        isLoaded = true;
+    });
+    map.on('error', (event) => {
+        console.error(`${logPrefix} map error:`, event?.error ?? event);
+
+        if (!isLoaded) {
+            showMapFallback(mapContainer);
+        }
+    });
+}
+
+/**
+ * One keyboard-accessible marker with a popup. Mapbox/GeoJSON order is
+ * [longitude, latitude].
+ */
+function addPlaceMarker(map, place, color, popupHtml, options = {}) {
+    const marker = new mapboxgl.Marker({ color, scale: options.scale ?? 1 })
+        .setLngLat([place.lng, place.lat])
+        .setPopup(new mapboxgl.Popup({ offset: 24, maxWidth: '260px' }).setHTML(popupHtml))
+        .addTo(map);
+
+    const element = marker.getElement();
+    element.setAttribute('role', 'button');
+    element.setAttribute('tabindex', '0');
+    element.setAttribute('aria-label', options.label ?? place.name);
+    element.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            marker.togglePopup();
+        }
+    });
+
+    return marker;
+}
+
+/**
+ * Highlights the list row ([data-map-item]) of the selected place, clearing
+ * the others — the list/map link in both directions.
+ */
+function highlightMapItem(slug) {
+    document.querySelectorAll('[data-map-item]').forEach((item) => {
+        item.classList.toggle('bg-primary-100', item.dataset.mapItem === slug);
+    });
+}
+
+/**
+ * "Show on map" buttons ([data-map-focus]): bring the map into view, move to
+ * the marker once (no looping animation), open its popup, and highlight the row.
+ */
+function wireMapFocusButtons(map, markersBySlug, mapContainer) {
+    document.querySelectorAll('[data-map-focus]').forEach((button) => {
+        button.addEventListener('click', () => {
+            const marker = markersBySlug.get(button.dataset.mapFocus);
+
+            if (!marker) {
+                return;
+            }
+
+            mapContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            map.easeTo({ center: marker.getLngLat(), zoom: Math.max(map.getZoom(), 14) });
+
+            if (!marker.getPopup().isOpen()) {
+                marker.togglePopup();
+            }
+
+            highlightMapItem(button.dataset.mapFocus);
+        });
+    });
+}
+
+/**
+ * Without a working map, "Show on map" has nothing to show — hide those
+ * buttons; the listings stay reachable through their normal links.
+ */
+function hideMapFocusButtons() {
+    document.querySelectorAll('[data-map-focus]').forEach((button) => {
+        button.hidden = true;
+    });
+}
+
+/**
+ * The /explore Map view (resources/views/explore.blade.php): plots the
+ * current page's listings. The server has already searched, filtered, and
+ * paginated them (App\Http\Controllers\ExploreController) — nothing is
+ * filtered and no distance is calculated here, and the page's JSON carries
+ * only public pin fields. Without Mapbox (no public token, no WebGL) it
+ * draws the illustrative province map; if Mapbox fails to load it shows the
+ * "Map can't be displayed" message. The list under the map always works.
+ */
+function initExploreMap() {
+    const dataEl = document.getElementById('explore-data');
+    const mapCanvas = document.getElementById('explore-map-canvas');
+
+    if (!dataEl || !mapCanvas) {
         return;
     }
 
-    const { listings, categories, municipalities } = JSON.parse(dataEl.textContent);
-
-    const categoryLabel = (slug) => categories.find((c) => c.slug === slug)?.label ?? slug;
-    const municipalityPosition = (name) => municipalities.find((m) => m.name === name);
-
-    const state = {
-        q: '',
-        municipality: '',
-        categories: new Set(),
-        view: 'grid',
-    };
-
-    // Prime the filter state from the URL (hero search, quick pills, and
-    // the homepage's municipality chips all deep-link here).
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('q')) state.q = params.get('q');
-    if (params.get('municipality')) state.municipality = params.get('municipality');
-    if (params.get('category')) state.categories.add(params.get('category'));
-
-    const searchInput = document.getElementById('explore-search');
-    const municipalitySelect = document.getElementById('explore-municipality');
-    // Multiple "All"/category elements can exist at once now (the desktop
-    // sidebar list and the mobile horizontally-scrollable chips render the
-    // same slugs twice) — querySelectorAll + the shared syncChipStates()
-    // below keeps every copy of a given control in sync.
-    const allChips = Array.from(document.querySelectorAll('[data-category-all]'));
-    const chipButtons = Array.from(document.querySelectorAll('[data-category-chip]'));
-    const viewButtons = Array.from(document.querySelectorAll('[data-view-option]'));
-    const countEl = document.getElementById('explore-count');
-    const emptyEl = document.getElementById('explore-empty');
-    const resetButton = document.getElementById('explore-reset');
-    const views = {
-        grid: document.getElementById('explore-grid'),
-        table: document.getElementById('explore-table'),
-        map: document.getElementById('explore-map'),
-    };
-    const tableBody = document.getElementById('explore-table-body');
-    const mapCanvas = document.getElementById('explore-map-canvas');
-
-    // --- Sync controls to the initial state -------------------------------
-    searchInput.value = state.q;
-    municipalitySelect.value = state.municipality;
-    syncChipStates();
-    setActiveView(state.view);
-
-    // "All" and the per-category chips share one active-state paint, so
-    // there's exactly one place that decides which chip looks selected —
-    // "All" reads as active whenever no category chip is (an empty Set),
-    // never as a chip of its own kind.
-    function syncChipStates() {
-        const noneActive = state.categories.size === 0;
-
-        allChips.forEach((chip) => {
-            chip.setAttribute('aria-pressed', String(noneActive));
-            chip.classList.toggle('bg-primary-100', noneActive);
-            chip.classList.toggle('border-primary-300', noneActive);
-            chip.classList.toggle('text-primary-700', noneActive);
-        });
-
-        chipButtons.forEach((chip) => {
-            const active = state.categories.has(chip.dataset.categoryChip);
-            chip.setAttribute('aria-pressed', String(active));
-            chip.classList.toggle('bg-primary-100', active);
-            chip.classList.toggle('border-primary-300', active);
-            chip.classList.toggle('text-primary-700', active);
-        });
-    }
-
-    // --- Wire up controls ---------------------------------------------------
-    let searchDebounce;
-    searchInput.addEventListener('input', () => {
-        clearTimeout(searchDebounce);
-        searchDebounce = setTimeout(() => {
-            state.q = searchInput.value.trim();
-            render();
-        }, 150);
-    });
-
-    municipalitySelect.addEventListener('change', () => {
-        state.municipality = municipalitySelect.value;
-        render();
-    });
-
-    allChips.forEach((chip) => {
-        chip.addEventListener('click', () => {
-            state.categories.clear();
-            syncChipStates();
-            render();
-        });
-    });
-
-    chipButtons.forEach((chip) => {
-        chip.addEventListener('click', () => {
-            const slug = chip.dataset.categoryChip;
-            const active = state.categories.has(slug);
-
-            active ? state.categories.delete(slug) : state.categories.add(slug);
-            syncChipStates();
-            render();
-        });
-    });
-
-    viewButtons.forEach((button) => {
-        button.addEventListener('click', () => {
-            state.view = button.dataset.viewOption;
-            setActiveView(state.view);
-            render();
-        });
-    });
-
-    resetButton?.addEventListener('click', () => {
-        state.q = '';
-        state.municipality = '';
-        state.categories.clear();
-
-        searchInput.value = '';
-        municipalitySelect.value = '';
-        syncChipStates();
-
-        render();
-    });
-
-    function setActiveView(view) {
-        viewButtons.forEach((button) => {
-            const active = button.dataset.viewOption === view;
-            button.setAttribute('aria-pressed', String(active));
-            button.classList.toggle('bg-sand-0', active);
-            button.classList.toggle('shadow-sm', active);
-            button.classList.toggle('text-primary-700', active);
-            button.classList.toggle('text-sand-600', !active);
-        });
-
-        Object.entries(views).forEach(([name, el]) => {
-            el.classList.toggle('hidden', name !== view || filtered().length === 0);
-        });
-    }
-
-    function filtered() {
-        const q = state.q.toLowerCase();
-
-        return listings.filter((item) => {
-            if (q) {
-                const haystack = `${item.name} ${item.description} ${item.municipality} ${item.barangay}`.toLowerCase();
-                if (!haystack.includes(q)) return false;
-            }
-
-            if (state.municipality && item.municipality !== state.municipality) return false;
-            if (state.categories.size && !state.categories.has(item.category)) return false;
-
-            return true;
-        });
-    }
-
-    function render() {
-        const items = filtered();
-
-        countEl.textContent = `${items.length} verified listing${items.length === 1 ? '' : 's'} from the Provincial Tourism Office and the 11 municipal tourism offices.`;
-        emptyEl.classList.toggle('hidden', items.length !== 0);
-        emptyEl.classList.toggle('flex', items.length === 0);
-
-        Object.entries(views).forEach(([name, el]) => {
-            el.classList.toggle('hidden', name !== state.view || items.length === 0);
-        });
-
-        if (items.length === 0) return;
-
-        if (state.view === 'grid') renderGrid(items);
-        if (state.view === 'table') renderTable(items);
-        if (state.view === 'map') renderMap(items);
-    }
-
-    function renderGrid(items) {
-        views.grid.innerHTML = items.map((item) => `
-            <article class="group flex flex-col overflow-hidden rounded-md border border-sand-200 bg-sand-0 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
-                <div class="relative h-44 overflow-hidden bg-sand-200">
-                    ${listingPhotoMarkup(item, 'absolute inset-0 h-full w-full object-cover')}
-                    <div class="pointer-events-none absolute inset-0 bg-gradient-to-t from-sand-900/55 via-transparent to-transparent"></div>
-                    <span class="relative m-3 inline-block rounded-sm bg-sand-900/45 px-2.5 py-1 text-xs font-semibold text-sand-0">${categoryLabel(item.category)}</span>
-                </div>
-                <div class="flex flex-1 flex-col gap-2 p-5">
-                    <div class="flex items-start justify-between gap-2">
-                        <h3 class="font-display text-lg font-bold text-sand-900">${item.name}</h3>
-                        <span class="mt-0.5 inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-sand-800"><i class="ti ti-star text-accent-500"></i>${item.rating !== null ? item.rating.toFixed(1) : 'New'}</span>
-                    </div>
-                    <p class="flex items-center gap-1 text-xs font-medium text-sand-500"><i class="ti ti-map-pin"></i>${item.barangay}, ${item.municipality}</p>
-                    <p class="text-sm leading-relaxed text-sand-600">${item.description}</p>
-                    <a href="${item.href}" class="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-primary-700 transition-colors group-hover:text-primary-900">View Details<i class="ti ti-arrow-right transition-transform group-hover:translate-x-0.5"></i></a>
-                </div>
-            </article>
-        `).join('');
-    }
-
-    function renderTable(items) {
-        tableBody.innerHTML = items.map((item) => `
-            <tr class="hover:bg-sand-50">
-                <td class="flex items-center gap-3 px-4 py-3">
-                    <span class="relative h-11 w-11 shrink-0 overflow-hidden rounded-sm bg-sand-200">${listingPhotoMarkup(item, 'h-full w-full object-cover')}</span>
-                    <span class="font-semibold text-sand-900">${item.name}</span>
-                </td>
-                <td class="px-4 py-3 text-sand-700">${categoryLabel(item.category)}</td>
-                <td class="px-4 py-3 text-sand-700">${item.barangay}, ${item.municipality}</td>
-                <td class="px-4 py-3 text-sand-700">${item.contactOffice}<br><span class="text-xs text-sand-500">${item.contactPhone}</span></td>
-                <td class="px-4 py-3 text-sand-700">${item.hours}</td>
-                <td class="px-4 py-3 whitespace-nowrap text-sand-700"><i class="ti ti-star text-accent-500"></i> ${item.rating !== null ? item.rating.toFixed(1) : 'New'}</td>
-                <td class="px-4 py-3 text-right"><a href="${item.href}" class="inline-flex items-center rounded-sm border border-sand-300 px-3 py-1.5 text-xs font-semibold text-sand-800 hover:border-primary-300 hover:text-primary-700">View</a></td>
-            </tr>
-        `).join('');
-    }
-
-    // Mapbox is created lazily the first time the Map view is shown — a map
-    // built inside a display:none container measures 0x0 and renders blank.
+    const { places, total, municipalities } = JSON.parse(dataEl.textContent);
+    const caption = document.getElementById('explore-map-caption');
+    const unplotted = total - places.length;
     const mapboxToken = mapCanvas.dataset.mapboxToken;
     const canUseMapbox = Boolean(window.mapboxgl && mapboxToken && mapboxgl.supported());
-    let mapboxMap = null;
-    let mapboxMarkers = [];
 
     if (!canUseMapbox) {
-        console.error('[explore-map] mapbox-gl unavailable, no token, or no WebGL — using the illustrative map.');
-        document.getElementById('explore-map-caption').textContent =
-            'Illustrative province map — not to scale. Pins mark the municipality of each filtered listing.';
+        console.error('[explore-map] mapbox-gl unavailable, no public token, or no WebGL — using the illustrative map.');
+        hideMapFocusButtons();
+        renderIllustrativeMap();
+        return;
     }
 
-    function renderMap(items) {
-        if (canUseMapbox) {
-            renderMapboxMap(items);
-        } else {
-            renderIllustrativeMap(items);
-        }
+    let mapboxMap;
+
+    try {
+        mapboxgl.accessToken = mapboxToken;
+        mapboxMap = new mapboxgl.Map({
+            container: mapCanvas,
+            style: MAP_STYLES.satellite,
+            center: [Number(mapCanvas.dataset.mapboxCenterLng), Number(mapCanvas.dataset.mapboxCenterLat)],
+            zoom: 8.4,
+        });
+    } catch (error) {
+        console.error('[explore-map] mapboxgl.Map() threw:', error);
+        hideMapFocusButtons();
+        showMapFallback(mapCanvas);
+        return;
     }
 
-    function renderMapboxMap(items) {
-        if (!mapboxMap) {
-            mapboxgl.accessToken = mapboxToken;
-            mapboxMap = new mapboxgl.Map({
-                container: mapCanvas,
-                style: MAP_STYLES.satellite,
-                center: [Number(mapCanvas.dataset.mapboxCenterLng), Number(mapCanvas.dataset.mapboxCenterLat)],
-                zoom: 8.4,
-            });
-            mapboxMap.addControl(new MapStyleToggleControl(), 'top-left');
-            mapboxMap.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
-            mapboxMap.on('error', (event) => console.error('[explore-map] map error:', event?.error ?? event));
-        } else {
-            // The container may have just been un-hidden by a view switch.
-            mapboxMap.resize();
-        }
+    mapboxMap.addControl(new MapStyleToggleControl(), 'top-left');
+    mapboxMap.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+    watchMapLoadFailure(mapboxMap, mapCanvas, '[explore-map]');
 
-        mapboxMarkers.forEach((marker) => marker.remove());
+    const markersBySlug = new Map();
 
-        const plotted = items.filter((item) => item.lat !== null && item.lng !== null);
+    places.forEach((place) => {
+        const marker = addPlaceMarker(
+            mapboxMap,
+            place,
+            MAP_MARKER_COLORS[place.kind] ?? MAP_MARKER_COLORS.establishment,
+            `
+                <span class="relative mb-2 block h-24 w-full overflow-hidden rounded-sm">${listingPhotoMarkup(place, 'h-24 w-full rounded-sm object-cover')}</span>
+                <p class="font-semibold text-sand-900">${escapeHtml(place.name)}</p>
+                <p class="text-xs text-sand-600">${escapeHtml(place.categoryLabel)} · ${escapeHtml(place.barangay)}, ${escapeHtml(place.municipality)}</p>
+                <a href="${escapeHtml(place.href)}" class="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary-700 hover:text-primary-900">View Details<i class="ti ti-arrow-right"></i></a>
+            `,
+            { label: `${place.name} — ${place.categoryLabel}` },
+        );
+        marker.getElement().addEventListener('click', () => highlightMapItem(place.slug));
+        markersBySlug.set(place.slug, marker);
+    });
 
-        mapboxMarkers = plotted.map((item) => new mapboxgl.Marker({ color: '#125d5a' })
-            .setLngLat([item.lng, item.lat])
-            .setPopup(new mapboxgl.Popup({ offset: 24, maxWidth: '260px' }).setHTML(`
-                <span class="relative mb-2 block h-24 w-full overflow-hidden rounded-sm">${listingPhotoMarkup(item, 'h-24 w-full rounded-sm object-cover')}</span>
-                <p class="font-semibold text-sand-900">${escapeHtml(item.name)}</p>
-                <p class="text-xs text-sand-600">${escapeHtml(categoryLabel(item.category))} · ${escapeHtml(item.barangay)}, ${escapeHtml(item.municipality)}</p>
-                <a href="${escapeHtml(item.href)}" class="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary-700 hover:text-primary-900">View Details<i class="ti ti-arrow-right"></i></a>
-            `))
-            .addTo(mapboxMap));
+    wireMapFocusButtons(mapboxMap, markersBySlug, mapCanvas);
 
-        const unplotted = items.length - plotted.length;
-        document.getElementById('explore-map-caption').textContent = unplotted > 0
-            ? `Pins mark ${plotted.length} of ${items.length} filtered listings — ${unplotted} ${unplotted === 1 ? "doesn't" : "don't"} have coordinates yet.`
-            : 'Pins mark every filtered listing — click one for details.';
-
-        if (plotted.length === 1) {
-            mapboxMap.flyTo({ center: [plotted[0].lng, plotted[0].lat], zoom: 13 });
-        } else if (plotted.length > 1) {
-            const bounds = new mapboxgl.LngLatBounds();
-            plotted.forEach((item) => bounds.extend([item.lng, item.lat]));
-            mapboxMap.fitBounds(bounds, { padding: 60, maxZoom: 13 });
-        }
+    if (caption) {
+        caption.textContent = unplotted > 0
+            ? `Pins mark ${places.length} of the ${total} listings on this page — ${unplotted} ${unplotted === 1 ? "doesn't" : "don't"} have a map location yet.`
+            : 'Pins mark the listings on this page — select one for details.';
     }
 
-    function renderIllustrativeMap(items) {
-        const municipalityLabels = municipalities.map((m) => `
-            <div class="absolute flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 text-[10px] font-medium text-sand-500" style="top:${m.top}%; left:${m.left}%;">
-                <span class="h-1.5 w-1.5 rounded-full bg-sand-400"></span>${m.name}
+    if (places.length === 1) {
+        mapboxMap.jumpTo({ center: [places[0].lng, places[0].lat], zoom: 13 });
+    } else if (places.length > 1) {
+        const bounds = new mapboxgl.LngLatBounds();
+        places.forEach((place) => bounds.extend([place.lng, place.lat]));
+        mapboxMap.fitBounds(bounds, { padding: 60, maxZoom: 13, duration: 0 });
+    }
+
+    /**
+     * Not-to-scale province sketch: municipality labels plus one pin per
+     * listing on this page, placed at its municipality.
+     */
+    function renderIllustrativeMap() {
+        const positionOf = (name) => municipalities.find((municipality) => municipality.name === name);
+        const municipalityLabels = municipalities.map((municipality) => `
+            <div class="absolute flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 text-[10px] font-medium text-sand-500" style="top:${municipality.top}%; left:${municipality.left}%;">
+                <span class="h-1.5 w-1.5 rounded-full bg-sand-400"></span>${escapeHtml(municipality.name)}
             </div>
         `).join('');
 
         const seenPerMunicipality = {};
-        const pins = items.map((item) => {
-            const pos = municipalityPosition(item.municipality);
-            if (!pos) return '';
+        const pins = places.map((place) => {
+            const position = positionOf(place.municipality);
+            if (!position) return '';
 
-            const n = seenPerMunicipality[item.municipality] ?? 0;
-            seenPerMunicipality[item.municipality] = n + 1;
-            const jitterTop = pos.top + (n % 3) * 2.2 - 2.2;
-            const jitterLeft = pos.left + Math.floor(n / 3) * 2.5;
+            const seen = seenPerMunicipality[place.municipality] ?? 0;
+            seenPerMunicipality[place.municipality] = seen + 1;
+            const jitterTop = position.top + (seen % 3) * 2.2 - 2.2;
+            const jitterLeft = position.left + Math.floor(seen / 3) * 2.5;
 
             return `
-                <div class="absolute -translate-x-1/2 -translate-y-full text-primary-700 drop-shadow" style="top:${jitterTop}%; left:${jitterLeft}%;" title="${item.name} — ${categoryLabel(item.category)}">
-                    <i class="ti ti-map-pin text-2xl"></i>
-                </div>
+                <a href="${escapeHtml(place.href)}" class="absolute -translate-x-1/2 -translate-y-full drop-shadow" style="top:${jitterTop}%; left:${jitterLeft}%; color:${MAP_MARKER_COLORS[place.kind] ?? MAP_MARKER_COLORS.establishment};" title="${escapeHtml(place.name)} — ${escapeHtml(place.categoryLabel)}" aria-label="${escapeHtml(place.name)}">
+                    <i class="ti ti-map-pin text-2xl" aria-hidden="true"></i>
+                </a>
             `;
         }).join('');
 
         mapCanvas.innerHTML = municipalityLabels + pins;
-    }
 
-    render();
+        if (caption) {
+            caption.textContent = 'Illustrative province map — not to scale. Pins mark the municipality of each listing on this page.';
+        }
+    }
 }
 
 /**
- * Landing page "Find Places Near You" section (resources/views/components/
- * near-you-section.blade.php): a live Mapbox GL map plotting every active,
- * geocoded destination/establishment, plus a geolocation-driven button that
- * flies to the visitor's position and highlights the nearest place.
+ * Destination detail map (resources/views/listing-detail.blade.php): the
+ * destination at its stored coordinates plus the nearby listings the
+ * server already found (App\Services\NearbySearchService), each with its
+ * server-calculated distance label. Rendered only when the destination has
+ * a valid location; shows the "Map can't be displayed" message when Mapbox
+ * is unavailable or fails. The nearby list below always works without it.
+ */
+function initListingDetailMap() {
+    const mapContainer = document.getElementById('listing-map');
+    const dataEl = document.getElementById('listing-map-data');
+
+    if (!mapContainer || !dataEl) {
+        return;
+    }
+
+    const { reference, places } = JSON.parse(dataEl.textContent);
+    const mapboxToken = mapContainer.dataset.mapboxToken;
+
+    if (!window.mapboxgl || !mapboxToken || !mapboxgl.supported()) {
+        console.error('[listing-map] mapbox-gl unavailable, no public token, or no WebGL.');
+        hideMapFocusButtons();
+        showMapFallback(mapContainer);
+        return;
+    }
+
+    let map;
+
+    try {
+        mapboxgl.accessToken = mapboxToken;
+        map = new mapboxgl.Map({
+            container: mapContainer,
+            style: MAP_STYLES.satellite,
+            center: [reference.lng, reference.lat],
+            zoom: 13,
+        });
+    } catch (error) {
+        console.error('[listing-map] mapboxgl.Map() threw:', error);
+        hideMapFocusButtons();
+        showMapFallback(mapContainer);
+        return;
+    }
+
+    map.addControl(new MapStyleToggleControl(), 'top-left');
+    map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+    watchMapLoadFailure(map, mapContainer, '[listing-map]');
+
+    addPlaceMarker(
+        map,
+        reference,
+        MAP_MARKER_COLORS.reference,
+        `<p class="font-semibold text-sand-900">${escapeHtml(reference.name)}</p><p class="text-xs text-sand-600">This destination</p>`,
+        { scale: 1.2, label: `${reference.name} — this destination` },
+    );
+
+    const markersBySlug = new Map();
+
+    places.forEach((place) => {
+        const marker = addPlaceMarker(
+            map,
+            place,
+            MAP_MARKER_COLORS[place.kind] ?? MAP_MARKER_COLORS.establishment,
+            `
+                <p class="font-semibold text-sand-900">${escapeHtml(place.name)}</p>
+                <p class="text-xs text-sand-600">${escapeHtml(place.categoryLabel)} · ${escapeHtml(place.distanceLabel)}</p>
+                <a href="${escapeHtml(place.href)}" class="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary-700 hover:text-primary-900">View Details<i class="ti ti-arrow-right"></i></a>
+            `,
+            { label: `${place.name} — ${place.categoryLabel}, ${place.distanceLabel}` },
+        );
+        marker.getElement().addEventListener('click', () => highlightMapItem(place.slug));
+        markersBySlug.set(place.slug, marker);
+    });
+
+    wireMapFocusButtons(map, markersBySlug, mapContainer);
+
+    if (places.length > 0) {
+        const bounds = new mapboxgl.LngLatBounds([reference.lng, reference.lat], [reference.lng, reference.lat]);
+        places.forEach((place) => bounds.extend([place.lng, place.lat]));
+        map.fitBounds(bounds, { padding: 50, maxZoom: 15, duration: 0 });
+    }
+}
+
+/**
+ * The public Nearby page (resources/views/nearby.blade.php): a Mapbox map and
+ * a list of the province's public places. Which places are nearest, and how
+ * far they are, comes only from the server (POST /find-near-me ->
+ * NearbySearchService, reached through requestNearbyPlaces()); this page
+ * calculates no distance. Without a chosen location it shows every public
+ * place, filtered by category for display only. The chosen location (device
+ * position or a searched place) lives in this function's memory only — it is
+ * never stored — and "Clear location" drops it. Mapbox order is [lng, lat].
  */
 function initNearbyMap() {
+    const page = document.getElementById('nearby-page');
     const container = document.getElementById('nearby-map');
     const dataEl = document.getElementById('nearby-map-data');
-    const button = document.getElementById('find-near-you-button');
-    const statusText = document.getElementById('nearby-map-status-text');
 
-    if (!container || !dataEl) {
-        return;
-    }
-
-    const token = container.dataset.mapboxToken;
-    if (!window.mapboxgl || !token) {
-        if (statusText) statusText.textContent = 'Map is currently unavailable';
-        console.error('[nearby-map] mapbox-gl failed to load, or no Mapbox token was configured.');
-        return;
-    }
-
-    if (!mapboxgl.supported()) {
-        if (statusText) statusText.textContent = "Your browser doesn't support this map (WebGL required)";
-        console.error('[nearby-map] mapboxgl.supported() returned false — no WebGL in this browser.');
+    if (!page || !container || !dataEl) {
         return;
     }
 
     const places = JSON.parse(dataEl.textContent);
-    const centerLat = Number(container.dataset.mapboxCenterLat);
-    const centerLng = Number(container.dataset.mapboxCenterLng);
+    const placesBySlug = new Map(places.map((place) => [place.slug, place]));
+    const endpoint = page.dataset.endpoint;
+    const mapboxToken = container.dataset.mapboxToken;
 
-    mapboxgl.accessToken = token;
+    const searchForm = document.getElementById('nearby-search-form');
+    const searchInput = document.getElementById('nearby-search');
+    const searchSubmit = document.getElementById('nearby-search-submit');
+    const useLocationButton = document.getElementById('nearby-use-location');
+    const useLocationLabel = document.getElementById('nearby-use-location-label');
+    const clearButton = document.getElementById('nearby-clear-location');
+    const radiusSelect = document.getElementById('nearby-radius');
+    const statusEl = document.getElementById('nearby-status');
+    const noticeEl = document.getElementById('nearby-notice');
+    const listEl = document.getElementById('nearby-list');
+    const distanceNote = document.getElementById('nearby-distance-note');
+    const categoryButtons = Array.from(page.querySelectorAll('[data-nearby-category]'));
+    const viewButtons = Array.from(page.querySelectorAll('[data-nearby-view]'));
+    const panels = Array.from(page.querySelectorAll('[data-nearby-panel]'));
 
-    let map;
-    try {
-        map = new mapboxgl.Map({
-            container,
-            style: MAP_STYLES.satellite,
-            center: [centerLng, centerLat],
-            zoom: 8.4,
-        });
-        map.addControl(new MapStyleToggleControl(), 'top-left');
-    } catch (error) {
-        if (statusText) statusText.textContent = 'Map failed to start — see console for details';
-        console.error('[nearby-map] mapboxgl.Map() threw:', error);
-        return;
+    const state = {
+        origin: null, // { lat, lng, label } — in memory only
+        category: '',
+        results: [],
+        total: 0,
+        page: 1,
+        lastPage: 1,
+        error: null,
+        isLoading: false,
+        selected: null,
+        requestId: 0,
+    };
+
+    const attr = (value) => escapeHtml(value).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    const isDesktop = () => window.matchMedia('(min-width: 1024px)').matches;
+
+    // ---- Map -------------------------------------------------------------
+
+    let map = null;
+    const markers = new Map();
+    let originMarker = null;
+
+    if (window.mapboxgl && mapboxToken && mapboxgl.supported()) {
+        try {
+            mapboxgl.accessToken = mapboxToken;
+            map = new mapboxgl.Map({
+                container,
+                style: MAP_STYLES.satellite,
+                center: [Number(container.dataset.mapboxCenterLng), Number(container.dataset.mapboxCenterLat)],
+                zoom: 8.4,
+            });
+            map.addControl(new MapStyleToggleControl(), 'top-left');
+            map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+            watchMapLoadFailure(map, container, '[nearby-map]');
+            map.on('load', () => map.resize());
+        } catch (error) {
+            console.error('[nearby-map] mapboxgl.Map() threw:', error);
+            map = null;
+            showMapFallback(container);
+        }
+    } else {
+        console.error('[nearby-map] mapbox-gl unavailable, no public Mapbox token, or no WebGL.');
+        showMapFallback(container);
     }
 
-    map.on('error', (event) => {
-        console.error('[nearby-map] map error:', event?.error ?? event);
-        if (statusText) statusText.textContent = 'Map failed to load tiles — check your connection';
-    });
+    // ---- What is shown ---------------------------------------------------
 
-    map.on('load', () => {
-        map.resize();
-    });
+    /**
+     * The list items for the current state: the server's nearest results
+     * (enriched with the page's public fields) once a location is chosen,
+     * otherwise every public place in the chosen category.
+     */
+    function currentItems() {
+        if (state.origin) {
+            return state.results.map((result) => {
+                const base = placesBySlug.get(result.slug);
 
-    map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+                return {
+                    slug: result.slug,
+                    name: result.name,
+                    kind: result.type,
+                    categoryLabel: result.subtype || result.category,
+                    address: [result.barangay, result.municipality].filter(Boolean).join(', '),
+                    lat: result.latitude,
+                    lng: result.longitude,
+                    hours: base?.hours ?? null,
+                    href: result.url,
+                    directionsUrl: base?.directionsUrl ?? null,
+                    distanceLabel: result.distanceLabel,
+                };
+            });
+        }
 
-    const placeMarkers = places.map((place) => {
-        const marker = new mapboxgl.Marker({ color: '#125d5a' })
-            .setLngLat([place.lng, place.lat])
-            .setPopup(new mapboxgl.Popup({ offset: 24 }).setHTML(`
-                <p class="font-semibold text-sand-900">${escapeHtml(place.name)}</p>
-                <p class="text-xs text-sand-600">${escapeHtml(place.categoryLabel)} · ${escapeHtml(place.barangay)}, ${escapeHtml(place.municipality)}</p>
-            `))
-            .addTo(map);
+        return places
+            .filter((place) => state.category === '' || place.category === state.category)
+            .sort((first, second) => first.name.localeCompare(second.name))
+            .map((place) => ({
+                slug: place.slug,
+                name: place.name,
+                kind: place.kind,
+                categoryLabel: place.categoryLabel,
+                address: [place.barangay, place.municipality].filter(Boolean).join(', '),
+                lat: place.lat,
+                lng: place.lng,
+                hours: place.hours,
+                href: place.href,
+                directionsUrl: place.directionsUrl,
+                distanceLabel: null,
+            }));
+    }
 
-        return { place, marker };
-    });
+    function render() {
+        const items = state.error ? [] : currentItems();
 
-    let userMarker = null;
+        renderList(items);
+        renderMarkers(items);
+        renderStatus(items);
 
-    button?.addEventListener('click', () => {
-        if (!navigator.geolocation) {
-            if (statusText) statusText.textContent = "Your browser doesn't support geolocation";
+        clearButton.hidden = !state.origin;
+        distanceNote.hidden = !state.origin || items.length === 0;
+    }
+
+    function renderList(items) {
+        if (state.isLoading && state.results.length === 0) {
+            listEl.innerHTML = Array.from({ length: 4 }, () => `
+                <li class="animate-pulse rounded-md border border-sand-200 bg-sand-0 p-4" aria-hidden="true">
+                    <div class="h-4 w-2/3 rounded-sm bg-sand-200"></div>
+                    <div class="mt-2 h-3 w-1/3 rounded-sm bg-sand-100"></div>
+                    <div class="mt-4 h-3 w-5/6 rounded-sm bg-sand-100"></div>
+                    <div class="mt-4 flex gap-2"><div class="h-8 w-24 rounded-sm bg-sand-200"></div><div class="h-8 w-24 rounded-sm bg-sand-100"></div></div>
+                </li>
+            `).join('');
+            listEl.setAttribute('aria-busy', 'true');
             return;
         }
 
-        button.disabled = true;
-        const originalLabel = button.innerHTML;
-        button.innerHTML = '<i class="ti ti-loader-2 animate-spin" aria-hidden="true"></i> Locating you…';
+        listEl.removeAttribute('aria-busy');
 
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                const { latitude, longitude } = position.coords;
+        if (state.error) {
+            listEl.innerHTML = `
+                <li class="rounded-md border border-sand-200 bg-sand-0 p-6 text-center">
+                    <i class="ti ti-cloud-off text-3xl text-sand-400" aria-hidden="true"></i>
+                    <p class="mt-2 text-sm font-semibold text-sand-900">${escapeHtml(state.error)}</p>
+                    <button type="button" data-nearby-retry class="mt-3 inline-flex items-center rounded-sm border border-sand-300 bg-sand-0 px-3 py-1.5 text-xs font-semibold text-sand-800 hover:border-primary-300">Try again</button>
+                </li>
+            `;
+            return;
+        }
 
-                if (userMarker) userMarker.remove();
-                userMarker = new mapboxgl.Marker({ color: '#cb6e30' })
-                    .setLngLat([longitude, latitude])
-                    .setPopup(new mapboxgl.Popup({ offset: 24 }).setText('You are here'))
-                    .addTo(map);
+        if (items.length === 0) {
+            const hasWiderRadius = Boolean(state.origin && radiusSelect.options[radiusSelect.selectedIndex + 1]);
 
-                map.flyTo({ center: [longitude, latitude], zoom: 11 });
+            listEl.innerHTML = `
+                <li class="rounded-md border border-sand-200 bg-sand-0 p-6 text-center">
+                    <i class="ti ti-map-search text-3xl text-sand-400" aria-hidden="true"></i>
+                    <p class="mt-2 text-sm font-semibold text-sand-900">${state.origin ? 'No places found near this location' : 'No places found in this category'}</p>
+                    <p class="mt-1 text-xs text-sand-600">Try ${state.origin ? 'a wider distance, ' : ''}another category, or browse the full directory.</p>
+                    <div class="mt-3 flex flex-wrap justify-center gap-2">
+                        ${hasWiderRadius ? '<button type="button" data-nearby-wider class="inline-flex items-center rounded-sm border border-sand-300 bg-sand-0 px-3 py-1.5 text-xs font-semibold text-sand-800 hover:border-primary-300">Search a wider area</button>' : ''}
+                        <a href="${attr(page.dataset.directoryUrl ?? '/explore')}" class="inline-flex items-center rounded-sm border border-sand-300 bg-sand-0 px-3 py-1.5 text-xs font-semibold text-sand-800 hover:border-primary-300">Browse the full directory</a>
+                    </div>
+                </li>
+            `;
+            return;
+        }
 
-                if (placeMarkers.length) {
-                    const nearest = placeMarkers.reduce((closest, entry) => {
-                        const distance = haversineDistanceKm(latitude, longitude, entry.place.lat, entry.place.lng);
-                        return !closest || distance < closest.distance ? { ...entry, distance } : closest;
-                    }, null);
+        listEl.innerHTML = items.map((item) => `
+            <li data-map-item="${attr(item.slug)}" data-nearby-card class="cursor-pointer rounded-md border border-sand-200 bg-sand-0 p-4 shadow-sm transition-colors hover:border-primary-300">
+                <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                        <h2 class="font-display text-sm font-bold text-sand-900">${escapeHtml(item.name)}</h2>
+                        <p class="mt-0.5 text-xs font-semibold text-primary-700">${escapeHtml(item.categoryLabel)}</p>
+                    </div>
+                    ${item.distanceLabel ? `<p class="shrink-0 rounded-sm bg-sand-100 px-2 py-1 text-xs font-semibold text-sand-700">${escapeHtml(item.distanceLabel)}</p>` : ''}
+                </div>
+                ${item.address ? `<p class="mt-2 flex items-start gap-1.5 text-xs text-sand-600"><i class="ti ti-map-pin mt-0.5 shrink-0" aria-hidden="true"></i>${escapeHtml(item.address)}</p>` : ''}
+                ${item.hours ? `<p class="mt-1 flex items-start gap-1.5 text-xs text-sand-600"><i class="ti ti-clock mt-0.5 shrink-0" aria-hidden="true"></i>${escapeHtml(item.hours)}</p>` : ''}
+                <div class="mt-3 flex flex-wrap gap-2">
+                    ${placesBySlug.has(item.slug)
+                        ? `<button type="button" data-listing-details="${attr(item.slug)}" class="inline-flex items-center gap-1 rounded-sm bg-primary-700 px-3 py-1.5 text-xs font-semibold text-sand-0 hover:bg-primary-900">View Details</button>`
+                        : `<a href="${attr(item.href)}" class="inline-flex items-center gap-1 rounded-sm bg-primary-700 px-3 py-1.5 text-xs font-semibold text-sand-0 hover:bg-primary-900">View Details</a>`}
+                    ${item.directionsUrl ? `<a href="${attr(item.directionsUrl)}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 rounded-sm border border-sand-300 bg-sand-0 px-3 py-1.5 text-xs font-semibold text-sand-800 hover:border-primary-300"><i class="ti ti-directions" aria-hidden="true"></i>Directions</a>` : ''}
+                </div>
+            </li>
+        `).join('') + (state.origin && state.page < state.lastPage
+            ? `<li class="text-center"><button type="button" data-nearby-more class="inline-flex items-center rounded-sm border border-sand-300 bg-sand-0 px-4 py-2 text-sm font-semibold text-sand-800 hover:border-primary-300 disabled:opacity-70">Show more places</button></li>`
+            : '');
 
-                    nearest.marker.togglePopup();
-                    if (statusText) {
-                        statusText.textContent = `Nearest to you: ${nearest.place.name} (${nearest.distance.toFixed(1)} km away)`;
-                    }
-                } else if (statusText) {
-                    statusText.textContent = "You're on the map — no nearby listings to compare yet";
-                }
+        paintSelection();
+    }
 
-                button.disabled = false;
-                button.innerHTML = originalLabel;
-            },
-            () => {
-                if (statusText) statusText.textContent = "Couldn't get your location — check your browser's location permission";
-                button.disabled = false;
-                button.innerHTML = originalLabel;
-            },
-            { enableHighAccuracy: true, timeout: 10000 }
-        );
+    function renderStatus(items) {
+        if (state.isLoading) {
+            statusEl.textContent = state.origin ? 'Looking for places near this location…' : 'Loading places…';
+            return;
+        }
+
+        if (state.error) {
+            statusEl.textContent = '';
+            return;
+        }
+
+        if (!state.origin) {
+            statusEl.textContent = `Showing ${items.length} ${items.length === 1 ? 'place' : 'places'} across Davao Oriental. Search a location or use yours to see the closest.`;
+            return;
+        }
+
+        if (items.length === 0) {
+            statusEl.textContent = '';
+            return;
+        }
+
+        const shown = items.length < state.total
+            ? `Showing the nearest ${items.length} of ${state.total}`
+            : `${state.total} ${state.total === 1 ? 'place' : 'places'}`;
+        statusEl.textContent = `${shown} within ${radiusSelect.value} km of ${state.origin.label}, nearest first.`;
+    }
+
+    function renderMarkers(items) {
+        if (!map) {
+            return;
+        }
+
+        markers.forEach((marker) => marker.remove());
+        markers.clear();
+        originMarker?.remove();
+        originMarker = null;
+
+        items.forEach((item) => {
+            const marker = addPlaceMarker(
+                map,
+                item,
+                MAP_MARKER_COLORS[item.kind] ?? MAP_MARKER_COLORS.establishment,
+                `
+                    <p class="font-semibold text-sand-900">${escapeHtml(item.name)}</p>
+                    <p class="text-xs text-sand-600">${escapeHtml(item.categoryLabel)}${item.distanceLabel ? ` · ${escapeHtml(item.distanceLabel)}` : ''}</p>
+                `,
+                { label: `${item.name} — ${item.categoryLabel}${item.distanceLabel ? `, ${item.distanceLabel}` : ''}` },
+            );
+            marker.getElement().addEventListener('click', () => selectPlace(item.slug, { fromMap: true }));
+            markers.set(item.slug, marker);
+        });
+
+        if (state.origin) {
+            originMarker = addPlaceMarker(
+                map,
+                { name: state.origin.label, lat: state.origin.lat, lng: state.origin.lng },
+                MAP_MARKER_COLORS.reference,
+                `<p class="font-semibold text-sand-900">${escapeHtml(state.origin.label)}</p>`,
+                { scale: 1.1, label: `Search location: ${state.origin.label}` },
+            );
+        }
+
+        const bounds = new mapboxgl.LngLatBounds();
+        let hasPoints = false;
+
+        if (state.origin) {
+            bounds.extend([state.origin.lng, state.origin.lat]);
+            hasPoints = true;
+        }
+
+        items.forEach((item) => {
+            bounds.extend([item.lng, item.lat]);
+            hasPoints = true;
+        });
+
+        if (hasPoints) {
+            map.fitBounds(bounds, { padding: 50, maxZoom: state.origin ? 14 : 12, duration: 0 });
+        }
+    }
+
+    // ---- Selection: marker <-> card --------------------------------------
+
+    function paintSelection() {
+        listEl.querySelectorAll('[data-nearby-card]').forEach((card) => {
+            const isSelected = card.dataset.mapItem === state.selected;
+
+            card.classList.toggle('bg-primary-100', isSelected);
+            card.classList.toggle('border-primary-700', isSelected);
+            card.classList.toggle('ring-1', isSelected);
+            card.classList.toggle('ring-primary-700', isSelected);
+        });
+    }
+
+    /**
+     * Highlights the card of a place. From the map it scrolls the card into
+     * view; from the list it moves the map to the marker and opens its popup.
+     */
+    function selectPlace(slug, { fromMap = false } = {}) {
+        state.selected = slug;
+        paintSelection();
+
+        const card = Array.from(listEl.querySelectorAll('[data-nearby-card]')).find((element) => element.dataset.mapItem === slug);
+
+        if (fromMap) {
+            card?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            return;
+        }
+
+        const marker = markers.get(slug);
+
+        if (!map || !marker) {
+            return;
+        }
+
+        if (!isDesktop()) {
+            setView('map');
+        }
+
+        map.easeTo({ center: marker.getLngLat(), zoom: Math.max(map.getZoom(), 14) });
+
+        if (!marker.getPopup().isOpen()) {
+            marker.togglePopup();
+        }
+    }
+
+    function setView(view) {
+        viewButtons.forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.nearbyView === view)));
+        panels.forEach((panel) => panel.classList.toggle('hidden', panel.dataset.nearbyPanel !== view));
+
+        if (view === 'map') {
+            map?.resize();
+        }
+    }
+
+    // ---- Location and server search --------------------------------------
+
+    function showNotice(message) {
+        noticeEl.textContent = message ?? '';
+        noticeEl.hidden = !message;
+    }
+
+    function setBusy(isBusy, label = 'Use my location') {
+        useLocationButton.disabled = isBusy;
+        searchSubmit.disabled = isBusy;
+        useLocationLabel.textContent = label;
+    }
+
+    /**
+     * Sets the search location and asks the server for its nearest places.
+     */
+    function chooseLocation(lat, lng, label) {
+        state.origin = { lat, lng, label };
+        showNotice('');
+        fetchResults(1);
+    }
+
+    async function fetchResults(pageNumber) {
+        const requestId = ++state.requestId;
+        const isAppend = pageNumber > 1;
+
+        state.isLoading = !isAppend;
+        state.error = null;
+
+        if (!isAppend) {
+            state.results = [];
+        }
+
+        render();
+
+        try {
+            const data = await requestNearbyPlaces(endpoint, {
+                latitude: state.origin.lat,
+                longitude: state.origin.lng,
+                radius: Number(radiusSelect.value),
+                category: state.category || null,
+                page: pageNumber,
+            });
+
+            if (requestId !== state.requestId) return;
+
+            state.results = isAppend ? [...state.results, ...data.results] : data.results;
+            state.total = data.total;
+            state.page = data.page;
+            state.lastPage = data.lastPage;
+        } catch (error) {
+            if (requestId !== state.requestId) return;
+
+            state.error = error.message;
+        }
+
+        state.isLoading = false;
+        render();
+    }
+
+    async function useDeviceLocation() {
+        showNotice('');
+        setBusy(true, 'Locating…');
+
+        try {
+            const { latitude, longitude } = await requestCurrentPosition();
+
+            // Rounded for display only, like the Find Near Me panel; the server rounds the search itself.
+            chooseLocation(Number(latitude.toFixed(4)), Number(longitude.toFixed(4)), 'your location');
+        } catch (error) {
+            showNotice(error.message);
+        }
+
+        setBusy(false);
+    }
+
+    /**
+     * Looks a typed place up through the Mapbox Geocoding API, limited to
+     * Davao Oriental. Only the typed text goes to Mapbox — never a visitor
+     * position.
+     */
+    async function searchPlace(query) {
+        if (!mapboxToken) {
+            showNotice("Place search isn't available right now. You can still use your location or pick a category.");
+            return;
+        }
+
+        showNotice('');
+        setBusy(true, 'Use my location');
+
+        try {
+            const params = new URLSearchParams({
+                q: query,
+                bbox: page.dataset.geocodeBounds,
+                country: 'ph',
+                limit: '1',
+                access_token: mapboxToken,
+            });
+            const response = await fetch(`https://api.mapbox.com/search/geocode/v6/forward?${params}`);
+
+            if (!response.ok) {
+                throw new Error('geocoding failed');
+            }
+
+            const feature = (await response.json()).features?.[0];
+
+            if (!feature) {
+                showNotice(`We couldn't find "${query}" in Davao Oriental. Try a town, barangay, or landmark name.`);
+            } else {
+                const [lng, lat] = feature.geometry.coordinates;
+
+                chooseLocation(lat, lng, feature.properties?.name ?? query);
+            }
+        } catch (error) {
+            console.error('[nearby-map] place search failed:', error);
+            showNotice("Place search isn't available right now. Please try again, or use your location.");
+        }
+
+        setBusy(false);
+    }
+
+    // ---- Wiring ----------------------------------------------------------
+
+    searchForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+
+        const query = searchInput.value.trim();
+
+        if (query === '') {
+            showNotice('Type a town, barangay, or landmark to search.');
+            return;
+        }
+
+        searchPlace(query);
     });
+
+    useLocationButton.addEventListener('click', useDeviceLocation);
+
+    clearButton.addEventListener('click', () => {
+        state.requestId++;
+        state.origin = null;
+        state.results = [];
+        state.error = null;
+        state.isLoading = false;
+        state.selected = null;
+        searchInput.value = '';
+        showNotice('');
+        render();
+    });
+
+    categoryButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+            state.category = button.dataset.nearbyCategory;
+            categoryButtons.forEach((other) => other.setAttribute('aria-pressed', String(other === button)));
+            state.selected = null;
+
+            if (state.origin) {
+                fetchResults(1);
+            } else {
+                render();
+            }
+        });
+    });
+
+    radiusSelect.addEventListener('change', () => {
+        if (state.origin) {
+            fetchResults(1);
+        }
+    });
+
+    viewButtons.forEach((button) => button.addEventListener('click', () => setView(button.dataset.nearbyView)));
+
+    listEl.addEventListener('click', (event) => {
+        if (event.target.closest('[data-nearby-retry]')) {
+            fetchResults(1);
+            return;
+        }
+
+        if (event.target.closest('[data-nearby-wider]')) {
+            radiusSelect.selectedIndex += 1;
+            fetchResults(1);
+            return;
+        }
+
+        const moreButton = event.target.closest('[data-nearby-more]');
+
+        if (moreButton) {
+            moreButton.disabled = true;
+            fetchResults(state.page + 1);
+            return;
+        }
+
+        // Buttons and links inside a card do their own thing; the rest of the card selects its place.
+        const card = event.target.closest('[data-nearby-card]');
+
+        if (card && !event.target.closest('a, button')) {
+            selectPlace(card.dataset.mapItem);
+        }
+    });
+
+    setView('map');
+    render();
 }
 
 /**
@@ -764,15 +1168,6 @@ class MapStyleToggleControl {
     onRemove() {
         this.container.remove();
     }
-}
-
-function haversineDistanceKm(lat1, lon1, lat2, lon2) {
-    const toRad = (deg) => (deg * Math.PI) / 180;
-    const R = 6371;
-    const dLat = toRad(lat2 - lat1);
-    const dLon = toRad(lon2 - lon1);
-    const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 function escapeHtml(value) {
@@ -879,33 +1274,55 @@ function initChatbot() {
 
 /**
  * Establishment QR self-registration form (resources/views/lgu/establishmentQR.blade.php).
- * Wires up every +/- counter, keeps the "Total Registration Headcount" readout
- * in sync, and swaps in a success step on submit.
+ * Wires up every +/- counter, keeps the live totals (header, per-group, and
+ * the sticky submit bar) in sync, shows the "where is your group from"
+ * fields only for the parts of the group that exist, and swaps in a
+ * success step on submit.
  *
- * Companion Headcount is a Foreign/Local x Male/Female x Adults/Children/Seniors
+ * The headcount is a Foreign/Local x Male/Female x Adults/Children/Seniors
  * matrix — each cell's data-counter is "<group>-<gender>-<age>" (e.g.
  * "foreign-male-adults"). computeMatrixSums() parses that key on every cell to
  * roll the 12 granular counters back up into the 7 flat totals
  * (male/female/adults/children/seniors/local/foreign) CheckinController
- * already validates and stores — every companion is counted exactly once per
+ * validates and stores — every guest is counted exactly once per
  * dimension, so foreign+local always equals male+female.
+ *
+ * Double submit is blocked by an in-flight flag plus a disabled button;
+ * server validation messages are shown inline above the submit button.
  */
 function initEstablishmentQrForm() {
     const form = document.getElementById('establishment-qr-form');
     if (!form) return;
 
     const counters = Array.from(form.querySelectorAll('[data-counter]'));
-    const totalValue = document.getElementById('qr-total-value');
-    const foreignValue = document.getElementById('qr-foreign-value');
-    const localValue = document.getElementById('qr-local-value');
-    const formStep = document.getElementById('qr-form-step');
-    const successStep = document.getElementById('qr-success-step');
-    const resetButton = document.getElementById('qr-form-reset');
+    const byId = (id) => document.getElementById(id);
+    const totalValue = byId('qr-total-value');
+    const submitTotal = byId('qr-submit-total');
+    const foreignValue = byId('qr-foreign-value');
+    const localValue = byId('qr-local-value');
+    const formStep = byId('qr-form-step');
+    const successStep = byId('qr-success-step');
+    const successSummary = byId('qr-success-summary');
+    const resetButton = byId('qr-form-reset');
+    const submitButton = byId('qr-submit');
+    const errorBox = byId('qr-form-error');
+
+    const originCard = byId('qr-origin-card');
+    const localOriginWrap = byId('qr-local-origin-wrap');
+    const municipalityWrap = byId('qr-local-origin-municipality-wrap');
+    const municipalitySelect = byId('qr-local-origin-municipality');
+    const provinceWrap = byId('qr-local-origin-place-wrap');
+    const provinceInput = byId('qr-local-origin-place');
+    const foreignCountryWrap = byId('qr-foreign-country-wrap');
+    const foreignCountry = byId('qr-foreign-country');
+
+    let isSubmitting = false;
 
     const readValue = (counter) => Number(counter.querySelector('[data-counter-value]').textContent) || 0;
     const writeValue = (counter, value) => {
         counter.querySelector('[data-counter-value]').textContent = String(Math.max(0, value));
     };
+    const checkedValue = (name) => form.querySelector(`input[name="${name}"]:checked`)?.value ?? '';
 
     function computeMatrixSums() {
         const sums = { male: 0, female: 0, adults: 0, children: 0, seniors: 0, local: 0, foreign: 0 };
@@ -919,23 +1336,73 @@ function initEstablishmentQrForm() {
         return sums;
     }
 
-    const localOriginScope = document.getElementById('qr-local-origin-scope');
-    const localOriginPlace = document.getElementById('qr-local-origin-place');
-    const foreignCountry = document.getElementById('qr-foreign-country');
+    function showError(message) {
+        if (!errorBox) {
+            return;
+        }
+        errorBox.textContent = message;
+        errorBox.classList.toggle('hidden', !message);
+    }
+
+    function setSubmitting(submitting) {
+        isSubmitting = submitting;
+        if (!submitButton) {
+            return;
+        }
+        submitButton.disabled = submitting;
+        submitButton.querySelector('[data-submit-label]').textContent = submitting ? 'Submitting…' : 'Submit Registration';
+        submitButton.querySelector('[data-submit-icon]').className = submitting
+            ? 'ti ti-loader-2 animate-spin text-lg'
+            : 'ti ti-clipboard-check text-lg';
+    }
 
     function updateTotal() {
         const sums = computeMatrixSums();
-        const companions = sums.foreign + sums.local;
-        totalValue.textContent = String(companions);
+        const total = sums.foreign + sums.local;
+        const originScope = checkedValue('localOriginScope');
+
+        totalValue.textContent = String(total);
+        if (submitTotal) submitTotal.textContent = String(total);
         foreignValue.textContent = String(sums.foreign);
         localValue.textContent = String(sums.local);
 
-        if (localOriginPlace) {
-            localOriginPlace.disabled = localOriginScope?.value !== 'outside_province';
-        }
+        originCard?.classList.toggle('hidden', total <= 0);
+        localOriginWrap?.classList.toggle('hidden', sums.local <= 0);
+        foreignCountryWrap?.classList.toggle('hidden', sums.foreign <= 0);
+        municipalityWrap?.classList.toggle('hidden', originScope !== 'within_province');
+        provinceWrap?.classList.toggle('hidden', originScope !== 'outside_province');
     }
 
-    localOriginScope?.addEventListener('change', updateTotal);
+    // The place sent depends on the chosen scope: a Davao Oriental
+    // municipality for "within", a province for "outside", nothing otherwise.
+    function localOriginPlace(sums) {
+        if (sums.local <= 0) return null;
+        const originScope = checkedValue('localOriginScope');
+        if (originScope === 'within_province') return municipalitySelect?.value || null;
+        if (originScope === 'outside_province') return provinceInput?.value.trim() || null;
+        return null;
+    }
+
+    // Where the group is from is required: local guests need within/outside
+    // Davao Oriental plus the municipality or home province, and foreign
+    // guests need their home country. Returns the message, or '' when complete.
+    function originMissing(sums) {
+        if (sums.local > 0) {
+            const originScope = checkedValue('localOriginScope');
+            if (!originScope) return 'Please tell us whether your local guests are from within or outside Davao Oriental.';
+            if (!localOriginPlace(sums)) {
+                return originScope === 'within_province'
+                    ? 'Please choose the municipality or city your local guests are from.'
+                    : 'Please enter the home province of your local guests.';
+            }
+        }
+        if (sums.foreign > 0 && !foreignCountry?.value.trim()) {
+            return 'Please enter the home country of your foreign guests.';
+        }
+        return '';
+    }
+
+    form.querySelectorAll('input[name="localOriginScope"]').forEach((radio) => radio.addEventListener('change', updateTotal));
 
     counters.forEach((counter) => {
         counter.querySelector('[data-counter-decrement]').addEventListener('click', () => {
@@ -945,37 +1412,48 @@ function initEstablishmentQrForm() {
         counter.querySelector('[data-counter-increment]').addEventListener('click', () => {
             writeValue(counter, readValue(counter) + 1);
             updateTotal();
+            showError('');
         });
     });
 
     form.addEventListener('submit', async (event) => {
         event.preventDefault();
-        if (!form.reportValidity()) return;
+        if (isSubmitting) return;
+        showError('');
 
         const sums = computeMatrixSums();
         if (sums.male + sums.female < 1) {
-            alert('Add at least one guest to the headcount.');
+            showError('Add at least one guest to the headcount — tap (+) for yourself and everyone with you.');
+            return;
+        }
+        if (!form.reportValidity()) return;
+
+        // Where the group is from is required for every non-empty part of it.
+        const originError = originMissing(sums);
+        if (originError) {
+            showError(originError);
             return;
         }
 
-        const submitButton = form.querySelector('button[type="submit"]');
-        if (submitButton) submitButton.disabled = true;
+        setSubmitting(true);
+        let succeeded = false;
 
         try {
-            // Companion counts live in [data-counter-value] spans, not real
-            // form fields (see resources/views/components/lgu/qr-counter.blade.php),
+            // Counts live in [data-counter-value] spans, not real form
+            // fields (see resources/views/components/lgu/qr-counter.blade.php),
             // so they're read directly rather than via FormData, then rolled
             // up from the 12-cell matrix into the 7 flat fields the backend
             // validates (see computeMatrixSums() above).
+            const originScope = checkedValue('localOriginScope');
             const payload = {
-                visitorName: form.elements.namedItem('visitorName')?.value,
-                visitorContact: form.elements.namedItem('visitorContact')?.value,
+                visitorName: form.elements.namedItem('visitorName')?.value.trim(),
+                visitorContact: form.elements.namedItem('visitorContact')?.value.trim(),
+                visitType: checkedValue('visitType'),
                 website: form.elements.namedItem('website')?.value,
-                visitType: form.querySelector('input[name="visitType"]:checked')?.value ?? 'Daytour',
-                remarks: form.elements.namedItem('remarks')?.value || null,
-                localOriginScope: sums.local > 0 ? (localOriginScope?.value || null) : null,
-                localOriginPlace: sums.local > 0 && localOriginScope?.value === 'outside_province' ? (localOriginPlace?.value || null) : null,
-                foreignCountry: sums.foreign > 0 ? (foreignCountry?.value || null) : null,
+                remarks: form.elements.namedItem('remarks')?.value.trim() || null,
+                localOriginScope: sums.local > 0 ? (originScope || null) : null,
+                localOriginPlace: localOriginPlace(sums),
+                foreignCountry: sums.foreign > 0 ? (foreignCountry?.value.trim() || null) : null,
                 ...sums,
             };
 
@@ -990,29 +1468,42 @@ function initEstablishmentQrForm() {
             });
 
             if (!response.ok) {
-                throw new Error('Request failed');
+                const body = await response.json().catch(() => ({}));
+                const firstError = body.errors ? Object.values(body.errors)[0]?.[0] : null;
+                const message = response.status === 429
+                    ? 'Too many submissions in a short time. Please wait a minute and try again.'
+                    : (firstError || body.message || "Couldn't submit your registration. Please try again.");
+                showError(message);
+                return;
             }
 
+            succeeded = true;
+            const visitLabel = payload.visitType === 'Overnight' ? 'Overnight' : 'Day Tour';
+            const total = sums.local + sums.foreign;
+            if (successSummary) successSummary.textContent = `${total} ${total === 1 ? 'person' : 'people'} · ${visitLabel}`;
             formStep?.classList.add('hidden');
             successStep?.classList.remove('hidden');
             successStep?.classList.add('flex');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         } catch {
-            alert("Couldn't submit your registration — please check your connection and try again.");
+            showError("Couldn't submit your registration — please check your connection and try again.");
         } finally {
-            if (submitButton) submitButton.disabled = false;
+            // After a success the button stays disabled until "Register
+            // Another Group", so a second tap can't save the group twice.
+            if (!succeeded) setSubmitting(false);
         }
     });
 
     resetButton?.addEventListener('click', () => {
         form.reset();
         counters.forEach((counter) => writeValue(counter, 0));
-        if (localOriginScope) localOriginScope.value = '';
-        if (localOriginPlace) localOriginPlace.value = '';
-        if (foreignCountry) foreignCountry.value = '';
+        showError('');
+        setSubmitting(false);
         updateTotal();
         successStep?.classList.add('hidden');
         successStep?.classList.remove('flex');
         formStep?.classList.remove('hidden');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     });
 
     updateTotal();
@@ -1083,172 +1574,97 @@ function initListingDetailsModal() {
         });
 
         currentListing = listing;
-        field('directions').hidden = listing.lat === null || listing.lng === null;
+        mapToggle.hidden = listing.lat === null || listing.lng === null;
+        directionsLink.hidden = !listing.directionsUrl;
+        directionsLink.href = listing.directionsUrl ?? '#';
         showPhoto();
 
         modal.showModal();
         document.body.classList.add('overflow-hidden');
     }
 
-    // "Get directions": swaps the hero photo for a Mapbox map, then routes
-    // from the visitor's location (browser geolocation) to the listing with
-    // the Mapbox Directions API. Without a location it shows the destination.
-    const directionsButton = field('directions');
-    const directionsLabel = directionsButton.querySelector('[data-directions-label]');
-    const directionsStatus = field('directions-status');
+    // Location (Objective 3, Phase 6): "View on map" swaps the hero photo
+    // for a Mapbox map of the destination only. "Get directions" is an
+    // external link built on the server (App\Support\DirectionsLink) with
+    // the destination's coordinates only. The visitor's location is never
+    // requested here and never sent to any directions or routing service.
+    const mapToggle = field('map-toggle');
+    const mapToggleLabel = mapToggle.querySelector('[data-map-toggle-label]');
+    const directionsLink = field('directions-link');
+    const mapStatus = field('map-status');
     const mapWrapper = document.getElementById('listing-details-map-wrapper');
     const mapContainer = document.getElementById('listing-details-map');
     const mapboxToken = mapContainer?.dataset.mapboxToken;
-    const emptyRoute = { type: 'FeatureCollection', features: [] };
 
     let currentListing = null;
-    let directionsMap = null;
-    let directionsMapReady = null;
-    let directionsMarkers = [];
-    let directionsRequestId = 0;
-    let currentRoute = emptyRoute;
+    let locationMap = null;
+    let locationMarker = null;
 
-    function setRoute(data) {
-        currentRoute = data;
-        directionsMapReady?.then(() => directionsMap.getSource('route')?.setData(data));
-    }
-
-    function setDirectionsStatus(message, icon = 'ti-info-circle') {
-        directionsStatus.hidden = !message;
-        directionsStatus.innerHTML = message
-            ? `<i class="ti ${icon}" aria-hidden="true"></i><span>${escapeHtml(message)}</span>`
-            : '';
+    function setMapStatus(message) {
+        mapStatus.hidden = !message;
+        mapStatus.textContent = message;
     }
 
     function showPhoto() {
-        directionsRequestId++;
         mapWrapper.hidden = true;
         modal.querySelectorAll('[data-listing-details-photo]').forEach((el) => { el.hidden = false; });
         // Re-applies which of image/placeholder belongs to this listing —
         // the blanket unhide above would otherwise show both.
         applyPhotoVisibility(currentListing);
-        directionsLabel.textContent = 'Get directions';
-        setDirectionsStatus('');
+        mapToggleLabel.textContent = 'View on map';
+        setMapStatus('');
     }
 
-    function showDirections(listing) {
+    function showLocation(listing) {
         if (!window.mapboxgl || !mapboxToken || !mapboxgl.supported()) {
-            setDirectionsStatus('The map is currently unavailable.', 'ti-alert-circle');
+            setMapStatus("Map can't be displayed right now.");
             return;
         }
 
-        const requestId = ++directionsRequestId;
+        // Mapbox/GeoJSON order is [longitude, latitude].
         const destination = [listing.lng, listing.lat];
 
         modal.querySelectorAll('[data-listing-details-photo]').forEach((el) => { el.hidden = true; });
         mapWrapper.hidden = false;
-        directionsLabel.textContent = 'Show photo';
+        mapToggleLabel.textContent = 'Show photo';
 
-        if (!directionsMap) {
-            mapboxgl.accessToken = mapboxToken;
-            directionsMap = new mapboxgl.Map({
-                container: mapContainer,
-                style: MAP_STYLES.satellite,
-                center: destination,
-                zoom: 13,
-            });
-            directionsMap.addControl(new MapStyleToggleControl(), 'top-left');
-            directionsMap.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'bottom-right');
-            directionsMap.on('error', (event) => console.error('[directions-map] map error:', event?.error ?? event));
-
-            // The route layer is dropped on every Satellite/Streets swap, so
-            // it is (re-)added with the current route on each style load.
-            directionsMapReady = new Promise((resolve) => directionsMap.on('style.load', () => {
-                directionsMap.addSource('route', { type: 'geojson', data: currentRoute });
-                directionsMap.addLayer({
-                    id: 'route',
-                    type: 'line',
-                    source: 'route',
-                    layout: { 'line-join': 'round', 'line-cap': 'round' },
-                    paint: { 'line-color': '#1d9bf0', 'line-width': 6, 'line-opacity': 0.9 },
+        if (!locationMap) {
+            try {
+                mapboxgl.accessToken = mapboxToken;
+                locationMap = new mapboxgl.Map({
+                    container: mapContainer,
+                    style: MAP_STYLES.satellite,
+                    center: destination,
+                    zoom: 13,
                 });
-                resolve();
-            }));
-        } else {
-            directionsMap.resize();
-            directionsMap.jumpTo({ center: destination, zoom: 13 });
-        }
-
-        directionsMarkers.forEach((marker) => marker.remove());
-        directionsMarkers = [
-            new mapboxgl.Marker({ color: '#125d5a' })
-                .setLngLat(destination)
-                .setPopup(new mapboxgl.Popup({ offset: 24 }).setText(listing.name))
-                .addTo(directionsMap),
-        ];
-        setRoute(emptyRoute);
-
-        if (!navigator.geolocation) {
-            setDirectionsStatus("Your browser doesn't support location — showing the destination only.", 'ti-alert-circle');
-            return;
-        }
-
-        setDirectionsStatus('Finding your location…', 'ti-loader-2 animate-spin');
-
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                if (requestId !== directionsRequestId) return;
-                routeFrom([position.coords.longitude, position.coords.latitude], destination, requestId);
-            },
-            () => {
-                if (requestId !== directionsRequestId) return;
-                setDirectionsStatus("Couldn't get your location — check your browser's location permission. Showing the destination only.", 'ti-alert-circle');
-            },
-            { enableHighAccuracy: true, timeout: 10000 }
-        );
-    }
-
-    async function routeFrom(origin, destination, requestId) {
-        directionsMarkers.push(
-            new mapboxgl.Marker({ color: '#cb6e30' })
-                .setLngLat(origin)
-                .setPopup(new mapboxgl.Popup({ offset: 24 }).setText('You are here'))
-                .addTo(directionsMap)
-        );
-        setDirectionsStatus('Calculating route…', 'ti-loader-2 animate-spin');
-
-        try {
-            const coordinates = `${origin.join(',')};${destination.join(',')}`;
-            const response = await fetch(`https://api.mapbox.com/directions/v5/mapbox/driving/${coordinates}?geometries=geojson&overview=full&access_token=${encodeURIComponent(mapboxToken)}`);
-            const data = await response.json();
-            await directionsMapReady;
-
-            if (requestId !== directionsRequestId) return;
-
-            const route = data.routes?.[0];
-            const bounds = new mapboxgl.LngLatBounds(origin, origin).extend(destination);
-
-            if (!response.ok || !route) {
-                directionsMap.fitBounds(bounds, { padding: 50, maxZoom: 14 });
-                setDirectionsStatus('No driving route found from your location.', 'ti-alert-circle');
+            } catch (error) {
+                console.error('[listing-details-map] mapboxgl.Map() threw:', error);
+                locationMap = null;
+                showPhoto();
+                setMapStatus("Map can't be displayed right now.");
                 return;
             }
 
-            setRoute({ type: 'Feature', geometry: route.geometry });
-            route.geometry.coordinates.forEach((point) => bounds.extend(point));
-            directionsMap.fitBounds(bounds, { padding: 50, maxZoom: 15 });
-
-            const km = (route.distance / 1000).toFixed(1);
-            const minutes = Math.round(route.duration / 60);
-            const duration = minutes >= 60 ? `${Math.floor(minutes / 60)} hr ${minutes % 60} min` : `${minutes} min`;
-            setDirectionsStatus(`${km} km · about ${duration} by car`, 'ti-car');
-        } catch (error) {
-            if (requestId !== directionsRequestId) return;
-            console.error('[directions-map] directions request failed:', error);
-            setDirectionsStatus("Couldn't load the route — check your connection.", 'ti-alert-circle');
+            locationMap.addControl(new MapStyleToggleControl(), 'top-left');
+            locationMap.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'bottom-right');
+            locationMap.on('error', (event) => console.error('[listing-details-map] map error:', event?.error ?? event));
+        } else {
+            locationMap.resize();
+            locationMap.jumpTo({ center: destination, zoom: 13 });
         }
+
+        locationMarker?.remove();
+        locationMarker = new mapboxgl.Marker({ color: MAP_MARKER_COLORS.destination })
+            .setLngLat(destination)
+            .setPopup(new mapboxgl.Popup({ offset: 24 }).setText(listing.name))
+            .addTo(locationMap);
     }
 
-    directionsButton.addEventListener('click', () => {
+    mapToggle.addEventListener('click', () => {
         if (!currentListing) return;
 
         if (mapWrapper.hidden) {
-            showDirections(currentListing);
+            showLocation(currentListing);
         } else {
             showPhoto();
         }

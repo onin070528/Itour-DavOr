@@ -11,12 +11,13 @@
         description="Log a guest arrival at {{ $establishmentName }}."
     />
 
-    {{-- Fallback for a guest who can't scan the QR — same Local/International x
-         Male/Female x Age-group companion matrix as the public self-checkin form
-         (resources/views/lgu/establishmentQR.blade.php), reactive via Alpine.js
-         (arrivalForm() in resources/js/establishment.js) instead of the old
-         Enter/Review/Submitted wizard, with the totals summary pinned in a
-         sticky right-hand panel while the form scrolls. --}}
+    {{-- Fallback for a guest who can't scan the QR — same visit type,
+         Local/International x Male/Female x Age-group headcount, and origin
+         fields as the public self-checkin form
+         (resources/views/lgu/establishmentQR.blade.php), both validated and
+         saved by App\Services\ArrivalRecorder. Reactive via Alpine.js
+         (arrivalForm() in resources/js/establishment.js), with the totals
+         summary pinned in a sticky right-hand panel while the form scrolls. --}}
     {{-- Js::from(), not @json() — @json() doesn't HTML-attribute-escape its
          output, so an unescaped double quote inside it truncates x-data early. --}}
     <div
@@ -84,92 +85,115 @@
                     </div>
                 </div>
 
-                @foreach ([
-                    ['key' => 'local', 'icon' => 'ti-home', 'label' => 'Local / Domestic Guests'],
-                    ['key' => 'foreign', 'icon' => 'ti-world', 'label' => 'International / Foreign Guests'],
-                ] as $group)
-                    <div class="rounded-md border border-sand-200 bg-sand-0 p-5 shadow-sm">
-                        <p class="flex items-center gap-1.5 text-xs font-semibold tracking-wide text-sand-500 uppercase">
-                            <i class="ti {{ $group['icon'] }} text-sm" aria-hidden="true"></i>
-                            {{ $group['label'] }}
+                {{-- Guest Headcount — the main section: both groups in one
+                     card with the live total in its header. --}}
+                <div class="rounded-md border-2 border-primary-700 bg-sand-0 p-5 shadow-sm">
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <h2 class="font-display text-base font-bold text-sand-900">Guest Headcount</h2>
+                            <p class="mt-0.5 text-xs text-sand-500">Count everyone in the group, including the lead visitor.</p>
+                        </div>
+                        <p class="shrink-0 rounded-md bg-primary-100 px-3 py-1.5 text-center leading-none">
+                            <span class="block font-display text-2xl font-extrabold text-primary-900" x-text="totalPeople"></span>
+                            <span class="text-[10px] font-semibold tracking-wide text-primary-700 uppercase">People</span>
                         </p>
+                    </div>
 
-                        <div class="mt-3 overflow-hidden rounded-sm border border-sand-200">
-                            <div class="grid grid-cols-3 bg-sand-100 text-[10px] font-semibold tracking-wide text-sand-500 uppercase">
-                                <span class="px-3 py-2">Age Group</span>
-                                <span class="border-l border-sand-200 px-2 py-2 text-center">Male</span>
-                                <span class="border-l border-sand-200 px-2 py-2 text-center">Female</span>
-                            </div>
-
-                            <template x-for="row in ageRows" :key="row.key">
-                                <div class="grid grid-cols-3 items-center border-t border-sand-200">
-                                    <div class="px-3 py-2">
-                                        <p class="text-xs font-semibold text-sand-900" x-text="row.label"></p>
-                                    </div>
-                                    <div class="flex justify-center gap-1.5 border-l border-sand-200 py-2">
-                                        <button
-                                            type="button"
-                                            @click="dec('{{ $group['key'] }}', row.key, 'male')"
-                                            class="flex h-7 w-7 items-center justify-center rounded-sm border border-sand-300 bg-sand-0 text-sand-700 transition-colors hover:border-primary-300 hover:text-primary-700"
-                                            :aria-label="'Decrease male ' + row.label"
-                                        >
-                                            <i class="ti ti-minus text-xs" aria-hidden="true"></i>
-                                        </button>
-                                        <span class="flex h-7 min-w-8 items-center justify-center rounded-sm border border-sand-300 bg-sand-0 text-sm font-bold text-sand-900" x-text="guests['{{ $group['key'] }}'][row.key].male"></span>
-                                        <button
-                                            type="button"
-                                            @click="inc('{{ $group['key'] }}', row.key, 'male')"
-                                            class="flex h-7 w-7 items-center justify-center rounded-sm border border-sand-300 bg-sand-0 text-sand-700 transition-colors hover:border-primary-300 hover:text-primary-700"
-                                            :aria-label="'Increase male ' + row.label"
-                                        >
-                                            <i class="ti ti-plus text-xs" aria-hidden="true"></i>
-                                        </button>
-                                    </div>
-                                    <div class="flex justify-center gap-1.5 border-l border-sand-200 py-2">
-                                        <button
-                                            type="button"
-                                            @click="dec('{{ $group['key'] }}', row.key, 'female')"
-                                            class="flex h-7 w-7 items-center justify-center rounded-sm border border-sand-300 bg-sand-0 text-sand-700 transition-colors hover:border-primary-300 hover:text-primary-700"
-                                            :aria-label="'Decrease female ' + row.label"
-                                        >
-                                            <i class="ti ti-minus text-xs" aria-hidden="true"></i>
-                                        </button>
-                                        <span class="flex h-7 min-w-8 items-center justify-center rounded-sm border border-sand-300 bg-sand-0 text-sm font-bold text-sand-900" x-text="guests['{{ $group['key'] }}'][row.key].female"></span>
-                                        <button
-                                            type="button"
-                                            @click="inc('{{ $group['key'] }}', row.key, 'female')"
-                                            class="flex h-7 w-7 items-center justify-center rounded-sm border border-sand-300 bg-sand-0 text-sand-700 transition-colors hover:border-primary-300 hover:text-primary-700"
-                                            :aria-label="'Increase female ' + row.label"
-                                        >
-                                            <i class="ti ti-plus text-xs" aria-hidden="true"></i>
-                                        </button>
-                                    </div>
+                    <div class="mt-4 grid grid-cols-1 gap-5 xl:grid-cols-2">
+                        @foreach ([
+                            ['key' => 'local', 'icon' => 'ti-home', 'label' => 'Local / Domestic', 'total' => 'localTotal'],
+                            ['key' => 'foreign', 'icon' => 'ti-world', 'label' => 'International / Foreign', 'total' => 'foreignTotal'],
+                        ] as $group)
+                            <div>
+                                <div class="flex items-center justify-between">
+                                    <p class="flex items-center gap-1.5 text-sm font-bold text-sand-900">
+                                        <i class="ti {{ $group['icon'] }} text-base text-primary-700" aria-hidden="true"></i>
+                                        {{ $group['label'] }}
+                                    </p>
+                                    <span class="rounded-sm bg-sand-100 px-2 py-0.5 text-xs font-bold text-sand-700" x-text="{{ $group['total'] }}"></span>
                                 </div>
-                            </template>
+
+                                <div class="mt-2 overflow-hidden rounded-sm border border-sand-200">
+                                    <div class="grid grid-cols-3 bg-sand-100 text-[10px] font-semibold tracking-wide text-sand-500 uppercase">
+                                        <span class="px-3 py-2">Age Group</span>
+                                        <span class="border-l border-sand-200 px-2 py-2 text-center">Male</span>
+                                        <span class="border-l border-sand-200 px-2 py-2 text-center">Female</span>
+                                    </div>
+
+                                    <template x-for="row in ageRows" :key="row.key">
+                                        <div class="grid grid-cols-3 items-center border-t border-sand-200">
+                                            <div class="px-3 py-2">
+                                                <p class="text-xs font-semibold text-sand-900" x-text="row.label"></p>
+                                            </div>
+                                            @foreach (['male', 'female'] as $gender)
+                                                <div class="flex justify-center gap-1.5 border-l border-sand-200 py-2">
+                                                    <button
+                                                        type="button"
+                                                        @click="dec('{{ $group['key'] }}', row.key, '{{ $gender }}')"
+                                                        class="flex h-7 w-7 items-center justify-center rounded-sm border border-sand-300 bg-sand-0 text-sand-700 transition-colors hover:border-primary-300 hover:text-primary-700"
+                                                        :aria-label="'Decrease {{ $gender }} ' + row.label + ' · {{ $group['label'] }}'"
+                                                    >
+                                                        <i class="ti ti-minus text-xs" aria-hidden="true"></i>
+                                                    </button>
+                                                    <span class="flex h-7 min-w-8 items-center justify-center rounded-sm border border-sand-300 bg-sand-0 text-sm font-bold text-sand-900" x-text="guests['{{ $group['key'] }}'][row.key].{{ $gender }}"></span>
+                                                    <button
+                                                        type="button"
+                                                        @click="inc('{{ $group['key'] }}', row.key, '{{ $gender }}')"
+                                                        class="flex h-7 w-7 items-center justify-center rounded-sm border border-sand-300 bg-sand-0 text-sand-700 transition-colors hover:border-primary-300 hover:text-primary-700"
+                                                        :aria-label="'Increase {{ $gender }} ' + row.label + ' · {{ $group['label'] }}'"
+                                                    >
+                                                        <i class="ti ti-plus text-xs" aria-hidden="true"></i>
+                                                    </button>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+
+                {{-- Where the group is from — shown once the group has someone in it --}}
+                <div class="rounded-md border border-sand-200 bg-sand-0 p-5 shadow-sm" x-show="totalPeople > 0" x-cloak>
+                    <h2 class="font-display text-sm font-bold text-sand-900">Where is the group from? <span class="text-danger" aria-hidden="true">*</span></h2>
+
+                    <div class="mt-3" x-show="localTotal > 0" x-cloak>
+                        <p class="mb-1.5 text-xs font-semibold text-sand-700">Local / Domestic guests</p>
+                        <div class="flex flex-wrap gap-2" role="radiogroup" aria-label="Where local guests are from">
+                            @foreach ([
+                                ['value' => 'within_province', 'label' => 'Within Davao Oriental'],
+                                ['value' => 'outside_province', 'label' => 'Outside Davao Oriental'],
+                            ] as $scope)
+                                <label class="cursor-pointer">
+                                    <input type="radio" name="staff-local-origin-scope" value="{{ $scope['value'] }}" x-model="localOriginScope" class="peer sr-only">
+                                    <span class="inline-block rounded-full border border-sand-300 px-3 py-1.5 text-xs font-semibold text-sand-700 transition-colors peer-checked:border-primary-700 peer-checked:bg-primary-700 peer-checked:text-sand-0 peer-focus-visible:ring-2 peer-focus-visible:ring-primary-300">{{ $scope['label'] }}</span>
+                                </label>
+                            @endforeach
                         </div>
 
-                        @if ($group['key'] === 'local')
-                            <div class="mt-4 border-t border-dashed border-sand-200 pt-4">
-                                <label for="local-origin-scope" class="mb-1 block text-xs font-semibold text-sand-700">Where are they from? <span class="font-normal text-sand-500">(optional)</span></label>
-                                <select id="local-origin-scope" x-model="localOriginScope" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none">
-                                    <option value="">Prefer not to say</option>
-                                    <option value="within_province">Within Davao Oriental</option>
-                                    <option value="outside_province">Outside Davao Oriental</option>
+                        <div class="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div x-show="localOriginScope === 'within_province'" x-cloak>
+                                <label for="local-origin-municipality" class="mb-1 block text-xs font-semibold text-sand-700">Municipality / City <span class="text-danger" aria-hidden="true">*</span></label>
+                                <select id="local-origin-municipality" x-model="localOriginMunicipality" class="w-full rounded-sm border border-sand-300 bg-sand-0 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none">
+                                    <option value="">Select a municipality or city</option>
+                                    @foreach ($municipalities as $municipality)
+                                        <option value="{{ $municipality }}">{{ $municipality }}</option>
+                                    @endforeach
                                 </select>
-
-                                <div class="mt-3">
-                                    <label for="local-origin-place" class="mb-1 block text-xs font-semibold text-sand-700">Home Province <span class="font-normal text-sand-500">(when outside Davao Oriental)</span></label>
-                                    <input id="local-origin-place" type="text" list="province-options" x-model="localOriginPlace" :disabled="localOriginScope !== 'outside_province'" placeholder="e.g. Davao del Sur" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none">
-                                </div>
                             </div>
-                        @else
-                            <div class="mt-4 border-t border-dashed border-sand-200 pt-4">
-                                <label for="foreign-country" class="mb-1 block text-xs font-semibold text-sand-700">Home Country <span class="font-normal text-sand-500">(optional)</span></label>
-                                <input id="foreign-country" type="text" list="country-options" x-model="foreignCountry" placeholder="e.g. Japan" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none">
+                            <div x-show="localOriginScope === 'outside_province'" x-cloak>
+                                <label for="local-origin-place" class="mb-1 block text-xs font-semibold text-sand-700">Home Province <span class="text-danger" aria-hidden="true">*</span></label>
+                                <input id="local-origin-place" type="text" list="province-options" x-model="localOriginPlace" placeholder="e.g. Davao del Sur" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none">
                             </div>
-                        @endif
+                        </div>
                     </div>
-                @endforeach
+
+                    <div class="mt-4 sm:max-w-sm" x-show="foreignTotal > 0" x-cloak>
+                        <label for="foreign-country" class="mb-1 block text-xs font-semibold text-sand-700">Foreign guests · Home Country <span class="text-danger" aria-hidden="true">*</span></label>
+                        <input id="foreign-country" type="text" list="country-options" x-model="foreignCountry" placeholder="e.g. Japan" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none">
+                    </div>
+                </div>
 
                 <datalist id="province-options">
                     @foreach ($provinces as $province)

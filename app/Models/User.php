@@ -12,7 +12,9 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Enums\UserRole;
+use App\Support\SecurityLogger;
 use Database\Factories\UserFactory;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Attributes\Table;
@@ -22,6 +24,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\Facades\Auth;
 
 /**
  * `mun_id`/`lst_id`/`usr_created_by` stay in #[Fillable] for legitimate
@@ -55,6 +58,54 @@ class User extends Authenticatable
      * Column holding the "remember me" token.
      */
     protected $rememberTokenName = 'usr_remember_token';
+
+    /**
+     * An LGU account's municipality is fixed once assigned — only a
+     * signed-in PTO Administrator may move it (Pto\UsersController). A
+     * non-PTO actor attempting it gets a 403 no matter which code path
+     * tried. Contexts with no signed-in user (seeders, console commands,
+     * queued jobs) are left alone so structural backfills such as
+     * RbacScopeBackfillSeeder keep working.
+     */
+    protected static function booted(): void
+    {
+        static::updating(function (User $objUser) {
+            $blnWasOrIsLgu = $objUser->isLgu() || $objUser->getOriginal('usr_role') === UserRole::Lgu;
+            $blnIsReassigning = $objUser->isDirty('mun_id') && $objUser->getOriginal('mun_id') !== null;
+
+            if (! $blnWasOrIsLgu || ! $blnIsReassigning) {
+                return;
+            }
+
+            $objActor = Auth::user();
+
+            if ($objActor !== null && ! $objActor->isPto()) {
+                throw new AuthorizationException('Only the Provincial Tourism Office can change an LGU account\'s municipality.');
+            }
+        });
+
+        // Summary comment: an establishment account stays linked to exactly
+        // one establishment, in that establishment's municipality. Once
+        // linked, only a signed-in PTO Administrator may move it; contexts
+        // with no signed-in user (seeders, backfills) are left alone.
+        static::updating(function (User $objUser) {
+            $blnIsEstablishmentAccount = $objUser->isEstablishment() || $objUser->getOriginal('usr_role') === UserRole::Establishment;
+            $blnIsRelinking = ($objUser->isDirty('lst_id') && $objUser->getOriginal('lst_id') !== null)
+                || ($objUser->isDirty('mun_id') && $objUser->getOriginal('mun_id') !== null);
+
+            if (! $blnIsEstablishmentAccount || ! $blnIsRelinking) {
+                return;
+            }
+
+            $objActor = Auth::user();
+
+            if ($objActor !== null && ! $objActor->isPto()) {
+                SecurityLogger::accessDenied($objActor, 'establishment_account_relink', User::class, $objUser->getOriginal('mun_id'));
+
+                throw new AuthorizationException('Only the Provincial Tourism Office can move an establishment account.');
+            }
+        });
+    }
 
     /**
      * Get the attributes that should be cast.

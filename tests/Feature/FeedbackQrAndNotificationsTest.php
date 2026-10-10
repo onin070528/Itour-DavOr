@@ -26,15 +26,16 @@ use Illuminate\Support\Facades\Storage;
 // makeEstablishmentListing()/makeEstablishmentUser() and makeLguUser() come from
 // the Rbac test files (shared Pest namespace).
 
-test('each published listing has its own formal feedback form', function () {
+test('each published listing has its own feedback QR that opens the public feedback form for that listing', function () {
     $objListing = makeEstablishmentListing('City of Mati', 'MATI', 'Botanika Resort');
     $objOther = makeEstablishmentListing('City of Mati', 'MATI', 'Other Resort');
 
+    // The QR address redirects to the analytics feedback form with this listing preselected.
     test()->get(route('feedback.form', $objListing->lst_uuid))
+        ->assertRedirect(route('feedback.create', ['listing' => $objListing->lst_slug]));
+    test()->get(route('feedback.create', ['listing' => $objListing->lst_slug]))
         ->assertOk()
-        ->assertSee('Visitor Feedback Form')
-        ->assertSee('Botanika Resort')
-        ->assertDontSee('Other Resort');
+        ->assertSee('Botanika Resort');
 
     expect($objListing->lst_uuid)->not->toBe($objOther->lst_uuid);
 });
@@ -294,12 +295,13 @@ test('the Record Arrival form saves the contact number and remarks and shows eve
         ->assertOk()
         ->assertSee('Contact Number')
         ->assertSee('Remarks')
-        ->assertSee('Where are they from?')
+        ->assertSee('Where is the group from?')
         ->assertSee('Home Country');
 
     test()->actingAs($objUser)->postJson(route('establishment.arrivals.store'), [
         'date' => '2026-10-09', 'visitorName' => 'Juan Dela Cruz', 'visitorContact' => '09171234567',
         'remarks' => 'Birthday group', 'visitType' => 'Daytour', 'male' => 2, 'female' => 1, 'adults' => 3, 'local' => 3,
+        'localOriginScope' => 'outside_province', 'localOriginPlace' => 'Davao del Sur',
     ])->assertOk();
 
     $objArrival = $objListing->arrivals()->sole();
@@ -321,12 +323,13 @@ test('the public QR check-in form has the same fields as the Record Arrival form
         ->assertSee('Date')
         ->assertSee('Contact Number')
         ->assertSee('Remarks')
-        ->assertSee('Where are you from?')
+        ->assertSee('Where is your group from?')
         ->assertSee('Home Country');
 
     test()->postJson(route('checkin.store', $objListing->lst_uuid), [
         'visitorName' => 'Ana Reyes', 'visitorContact' => '09171234567', 'visitType' => 'Overnight',
         'remarks' => 'Honeymoon', 'male' => 1, 'female' => 1, 'adults' => 2, 'local' => 2,
+        'localOriginScope' => 'outside_province', 'localOriginPlace' => 'Davao del Sur',
     ])->assertOk();
 
     $objArrival = $objListing->arrivals()->sole();

@@ -9,6 +9,7 @@
  */
 
 use App\Enums\UserRole;
+use App\Models\Listing;
 use App\Models\Municipality;
 use App\Models\SecurityLog;
 use App\Models\User;
@@ -58,7 +59,9 @@ test('the reset link page renders with the email pre-filled', function () {
     Notification::assertSentTo($user, ResetPassword::class, function (ResetPassword $notification) use ($user) {
         $this->get(route('password.reset', ['token' => $notification->token, 'email' => $user->usr_email]))
             ->assertOk()
-            ->assertSee($user->usr_email);
+            ->assertSee($user->usr_email)
+            ->assertSeeInOrder(['New Password', 'Password requirements:', 'At least 12 characters', 'At least 1 special character', 'Confirm New Password'])
+            ->assertDontSee('at least 8 characters');
 
         return true;
     });
@@ -106,13 +109,19 @@ test('a newly registered establishment account cannot sign in with a default pas
         'mun_id' => $mati->mun_id,
     ]);
 
-    $this->actingAs($lgu)->post(route('lgu.users.store'), [
-        'name' => 'First Login Inn',
-        'category' => 'accommodation',
-        'barangay' => 'Brgy. Dahican',
-        'ownerName' => 'Maria Santos',
-        'contactPhone' => '09170000000',
-        'email' => 'owner@firstlogininn.test',
+    $listing = Listing::query()->create([
+        'lst_slug' => 'first-login-inn',
+        'lst_name' => 'First Login Inn',
+        'lst_category' => 'accommodation',
+        'lst_municipality' => $mati->mun_name,
+        'mun_id' => $mati->mun_id,
+        'lst_barangay' => 'Dahican',
+        'lst_status' => 'DRAFT',
+    ]);
+
+    $this->actingAs($lgu)->post(route('lgu.directory.establishments.switchToOnline', $listing), [
+        'account_name' => 'Maria Santos',
+        'account_email' => 'owner@firstlogininn.test',
     ])->assertSessionHasNoErrors();
     auth()->logout();
 

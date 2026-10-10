@@ -78,7 +78,8 @@ test('LGU security logs include its own account and establishment_owner accounts
     $matiEstablishment = User::factory()->create(['usr_role' => UserRole::Establishment, 'mun_id' => $mati->mun_id]);
     $bagangaLgu = User::factory()->create(['usr_role' => UserRole::Lgu, 'mun_id' => $baganga->mun_id]);
     $bagangaEstablishment = User::factory()->create(['usr_role' => UserRole::Establishment, 'mun_id' => $baganga->mun_id]);
-    $otherMatiLgu = User::factory()->create(['usr_role' => UserRole::Lgu, 'mun_id' => $mati->mun_id]);
+    // Inactive: only one active LGU account per municipality is allowed.
+    $otherMatiLgu = User::factory()->create(['usr_role' => UserRole::Lgu, 'mun_id' => $mati->mun_id, 'usr_status' => 'Inactive']);
 
     $ownLog = SecurityLog::factory()->create(['usr_id' => $matiLgu->usr_id]);
     $ownEstablishmentLog = SecurityLog::factory()->create(['usr_id' => $matiEstablishment->usr_id]);

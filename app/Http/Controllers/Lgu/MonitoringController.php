@@ -11,6 +11,7 @@
 
 namespace App\Http\Controllers\Lgu;
 
+use App\Services\FeedbackAnalyticsService;
 use App\Support\LguMockData;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -34,7 +35,7 @@ class MonitoringController extends LguController
     /**
      * Visitation Statistics: municipality-level trend and establishment comparison.
      */
-    public function statistics(Request $request): View
+    public function statistics(Request $request, FeedbackAnalyticsService $objAnalytics): View
     {
         $municipality = $request->user()->usr_organization_subtitle;
         $arrivals = collect(LguMockData::arrivals($municipality));
@@ -42,7 +43,7 @@ class MonitoringController extends LguController
         return $this->renderLgu($request, 'lgu.monitoring.statistics', 'monitoring.statistics', 'Visitation Statistics', [
             'municipality' => $municipality,
             'arrivalTrend' => LguMockData::arrivalTrend($municipality),
-            'summary' => LguMockData::dashboardSummary($municipality),
+            'summary' => $objAnalytics->withFeedbackCards(LguMockData::dashboardSummary($municipality), $objAnalytics->scopedQuery($request->user())),
             'classificationBreakdown' => $arrivals->groupBy('classification')->map->sum('visitors'),
             'establishmentComparison' => $arrivals->groupBy('establishment')->map->sum('visitors')->sortDesc(),
         ]);

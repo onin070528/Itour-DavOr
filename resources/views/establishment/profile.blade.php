@@ -52,14 +52,21 @@
             </div>
 
             <div data-field>
-                <label class="mb-1 block text-xs font-semibold text-sand-700">Category <span class="text-danger" aria-hidden="true">*</span></label>
-                <select name="category" @disabled($blnIsReadOnly) class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
-                    @foreach ($categories as $c)
-                        @if ($c['slug'] !== 'destinations')
-                            <option value="{{ $c['slug'] }}" @selected($c['slug'] === $listing->lst_category)>{{ $c['label'] }}</option>
-                        @endif
+                <label for="profile-category" class="mb-1 block text-xs font-semibold text-sand-700">Category <span class="text-danger" aria-hidden="true">*</span></label>
+                <select id="profile-category" name="cat_id" @disabled($blnIsReadOnly) class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                    <option value="">Select a category</option>
+                    @foreach ($categories as $category)
+                        <option value="{{ $category->cat_id }}" @selected((string) old('cat_id', $listing->cat_id) === (string) $category->cat_id)>{{ $category->cat_name }}</option>
                     @endforeach
                 </select>
+                @error('cat_id') <p class="mt-1 text-xs text-danger">{{ $message }}</p> @enderror
+            </div>
+
+            {{-- Same Category -> Type list and server-side check as the LGU establishment form (config/establishment_categories.php). --}}
+            <div data-field>
+                <label for="profile-type" class="mb-1 block text-xs font-semibold text-sand-700">Establishment Type <span class="text-danger" aria-hidden="true">*</span></label>
+                <x-dashboard.establishment-type-select id="profile-type" :categories="$categories" :selected="old('type', $listing->lst_type)" :disabled="$blnIsReadOnly" :data-locked="$blnIsReadOnly ? 'true' : null" />
+                @error('type') <p class="mt-1 text-xs text-danger">{{ $message }}</p> @enderror
             </div>
 
             <div data-field>

@@ -96,6 +96,8 @@ class UsersController extends PtoController
 
     public function update(Request $objRequest, User $user): RedirectResponse
     {
+        abort_unless($objRequest->user()->can('update', $user), 403);
+
         $arrData = $this->_validatedForUpdate($objRequest, $user);
 
         $objFromRole = $user->usr_role;
@@ -126,8 +128,8 @@ class UsersController extends PtoController
 
     public function toggleStatus(Request $objRequest, User $user): RedirectResponse
     {
-        // Nobody — including a PTO administrator — can change their own status.
-        abort_if($user->usr_id === $objRequest->user()->usr_id, 403, 'You cannot change the status of your own account.');
+        // UserPolicy::deactivate() also covers "nobody can change their own status".
+        abort_unless($objRequest->user()->can('deactivate', $user), 403);
 
         $strNext = $user->usr_status === 'Active' ? 'Inactive' : 'Active';
 

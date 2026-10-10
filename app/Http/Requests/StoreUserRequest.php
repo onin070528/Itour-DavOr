@@ -13,6 +13,7 @@ namespace App\Http\Requests;
 
 use App\Enums\UserRole;
 use App\Models\Listing;
+use App\Models\User;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -64,6 +65,21 @@ class StoreUserRequest extends FormRequest
     public function withValidator(Validator $objValidator): void
     {
         $objValidator->after(function (Validator $objValidator) {
+            // One active LGU account per municipality (database unique index
+            // users_one_active_lgu_per_municipality_unique): say so up front
+            // instead of failing at insert time.
+            $blnLguMunicipalityTaken = $this->input('role') === UserRole::Lgu->value
+                && $this->input('municipality_id') !== null
+                && User::query()
+                    ->where('usr_role', UserRole::Lgu->value)
+                    ->where('mun_id', $this->input('municipality_id'))
+                    ->where('usr_status', 'Active')
+                    ->exists();
+
+            if ($blnLguMunicipalityTaken) {
+                $objValidator->errors()->add('municipality_id', 'This municipality already has an active LGU account. Deactivate it first, or choose another municipality.');
+            }
+
             if ($this->input('role') !== UserRole::Establishment->value || $this->input('establishment_id') === null) {
                 return;
             }

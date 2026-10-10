@@ -36,7 +36,7 @@ abstract class LguController extends Controller
         return view($strView, array_merge([
             'user' => $objUser,
             'municipality' => $objUser->usr_organization_subtitle,
-            'navSections' => DashboardNavigation::sections($objUser, $strActiveKey, $this->_imageApprovalCount($objUser)),
+            'navSections' => DashboardNavigation::sections($objUser, $strActiveKey, $this->imageApprovalCount($objUser)),
             'pageTitle' => $strPageTitle,
             'accountHeading' => 'System',
             'settingsHref' => route('lgu.settings'),
@@ -50,7 +50,7 @@ abstract class LguController extends Controller
      * mirrored here for the badge count — one card per establishment on
      * the queue page, so the badge counts cards, not photos).
      */
-    private function _imageApprovalCount(User $objUser): int
+    protected function imageApprovalCount(User $objUser): int
     {
         if ($objUser->mun_id === null) {
             return 0;

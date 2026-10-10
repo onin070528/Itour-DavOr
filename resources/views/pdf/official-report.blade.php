@@ -272,14 +272,58 @@
                 display: none;
             }
         }
+
+        /* Small screens: the sheet shrinks to the viewport width instead of
+           clipping; the wide arrivals table scrolls inside its own box. */
+        @media screen and (max-width: 640px) {
+            body {
+                margin: 0;
+                padding: 12px;
+                font-size: 8.5pt;
+            }
+
+            .preview-toolbar {
+                margin: -12px -12px 12px;
+                flex-wrap: wrap;
+            }
+
+            .report-table-wrap {
+                overflow-x: auto;
+            }
+        }
+
+        .details-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 10px;
+            font-size: 9.5pt;
+        }
+
+        .details-table td {
+            border: 1px solid #000;
+            padding: 4px 6px;
+            vertical-align: top;
+        }
+
+        .details-table .meta-label {
+            width: 32%;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
     @if ($preview ?? false)
         <div class="preview-toolbar">
             <button type="button" onclick="window.print()">Print</button>
-            <a href="{{ $pdfUrl }}">Download PDF</a>
-            <a href="{{ $excelUrl }}">Download Excel</a>
+            @isset($backUrl)
+                <a href="{{ $backUrl }}">Back</a>
+            @endisset
+            @isset($pdfUrl)
+                <a href="{{ $pdfUrl }}">Download PDF</a>
+            @endisset
+            @isset($excelUrl)
+                <a href="{{ $excelUrl }}">Download Excel</a>
+            @endisset
         </div>
     @endif
 
@@ -325,12 +369,24 @@
         </tr>
     </table>
 
+    @if (! empty($report['details']))
+        <table class="details-table">
+            @foreach ($report['details'] as $label => $value)
+                <tr>
+                    <td class="meta-label">{{ $label }}</td>
+                    <td>{{ $value }}</td>
+                </tr>
+            @endforeach
+        </table>
+    @endif
+
     @if ($report['supersedes_reference'])
         <div class="revision-note">
             This is revision {{ $report['revision_number'] }} of this report. It supersedes {{ $report['supersedes_reference'] }}, whose own record remains unchanged.
         </div>
     @endif
 
+    <div class="report-table-wrap">
     <table class="report-table">
         <thead>
             <tr>
@@ -393,6 +449,8 @@
             </tr>
         </tbody>
     </table>
+
+    </div>
 
     <div class="remarks-box">
         <div class="remarks-label">Remarks</div>

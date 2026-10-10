@@ -13,6 +13,7 @@ namespace App\Http\Controllers\Pto;
 
 use App\Http\Controllers\Concerns\ExportsAuditLogs;
 use App\Models\Municipality;
+use App\Models\SecurityLog;
 use App\Support\AuditLogQuery;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -24,6 +25,7 @@ class AuditLogsController extends PtoController
 
     public function index(Request $objRequest): View
     {
+        abort_unless($objRequest->user()->can('viewAny', SecurityLog::class), 403);
         $objRequest->validate(['tab' => ['nullable', Rule::in(['security', 'operation'])]]);
         $strTab = $objRequest->query('tab', 'security');
         $arrFilters = AuditLogQuery::validatedFilters($objRequest);

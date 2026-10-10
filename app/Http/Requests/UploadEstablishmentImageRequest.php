@@ -15,6 +15,7 @@ use App\Models\Listing;
 use App\Policies\ImagePolicy;
 use App\Rules\MinimumImageDimensions;
 use App\Rules\RealImageMimeType;
+use App\Support\SecurityLogger;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 
@@ -35,7 +36,15 @@ class UploadEstablishmentImageRequest extends FormRequest
             return false;
         }
 
-        return app(ImagePolicy::class)->uploadFor($this->user(), $objListing);
+        $blnIsAllowed = app(ImagePolicy::class)->uploadFor($this->user(), $objListing);
+
+        // ImagePolicy is called directly (not through the Gate), so a
+        // denial is security-logged explicitly, as Gate::after logs others.
+        if (! $blnIsAllowed) {
+            SecurityLogger::lguPolicyDenied($this->user(), 'uploadFor', $objListing);
+        }
+
+        return $blnIsAllowed;
     }
 
     /**
@@ -43,19 +52,12 @@ class UploadEstablishmentImageRequest extends FormRequest
      */
     public function rules(): array
     {
-        $intMaxFileSizeKb = (int) config('establishment_images.max_file_size_kb');
         $intMinLiveImages = (int) config('establishment_images.min_live_images_per_listing');
 
         return [
             'listing_id' => ['required', 'integer', 'exists:tbl_listings,lst_id'],
             'photos' => ['required', 'array', 'min:'.$intMinLiveImages],
-            'photos.*' => [
-                'required',
-                'file',
-                'max:'.$intMaxFileSizeKb,
-                new RealImageMimeType,
-                new MinimumImageDimensions,
-            ],
+            'photos.*' => self::photoFileRules(),
             'ownership_declared' => ['required', 'accepted'],
             'credit' => ['nullable', 'string', 'max:255'],
         ];
@@ -69,8 +71,42 @@ class UploadEstablishmentImageRequest extends FormRequest
         return [
             'photos.required' => 'Please select at least 1 photo.',
             'photos.min' => 'Please select at least 1 photo.',
+            ...self::photoMessages(),
+        ];
+    }
+
+    /**
+     * The per-file rules for one uploaded photo — real (content-sniffed)
+     * image type, size cap, minimum dimensions. The single definition,
+     * also used by the LGU Add Establishment form's Photos section
+     * (App\Http\Requests\SaveEstablishmentRequest).
+     *
+     * @return array<int, mixed>
+     */
+    public static function photoFileRules(): array
+    {
+        $intMaxFileSizeKb = (int) config('establishment_images.max_file_size_kb');
+
+        return [
+            'required',
+            'file',
+            'max:'.$intMaxFileSizeKb,
+            new RealImageMimeType,
+            new MinimumImageDimensions,
+        ];
+    }
+
+    /**
+     * Messages shared with every form that uses photoFileRules().
+     *
+     * @return array<string, string>
+     */
+    public static function photoMessages(): array
+    {
+        return [
             'photos.*.max' => 'This photo is too large. Please use a file under 5 MB.',
             'ownership_declared.required' => 'Please confirm you have permission to use this photo.',
+            'ownership_declared.required_with' => 'Please confirm you have permission to use this photo.',
             'ownership_declared.accepted' => 'Please confirm you have permission to use this photo.',
         ];
     }

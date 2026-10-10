@@ -8,6 +8,7 @@
  * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
  */
 
+use App\Enums\ReportingMethod;
 use App\Enums\UserRole;
 use App\Models\Category;
 use App\Models\Listing;
@@ -126,6 +127,13 @@ test('feedback and arrival records are limited to the account\'s own establishme
         'lst_id' => $badjaoListing->lst_id,
     ]);
 
+    // Real tourist feedback rows (Objective 4) — one per establishment.
+    foreach ([[$botanikaListing, 'Beautiful sunrise from the room'], [$badjaoListing, 'Lami kaayo ang kinilaw']] as [$objListing, $strText]) {
+        $objListing->feedbacks()->make(['fbk_original_text' => $strText])
+            ->forceFill(['fbk_consent_at' => now(), 'fbk_content_hash' => hash('sha256', $strText)])
+            ->save();
+    }
+
     // Botanika user should see their own feedback and arrivals
     $feedback = test()->actingAs($botanikaUser)->get(route('establishment.feedback.index'));
     $feedback->assertOk();
@@ -174,6 +182,8 @@ test('two establishments with the same display name do not see each other\'s arr
         'lst_barangay' => 'Poblacion',
         'lst_status' => 'PUBLISHED',
     ]);
+
+    $listingA->forceFill(['lst_reporting_mode' => ReportingMethod::OnlineItour])->save();
 
     $listingA->arrivals()->create([
         'arr_source' => 'staff', 'arr_date' => '2026-08-22', 'arr_visitor_name' => 'Guest At A',

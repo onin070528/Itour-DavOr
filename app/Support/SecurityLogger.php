@@ -71,6 +71,39 @@ class SecurityLogger
         self::write($strNewStatus === 'Inactive' ? 'account_suspended' : 'account_reactivated', user: $objActor, targetUser: $objAccount);
     }
 
+    /**
+     * Records a denied authorization attempt without recording request
+     * payloads or other sensitive data.
+     */
+    public static function accessDenied(User $objUser, string $strAbility, ?string $strResource = null, ?int $intTargetMunicipalityId = null): void
+    {
+        self::write('access_denied', user: $objUser, details: array_filter([
+            'ability' => $strAbility,
+            'resource' => $strResource,
+            'target_municipality_id' => $intTargetMunicipalityId,
+        ], static fn (mixed $mixedValue): bool => $mixedValue !== null));
+    }
+
+    /**
+     * A policy check denied for an LGU account — recorded as access_denied
+     * with the ability, the target's class, and the target's municipality.
+     * Other roles are not recorded here. Shared by Gate::after
+     * (AppServiceProvider) and the photo actions that call ImagePolicy
+     * directly (photo upload and reorder), so both log the same way.
+     */
+    public static function lguPolicyDenied(User $objUser, string $strAbility, mixed $mixTarget = null): void
+    {
+        if (! $objUser->isLgu()) {
+            return;
+        }
+
+        $intTargetMunicipalityId = is_object($mixTarget) && isset($mixTarget->mun_id)
+            ? (int) $mixTarget->mun_id
+            : null;
+
+        self::accessDenied($objUser, $strAbility, is_object($mixTarget) ? $mixTarget::class : null, $intTargetMunicipalityId);
+    }
+
     public static function roleChanged(User $objActor, User $objAccount, UserRole $objFromRole, UserRole $objToRole): void
     {
         self::write('role_changed', user: $objActor, targetUser: $objAccount, details: [

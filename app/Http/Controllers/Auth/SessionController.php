@@ -103,6 +103,12 @@ class SessionController extends Controller
             Log::warning('Failed to record the last sign-in time.', ['exception' => $objException, 'usr_id' => $objUser->usr_id]);
         }
 
+        // Temporary password: straight to the change-password page. The
+        // intended URL stays in the session for after the change.
+        if ($objUser->mustChangePassword()) {
+            return redirect()->route('password.change');
+        }
+
         return redirect()->intended(
             $objUser->usr_role ? route($objUser->usr_role->dashboardRouteName()) : route('home')
         );

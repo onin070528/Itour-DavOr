@@ -18,6 +18,7 @@ use App\Rules\MinimumImageDimensions;
 use App\Rules\RealImageMimeType;
 use App\Services\EstablishmentImageManager;
 use App\Services\EstablishmentImageUploader;
+use App\Support\SecurityLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -98,7 +99,13 @@ trait ManagesEstablishmentImages
 
     public function reorderImages(Request $objRequest, Listing $listing, EstablishmentImageManager $objManager): RedirectResponse
     {
-        abort_unless(app(ImagePolicy::class)->manageListing($objRequest->user(), $listing), 403);
+        // ImagePolicy is called directly here (its Listing argument would
+        // resolve to ListingPolicy through the Gate), so a denial is
+        // security-logged explicitly, the same way Gate::after logs others.
+        if (! app(ImagePolicy::class)->manageListing($objRequest->user(), $listing)) {
+            SecurityLogger::lguPolicyDenied($objRequest->user(), 'manageListing', $listing);
+            abort(403);
+        }
 
         $arrData = $objRequest->validate(['order' => ['required', 'array']]);
 

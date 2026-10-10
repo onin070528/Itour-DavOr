@@ -19,7 +19,6 @@
 namespace App\Http\Controllers\Pto;
 
 use App\Exports\OfficialReportExport;
-use App\Models\Listing;
 use App\Models\Municipality;
 use App\Models\MunicipalReport;
 use App\Models\OperationLog;
@@ -103,6 +102,8 @@ class MunicipalReportsController extends PtoController
      */
     public function show(Request $objRequest, MunicipalReport $municipalReport): View
     {
+        abort_unless($objRequest->user()->can('view', $municipalReport), 403);
+
         [$objBreakdown, $objMissingEstablishments] = $this->loadBreakdown($municipalReport);
 
         $objPreviousReport = $municipalReport->mun_id
@@ -150,6 +151,7 @@ class MunicipalReportsController extends PtoController
      */
     public function approve(Request $objRequest, MunicipalReport $municipalReport): RedirectResponse
     {
+        abort_unless($objRequest->user()->can('approve', $municipalReport), 403);
         abort_unless(
             in_array($municipalReport->mrp_status, [MunicipalReport::STATUS_SUBMITTED, MunicipalReport::STATUS_REVIEWED], true),
             403,
@@ -204,6 +206,8 @@ class MunicipalReportsController extends PtoController
      */
     public function officialReport(Request $objRequest, MunicipalReport $municipalReport): View
     {
+        abort_unless($objRequest->user()->can('export', $municipalReport), 403);
+
         $arrData = $municipalReport->isFrozen() && $municipalReport->mrp_frozen_snapshot
             ? $municipalReport->mrp_frozen_snapshot
             : $this->officialReportData($municipalReport);
@@ -220,6 +224,8 @@ class MunicipalReportsController extends PtoController
 
     public function officialReportPdf(Request $objRequest, MunicipalReport $municipalReport): Response
     {
+        abort_unless($objRequest->user()->can('export', $municipalReport), 403);
+
         $arrData = $municipalReport->isFrozen() && $municipalReport->mrp_frozen_snapshot
             ? $municipalReport->mrp_frozen_snapshot
             : $this->officialReportData($municipalReport);
@@ -233,6 +239,8 @@ class MunicipalReportsController extends PtoController
 
     public function officialReportExcel(Request $objRequest, MunicipalReport $municipalReport)
     {
+        abort_unless($objRequest->user()->can('export', $municipalReport), 403);
+
         $arrData = $municipalReport->isFrozen() && $municipalReport->mrp_frozen_snapshot
             ? $municipalReport->mrp_frozen_snapshot
             : $this->officialReportData($municipalReport);
@@ -247,22 +255,7 @@ class MunicipalReportsController extends PtoController
      */
     private function loadBreakdown(MunicipalReport $objMunicipalReport): array
     {
-        $objMunicipalReport->loadMissing(['submitter', 'reviewer', 'monthlyArrivalReports.listing.categoryRecord', 'monthlyArrivalReports.submitter', 'monthlyArrivalReports.verifier']);
-
-        $objBreakdown = $objMunicipalReport->monthlyArrivalReports->filter(
-            fn ($objMonthlyReport) => $objMonthlyReport->listing?->isQrEnabled()
-        )->values();
-
-        $objMissingEstablishments = $objMunicipalReport->mun_id
-            ? Listing::query()
-                ->with('categoryRecord')
-                ->where('mun_id', $objMunicipalReport->mun_id)
-                ->get()
-                ->filter(fn (Listing $objListing) => $objListing->isQrEnabled() && ! $objBreakdown->contains(fn ($r) => $r->lst_id === $objListing->lst_id))
-                ->values()
-            : collect();
-
-        return [$objBreakdown, $objMissingEstablishments];
+        return OfficialReportBuilder::municipalBreakdown($objMunicipalReport);
     }
 
     /**
@@ -270,80 +263,24 @@ class MunicipalReportsController extends PtoController
      */
     private function breakdownToRows(Collection $objBreakdown): Collection
     {
-        return $objBreakdown->map(fn ($objMonthlyReport) => [
-            'establishment' => $objMonthlyReport->listing->lst_name,
-            'category' => $objMonthlyReport->listing->categoryRecord?->cat_name ?? 'Uncategorized',
-            'source' => $objMonthlyReport->mar_submission_source->label(),
-            'male' => (int) $objMonthlyReport->mar_party_male,
-            'female' => (int) $objMonthlyReport->mar_party_female,
-            'total' => (int) $objMonthlyReport->mar_total_visitors,
-            'adults' => (int) $objMonthlyReport->mar_party_adults,
-            'children' => (int) $objMonthlyReport->mar_party_children,
-            'seniors' => (int) $objMonthlyReport->mar_party_seniors,
-            'local' => (int) $objMonthlyReport->mar_party_local,
-            'foreign' => (int) $objMonthlyReport->mar_party_foreign,
-        ]);
+        return OfficialReportBuilder::breakdownRows($objBreakdown);
     }
 
     /**
      * Builds the generic shape resources/views/pdf/official-report.blade.php
-     * renders — see App\Support\OfficialReportBuilder.
+     * renders — shared with the LGU's Municipal Reports views, see
+     * App\Support\OfficialReportBuilder::fromMunicipalReport().
      *
      * @return array<string, mixed>
      */
     private function officialReportData(MunicipalReport $objMunicipalReport): array
     {
-        [$objBreakdown, $objMissingEstablishments] = $this->loadBreakdown($objMunicipalReport);
-        $objRows = $this->breakdownToRows($objBreakdown);
-
-        $intDigitalCount = $objBreakdown->filter(fn ($r) => $r->mar_submission_source->value === 'digital')->count();
-        $intPaperCount = $objBreakdown->count() - $intDigitalCount;
-        $intTotalEstablishments = $objBreakdown->count() + $objMissingEstablishments->count();
-
-        return [
-            'title' => 'LGU Consolidated Tourism Report',
-            'letterhead' => [
-                'office_name' => $objMunicipalReport->mrp_municipality.' Tourism Office',
-                'office_subtitle' => 'Local Government Unit, Province of Davao Oriental',
-                'address' => 'Davao Oriental, Philippines',
-            ],
-            'period_label' => $objMunicipalReport->mrp_period_start->format('F Y'),
-            'reference_number' => sprintf('MRP-%06d', $objMunicipalReport->mrp_id),
-            'status_label' => self::statusLabel($objMunicipalReport->mrp_status),
-            'is_draft' => ! $objMunicipalReport->isFrozen(),
-            'verified_label' => $objMunicipalReport->isFrozen() && $objMunicipalReport->mrp_reviewed_at
-                ? 'Verified on '.$objMunicipalReport->mrp_reviewed_at->format('F j, Y').' by '.($objMunicipalReport->reviewer->usr_name ?? 'PTO Administrator')
-                : null,
-            'revision_number' => $objMunicipalReport->mrp_revision_number,
-            'supersedes_reference' => $objMunicipalReport->mrp_supersedes_id ? sprintf('MRP-%06d', $objMunicipalReport->mrp_supersedes_id) : null,
-            'submission_summary' => "{$objBreakdown->count()} of {$intTotalEstablishments} establishments reported ({$intDigitalCount} digital, {$intPaperCount} paper)",
-            'groups' => OfficialReportBuilder::groupByCategory($objRows),
-            'grand_total' => OfficialReportBuilder::sumRows($objRows),
-            'remarks' => $objMunicipalReport->mrp_remarks,
-            'signatures' => [
-                'prepared_by' => [
-                    'name' => $objMunicipalReport->submitter->usr_name ?? null,
-                    'position' => $objMunicipalReport->submitter?->usr_role?->title(),
-                    'date' => $objMunicipalReport->mrp_created_at->format('M j, Y'),
-                ],
-                'reviewed_by' => [
-                    'name' => $objMunicipalReport->reviewer->usr_name ?? null,
-                    'position' => $objMunicipalReport->reviewer?->usr_role?->title(),
-                    'date' => $objMunicipalReport->mrp_reviewed_at?->format('M j, Y'),
-                ],
-                'approved_by' => [
-                    'name' => $objMunicipalReport->reviewer->usr_name ?? null,
-                    'position' => $objMunicipalReport->reviewer?->usr_role?->title(),
-                    'date' => $objMunicipalReport->mrp_reviewed_at?->format('M j, Y'),
-                ],
-            ],
-            'verification_code' => $objMunicipalReport->mrp_verification_code,
-            'generated_at' => now()->format('M j, Y g:i A'),
-        ];
+        return OfficialReportBuilder::fromMunicipalReport($objMunicipalReport);
     }
 
     public function return(Request $objRequest, MunicipalReport $municipalReport): RedirectResponse
     {
+        abort_unless($objRequest->user()->can('return', $municipalReport), 403);
         abort_if($municipalReport->mrp_status === MunicipalReport::STATUS_APPROVED, 403, 'A verified report cannot be returned — ask the LGU to resubmit instead.');
 
         $arrData = $objRequest->validate([

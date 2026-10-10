@@ -36,6 +36,8 @@ class HotlinesController extends PtoController
 
     public function store(Request $objRequest): RedirectResponse
     {
+        abort_unless($objRequest->user()->can('create', Hotline::class), 403);
+
         $arrData = $this->validatedFields($objRequest);
 
         try {
@@ -57,6 +59,8 @@ class HotlinesController extends PtoController
 
     public function update(Request $objRequest, Hotline $hotline): RedirectResponse
     {
+        abort_unless($objRequest->user()->can('update', $hotline), 403);
+
         $arrData = $this->validatedFields($objRequest);
         $arrBefore = $hotline->getOriginal();
 
@@ -79,6 +83,8 @@ class HotlinesController extends PtoController
      */
     public function deactivate(Request $objRequest, Hotline $hotline): RedirectResponse
     {
+        abort_unless($objRequest->user()->can('deactivate', $hotline), 403);
+
         $arrBefore = $hotline->getOriginal();
 
         try {
@@ -100,6 +106,8 @@ class HotlinesController extends PtoController
      */
     public function reorder(Request $objRequest, Hotline $hotline): RedirectResponse
     {
+        abort_unless($objRequest->user()->can('reorder', $hotline), 403);
+
         $arrData = $objRequest->validate([
             'direction' => ['required', Rule::in(['up', 'down'])],
         ]);

@@ -3,11 +3,12 @@
 /**
  * iTOUR — Davao Oriental Tourism Information System
  *
- * Purpose: LGU-only establishment registration and account management —
- * register an establishment (listing + its login account) and edit/deactivate
- * Establishment accounts within the LGU's own municipality. LGU cannot
- * create LGU or PTO accounts (see Pto\UsersController for that side of
- * the account-creation chain: PTO creates LGU accounts).
+ * Purpose: LGU-only Establishment Accounts page — list, edit (account fields
+ * only), and enable/disable the Establishment accounts in the LGU's own
+ * municipality. Accounts are created from an existing establishment
+ * (Lgu\EstablishmentAdoptionController, "Switch to Online iTOUR"), never
+ * here. LGU cannot create LGU or PTO accounts (see Pto\UsersController for
+ * that side of the account-creation chain: PTO creates LGU accounts).
  * Programmer/s: iTOUR Development Team
  * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
  */
@@ -18,6 +19,7 @@ use App\Enums\UserRole;
 use App\Events\UserAccountStatusChanged;
 use App\Http\Controllers\Concerns\ManagesDestinationListings;
 use App\Mail\WelcomeAccountCreated;
+use App\Models\Category;
 use App\Models\Listing;
 use App\Models\User;
 use App\Services\UserAccountProvisioner;
@@ -52,6 +54,7 @@ class UsersController extends LguController
         return $this->renderLgu($objRequest, 'lgu.users', 'users', 'Accounts', [
             'users' => $objUsers,
             'categories' => $this->establishmentCategories(),
+            'filterCategories' => Category::query()->active()->get()->reject(fn (Category $objCategory) => $objCategory->isDestinationCategory())->values(),
             'barangays' => TourismCatalog::barangaysFor($objRequest->user()->usr_organization_subtitle),
         ]);
     }
@@ -81,7 +84,12 @@ class UsersController extends LguController
                     // before it goes live. A destination uses its own
                     // Active/Inactive status and is live right away.
                     'lst_status' => $blnDestination ? 'Active' : 'DRAFT',
-                    ...($blnDestination ? ['lst_contact_office' => TourismCatalog::tourismOfficeName($objLgu->usr_organization_subtitle)] : []),
+                    // A destination's category is fixed to Tourist Destinations,
+                    // set here — the form's read-only field is never submitted.
+                    ...($blnDestination ? [
+                        'cat_id' => Category::query()->where('cat_name', Category::DESTINATION_CATEGORY_NAME)->value('cat_id'),
+                        'lst_contact_office' => TourismCatalog::tourismOfficeName($objLgu->usr_organization_subtitle),
+                    ] : []),
                 ]);
 
                 return $objProvisioner->createWithPassphrase([
@@ -118,7 +126,7 @@ class UsersController extends LguController
 
     public function update(Request $objRequest, User $user): RedirectResponse
     {
-        $this->authorizeOwnEstablishmentUser($objRequest, $user);
+        abort_unless($objRequest->user()->can('update', $user), 403);
 
         // Role, mun_id, lst_id, and status are never
         // accepted from this endpoint.
@@ -128,26 +136,18 @@ class UsersController extends LguController
         $arrBefore = $objListing?->getOriginal();
 
         try {
-            DB::transaction(function () use ($arrData, $user, $objListing): void {
-                $arrUserFields = $arrData['account'];
-
-                if ($objListing) {
-                    $objListing->update($arrData['listing']);
-                    $arrUserFields['usr_organization_name'] = $objListing->lst_name;
-                    $arrUserFields['usr_organization_subtitle'] = "{$objListing->lst_barangay}, {$objListing->lst_municipality}";
-                }
-
-                $user->update($arrUserFields);
-            });
+            $user->update([
+                'usr_name' => $arrData['name'],
+                'usr_email' => $arrData['email'],
+            ]);
         } catch (\Throwable $objException) {
-            Log::error('Failed to update establishment and its user account.', ['exception' => $objException, 'user_id' => $user->usr_id]);
+            Log::error('Failed to update establishment user account.', ['exception' => $objException, 'user_id' => $user->usr_id]);
 
             return back()->withInput()->with('toast', 'Something went wrong while saving. Please try again.')->with('toast_tone', 'danger');
         }
 
-        if ($objListing) {
-            OperationLogger::updated($objRequest->user(), 'establishment', $objListing->lst_id, $objListing->mun_id, $objListing->lst_id, OperationLogger::diff($arrBefore, $objListing));
-        }
+        // OperationLogger::diff() masks the email in the log.
+        OperationLogger::updated($objRequest->user(), 'user', $user->usr_id, $user->mun_id, $user->lst_id, OperationLogger::diff($arrBefore, $user));
 
         return back()->with('toast', $blnDestination ? 'Destination information saved.' : 'Establishment information saved.');
     }
@@ -165,7 +165,7 @@ class UsersController extends LguController
         ]);
 
         $objUser = User::query()->findOrFail($arrData['user_id']);
-        $this->authorizeOwnEstablishmentUser($objRequest, $objUser);
+        abort_unless($objRequest->user()->can('view', $objUser), 403);
 
         try {
             Mail::to($objUser->usr_email)->send(new WelcomeAccountCreated($objUser, $arrData['passphrase']));
@@ -178,12 +178,28 @@ class UsersController extends LguController
         }
     }
 
+    /**
+     * Disable / enable an account. Enabling is refused while the linked
+     * establishment reports on paper — reactivation goes through "Switch to
+     * Online iTOUR" on the establishment, so the account and the reporting
+     * method never disagree.
+     */
     public function toggleStatus(Request $objRequest, User $user): RedirectResponse
     {
-        $this->authorizeOwnEstablishmentUser($objRequest, $user);
-        abort_if($user->usr_id === $objRequest->user()->usr_id, 403, 'You cannot change the status of your own account.');
+        // UserPolicy::deactivate() also covers "nobody can change their own status".
+        abort_unless($objRequest->user()->can('deactivate', $user), 403);
 
-        $strNext = $user->usr_status === 'Active' ? 'Inactive' : 'Active';
+        $strNext = $user->usr_status === Listing::ACCOUNT_STATUS_ACTIVE ? 'Inactive' : Listing::ACCOUNT_STATUS_ACTIVE;
+        $objListing = $user->establishment;
+        $blnIsEnablingPaperEstablishment = $strNext === Listing::ACCOUNT_STATUS_ACTIVE
+            && $objListing !== null
+            && ! $objListing->reportingMethod()->isOnline();
+
+        if ($blnIsEnablingPaperEstablishment) {
+            return back()
+                ->with('toast', "{$objListing->lst_name} reports on paper. Open the establishment and choose \"Switch to Online iTOUR\" to reactivate its account.")
+                ->with('toast_tone', 'danger');
+        }
 
         try {
             $user->update(['usr_status' => $strNext]);
@@ -195,7 +211,7 @@ class UsersController extends LguController
 
         event(new UserAccountStatusChanged($objRequest->user(), $user, $strNext));
 
-        $strVerb = $strNext === 'Active' ? 'enabled' : 'disabled';
+        $strVerb = $strNext === Listing::ACCOUNT_STATUS_ACTIVE ? 'enabled' : 'disabled';
 
         return back()->with('toast', "{$user->usr_name}'s account was {$strVerb}.");
     }

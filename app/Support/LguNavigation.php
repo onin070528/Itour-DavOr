@@ -65,6 +65,6 @@ class LguNavigation
             'User Management' => [
                 $item('users', 'ti-users-group', 'Establishments', 'lgu.users'),
             ],
-        ]
+        ];
     }
 }

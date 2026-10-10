@@ -1,7 +1,7 @@
 {{--
     iTOUR — Davao Oriental Tourism Information System
 
-    Purpose: LGU Destinations directory — view, edit and archive (new destinations are added from the Accounts page).
+    Purpose: LGU Destinations directory — view and edit (archiving is PTO-only) (new destinations are added from the Accounts page).
     Programmer/s: iTOUR Development Team
     Copyright (c) 2026 iTOUR Development Team. All rights reserved.
 --}}
@@ -10,6 +10,12 @@
         title="Destinations"
         description="Manage tourism destinations in {{ $municipality }}."
     />
+
+    {{-- Destinations now live in the Attractions view of the Establishments page (D1); this page stays until the navigation update. --}}
+    <div class="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-md border border-primary-300 bg-primary-100 px-4 py-3 text-sm text-primary-900">
+        <p class="flex items-center gap-2"><i class="ti ti-info-circle" aria-hidden="true"></i> Tourist attractions are now managed under Establishments → Attractions, with photos and PTO review in one place. New destinations appear publicly only after PTO approval.</p>
+        <a href="{{ route('lgu.directory.establishments', ['view' => 'attractions']) }}" class="rounded-sm bg-primary-700 px-3 py-1.5 text-xs font-semibold text-sand-0 hover:bg-primary-900">Go to Attractions</a>
+    </div>
 
     <div data-filterable-table class="mt-6">
         <div class="rounded-md border border-sand-200 bg-sand-0 p-4">
@@ -56,21 +62,7 @@
                                         >
                                             <i class="ti ti-pencil" aria-hidden="true"></i> Edit
                                         </button>
-                                        <form method="POST" action="{{ route('lgu.directory.destinations.archive', $d['id']) }}">
-                                            @csrf
-                                            @method('PATCH')
-                                            <button
-                                                type="button"
-                                                data-confirm-trigger
-                                                data-confirm-title="Archive {{ $d['name'] }}?"
-                                                data-confirm-message="Archived destinations are hidden from the public site until restored."
-                                                data-confirm-label="Archive"
-                                                data-confirm-tone="danger"
-                                                class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-danger hover:bg-danger-bg"
-                                            >
-                                                <i class="ti ti-archive" aria-hidden="true"></i> Archive
-                                            </button>
-                                        </form>
+                                        {{-- No Archive action: archiving is PTO-only (Objective 3, D3). --}}
                                     </div>
                                 </div>
                             </div>

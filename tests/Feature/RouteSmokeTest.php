@@ -10,7 +10,6 @@
  */
 
 use App\Enums\UserRole;
-use App\Models\Municipality;
 use App\Models\User;
 use Illuminate\Support\Facades\Route;
 
@@ -38,15 +37,11 @@ test('every parameterless GET route renders without a server error for each role
 
     expect(smokeRouteNames())->not->toBeEmpty();
 
-    $objMati = Municipality::query()->firstOrCreate(['mun_code' => 'MATI'], ['mun_name' => 'City of Mati']);
-
     $objUser = match ($strRole) {
         'pto' => User::factory()->create(['usr_role' => UserRole::PtoAdministrator]),
-        'lgu' => User::factory()->create([
-            'usr_role' => UserRole::Lgu,
-            'usr_organization_subtitle' => 'City of Mati',
-            'mun_id' => $objMati->mun_id,
-        ]),
+        // Reuses the already-seeded active LGU account rather than creating a
+        // second one — only one active LGU account per municipality is allowed.
+        'lgu' => User::query()->where('usr_role', UserRole::Lgu)->where('usr_status', '!=', 'Inactive')->firstOrFail(),
         'establishment' => User::query()->where('usr_role', UserRole::Establishment)->whereNotNull('lst_id')->firstOrFail(),
         default => null,
     };
