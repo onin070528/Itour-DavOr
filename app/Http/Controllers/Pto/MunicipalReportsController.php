@@ -23,6 +23,7 @@ use App\Models\Listing;
 use App\Models\Municipality;
 use App\Models\MunicipalReport;
 use App\Models\OperationLog;
+use App\Support\Notifier;
 use App\Support\OfficialReportBuilder;
 use App\Support\OperationLogger;
 use App\Support\TourismAnalytics;
@@ -184,6 +185,14 @@ class MunicipalReportsController extends PtoController
         }
 
         OperationLogger::approved($objRequest->user(), 'municipal_report', $municipalReport->mrp_id, $this->municipalityId($municipalReport), OperationLogger::diff($arrBefore, $municipalReport));
+
+        Notifier::toLgu(
+            $this->municipalityId($municipalReport),
+            'municipal-report-verified',
+            "The PTO verified your {$municipalReport->mrp_period_start->format('F Y')} report.",
+            route('lgu.monthlyReports.index', ['period' => $municipalReport->mrp_period_start->format('Y-m')]),
+            'ti-circle-check',
+        );
 
         return back()->with('toast', "{$municipalReport->mrp_municipality}'s report was verified.");
     }
@@ -357,6 +366,14 @@ class MunicipalReportsController extends PtoController
         }
 
         OperationLogger::returned($objRequest->user(), 'municipal_report', $municipalReport->mrp_id, $arrData['remarks'], $this->municipalityId($municipalReport), OperationLogger::diff($arrBefore, $municipalReport));
+
+        Notifier::toLgu(
+            $this->municipalityId($municipalReport),
+            'municipal-report-returned',
+            "The PTO returned your {$municipalReport->mrp_period_start->format('F Y')} report for clarification: {$arrData['remarks']}",
+            route('lgu.monthlyReports.index', ['period' => $municipalReport->mrp_period_start->format('Y-m')]),
+            'ti-arrow-back-up',
+        );
 
         return back()->with('toast', "{$municipalReport->mrp_municipality}'s report was returned for clarification.");
     }

@@ -22,7 +22,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * submission by App\Services\SentimentAnalyzer and stored here.
  */
 #[Table('tbl_feedback', key: 'fbk_id')]
-#[Fillable(['lst_id', 'fbk_name', 'fbk_rating', 'fbk_text', 'fbk_language', 'fbk_sentiment', 'fbk_polarity'])]
+#[Fillable([
+    'lst_id', 'fbk_name', 'fbk_email', 'fbk_visit_date', 'fbk_visit_purpose', 'fbk_visitor_origin',
+    'fbk_rating', 'fbk_aspect_ratings', 'fbk_would_recommend',
+    'fbk_text', 'fbk_language', 'fbk_sentiment', 'fbk_polarity',
+])]
 class Feedback extends Model
 {
     use HasFactory;
@@ -36,6 +40,9 @@ class Feedback extends Model
         return [
             'fbk_rating' => 'integer',
             'fbk_polarity' => 'float',
+            'fbk_visit_date' => 'date',
+            'fbk_aspect_ratings' => 'array',
+            'fbk_would_recommend' => 'boolean',
         ];
     }
 

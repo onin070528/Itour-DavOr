@@ -37,7 +37,7 @@ class ImagePolicy
             // uploads once the package has been submitted, until it's
             // returned — same editable window as the profile form.
             UserRole::Establishment => $objUser->lst_id === $objListing->lst_id
-                && in_array($objListing->lst_status, ['DRAFT', 'UNPUBLISHED'], true),
+                && $this->isEstablishmentEditWindowOpen($objListing),
             UserRole::Lgu => $objUser->mun_id !== null
                 && $objUser->mun_id === $objListing->mun_id
                 && ($objListing->establishmentUser === null || $objListing->lst_reporting_mode === 'PAPER_LGU'),
@@ -108,11 +108,27 @@ class ImagePolicy
             // managing photos regardless of status, their own review work
             // is unaffected.
             UserRole::Establishment => $objUser->lst_id === $objListing->lst_id
-                && in_array($objListing->lst_status, ['DRAFT', 'UNPUBLISHED'], true),
+                && $this->isEstablishmentEditWindowOpen($objListing),
             UserRole::Lgu => $objUser->mun_id !== null
                 && $objUser->mun_id === $objListing->mun_id,
             UserRole::PtoAdministrator => true,
             default => false,
         };
+    }
+
+    /**
+     * When the account holder itself may add or change photos. An
+     * establishment only while its package is a Draft/Unpublished one; a
+     * destination (which has no publish workflow, just Active/Suspended/
+     * Archived) at any time except once Archived. Every photo it adds still
+     * goes to its LGU for approval.
+     */
+    private function isEstablishmentEditWindowOpen(Listing $objListing): bool
+    {
+        if ($objListing->lst_category === 'destinations') {
+            return $objListing->lst_status !== 'Archived';
+        }
+
+        return in_array($objListing->lst_status, ['DRAFT', 'UNPUBLISHED'], true);
     }
 }

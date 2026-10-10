@@ -77,12 +77,31 @@
 
                         <div class="mt-4 flex flex-col gap-3">
                             <div>
+                                <p class="mb-2 text-xs font-semibold text-sand-700">Visit Type</p>
+                                <div class="inline-flex rounded-md border border-sand-300 p-1" role="radiogroup" aria-label="Visit type">
+                                    @foreach (['Daytour' => '☀️ Daytour', 'Overnight' => '🌙 Overnight'] as $strType => $strTypeLabel)
+                                        <label class="cursor-pointer rounded-sm px-4 py-2 text-sm font-semibold text-sand-600 transition-colors has-[:checked]:bg-primary-700 has-[:checked]:text-sand-0">
+                                            <input type="radio" name="visitType" value="{{ $strType }}" @checked($strType === 'Daytour') class="sr-only">
+                                            {{ $strTypeLabel }}
+                                        </label>
+                                    @endforeach
+                                </div>
+                            </div>
+                            <div>
+                                <label for="qr-visit-date" class="mb-1 block text-xs font-semibold text-sand-700">Date</label>
+                                <input id="qr-visit-date" type="date" value="{{ now()->toDateString() }}" readonly class="w-full rounded-sm border border-sand-300 bg-sand-100 px-3 py-2 text-sm text-sand-700">
+                            </div>
+                            <div>
                                 <label for="qr-visitor-name" class="mb-1 block text-xs font-semibold text-sand-700">Full Name</label>
                                 <input id="qr-visitor-name" name="visitorName" type="text" required placeholder="e.g. Juan Dela Cruz" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none">
                             </div>
                             <div>
                                 <label for="qr-visitor-contact" class="mb-1 block text-xs font-semibold text-sand-700">Contact Number</label>
                                 <input id="qr-visitor-contact" name="visitorContact" type="tel" required placeholder="e.g. 0912 345 6789" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none">
+                            </div>
+                            <div>
+                                <label for="qr-remarks" class="mb-1 block text-xs font-semibold text-sand-700">Remarks <span class="font-normal text-sand-500">(optional)</span></label>
+                                <textarea id="qr-remarks" name="remarks" rows="2" maxlength="1000" placeholder="Anything you would like us to know" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none"></textarea>
                             </div>
                         </div>
                     </div>
@@ -150,7 +169,7 @@
                                 </div>
 
                                 @if ($group['key'] === 'local')
-                                    <div id="qr-local-origin-wrap" class="mt-4 border-t border-dashed border-sand-200 pt-4 hidden">
+                                    <div id="qr-local-origin-wrap" class="mt-4 border-t border-dashed border-sand-200 pt-4">
                                         <label for="qr-local-origin-scope" class="mb-1 block text-xs font-semibold text-sand-700">Where are you from? <span class="font-normal text-sand-500">(optional)</span></label>
                                         <select id="qr-local-origin-scope" name="localOriginScope" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none">
                                             <option value="">Prefer not to say</option>
@@ -158,13 +177,13 @@
                                             <option value="outside_province">Outside Davao Oriental</option>
                                         </select>
 
-                                        <div id="qr-local-origin-place-wrap" class="mt-3 hidden">
-                                            <label for="qr-local-origin-place" class="mb-1 block text-xs font-semibold text-sand-700">Home Province</label>
+                                        <div id="qr-local-origin-place-wrap" class="mt-3">
+                                            <label for="qr-local-origin-place" class="mb-1 block text-xs font-semibold text-sand-700">Home Province <span class="font-normal text-sand-500">(when outside Davao Oriental)</span></label>
                                             <input id="qr-local-origin-place" name="localOriginPlace" type="text" list="province-options" placeholder="e.g. Davao del Sur" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none">
                                         </div>
                                     </div>
                                 @else
-                                    <div id="qr-foreign-country-wrap" class="mt-4 border-t border-dashed border-sand-200 pt-4 hidden">
+                                    <div id="qr-foreign-country-wrap" class="mt-4 border-t border-dashed border-sand-200 pt-4">
                                         <label for="qr-foreign-country" class="mb-1 block text-xs font-semibold text-sand-700">Home Country <span class="font-normal text-sand-500">(optional)</span></label>
                                         <input id="qr-foreign-country" name="foreignCountry" type="text" list="country-options" placeholder="e.g. Japan" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none">
                                     </div>

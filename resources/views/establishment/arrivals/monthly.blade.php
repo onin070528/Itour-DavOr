@@ -11,6 +11,21 @@
         description="Submit {{ $establishmentName }}'s monthly tourist-arrival report for LGU review."
     />
 
+    @if ($reminder)
+        <div class="mt-6 flex items-start gap-3 rounded-md border {{ $reminder['stage'] === 'upcoming' ? 'border-warning bg-warning-bg' : 'border-danger bg-danger-bg' }} p-4 text-sm text-sand-800">
+            <i class="ti {{ $reminder['stage'] === 'upcoming' ? 'ti-bell-ringing' : 'ti-alert-triangle' }} mt-0.5 text-lg" aria-hidden="true"></i>
+            <p>
+                @if ($reminder['stage'] === 'upcoming')
+                    Your <strong>{{ $reminder['period']->format('F Y') }}</strong> report is due on {{ $reminder['due']->format('F j') }} — {{ $reminder['daysLeft'] }} {{ \Illuminate\Support\Str::plural('day', $reminder['daysLeft']) }} left.
+                @elseif ($reminder['stage'] === 'due')
+                    Your <strong>{{ $reminder['period']->format('F Y') }}</strong> report is due today.
+                @else
+                    Your <strong>{{ $reminder['period']->format('F Y') }}</strong> report was due on {{ $reminder['due']->format('F j') }} and is overdue.
+                @endif
+            </p>
+        </div>
+    @endif
+
     <div class="mt-6 rounded-md border border-sand-200 bg-sand-0 p-5">
         <h2 class="font-display text-base font-bold text-sand-900">Submit a Monthly Report</h2>
         <p class="mt-1.5 text-sm text-sand-600">

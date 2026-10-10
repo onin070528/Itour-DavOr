@@ -26,7 +26,7 @@
         <div class="flex flex-col gap-3 rounded-md border border-sand-200 bg-sand-0 p-4 lg:flex-row lg:items-center">
             <div class="flex flex-1 items-center gap-2 rounded-sm border border-sand-300 bg-sand-50 px-3 py-2.5">
                 <i class="ti ti-search text-sand-500" aria-hidden="true"></i>
-                <input data-filter-input type="search" placeholder="Search by establishment, owner, email, or barangay..." class="w-full border-0 bg-transparent text-sm text-sand-900 placeholder:text-sand-500 focus:outline-none">
+                <input data-filter-input type="search" placeholder="Search by establishment or destination, owner, email, or barangay..." class="w-full border-0 bg-transparent text-sm text-sand-900 placeholder:text-sand-500 focus:outline-none">
             </div>
             <select data-filter-select data-filter-key="category" class="rounded-sm border border-sand-300 bg-sand-50 px-3 py-2.5 text-sm text-sand-700">
                 <option value="">All Categories</option>
@@ -47,7 +47,7 @@
             <table class="w-full min-w-[820px] border-collapse text-sm">
                 <thead>
                     <tr class="border-b border-sand-200 bg-sand-50 text-left text-xs font-semibold tracking-wide text-sand-500 uppercase">
-                        <th class="px-4 py-3">Establishment</th>
+                        <th class="px-4 py-3">Establishment / Destination</th>
                         <th class="px-4 py-3">Barangay</th>
                         <th class="px-4 py-3">Owner / Manager</th>
                         <th class="px-4 py-3">Contact</th>
@@ -98,19 +98,19 @@
                                 @endif
                             </td>
                             <td class="px-4 py-3"><x-dashboard.status-badge :tone="$statusTone($u->usr_status)">{{ $u->usr_status }}</x-dashboard.status-badge></td>
-                            <td class="px-4 py-3 text-right">
-                                <div class="relative inline-block">
+                            <td class="px-4 py-3 text-right whitespace-nowrap">
+                                <button
+                                    type="button"
+                                    data-modal-open="user-view-{{ $u->usr_id }}"
+                                    class="mr-1 rounded-sm border border-sand-300 px-2.5 py-1 text-xs font-semibold text-sand-800 hover:border-primary-300"
+                                >
+                                    <i class="ti ti-eye" aria-hidden="true"></i> View
+                                </button>
+                                <div class="relative inline-block align-middle">
                                     <button type="button" data-dropdown-toggle class="text-sand-500 hover:text-sand-800">
                                         <i class="ti ti-dots-vertical" aria-hidden="true"></i>
                                     </button>
                                     <div data-dropdown-menu class="absolute right-0 z-10 mt-1 hidden w-44 rounded-md border border-sand-200 bg-sand-0 py-1 shadow-md">
-                                        <button
-                                            type="button"
-                                            data-modal-open="user-view-{{ $u->usr_id }}"
-                                            class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-sand-700 hover:bg-sand-50"
-                                        >
-                                            <i class="ti ti-eye" aria-hidden="true"></i> View
-                                        </button>
                                         <button
                                             type="button"
                                             data-modal-open="user-form-modal"
@@ -186,8 +186,9 @@
             $photoCounts = $listing
                 ? $listing->establishmentImages->countBy(fn ($image) => $image->img_status->value)
                 : collect();
+            $isDestination = $listing?->lst_category === 'destinations';
             $viewRows = [
-                'Establishment' => [
+                ($isDestination ? 'Destination' : 'Establishment') => [
                     'Name' => $viewName,
                     'Category' => $listing ? \App\Support\TourismCatalog::categoryLabel($listing->lst_category) : null,
                     'Type' => $listing?->lst_type,
@@ -227,6 +228,7 @@
                     </div>
                 @endforeach
 
+                @unless ($isDestination)
                 <div>
                     <h3 class="mb-2 text-xs font-semibold tracking-wide text-sand-500 uppercase">Photos</h3>
                     <p class="text-sm text-sand-800">
@@ -235,6 +237,7 @@
                         {{ $photoCounts->get('REJECTED', 0) }} returned
                     </p>
                 </div>
+                @endunless
             </div>
 
             <x-slot:footer>
@@ -243,13 +246,12 @@
         </x-dashboard.modal>
     @endforeach
 
-    <x-dashboard.modal id="user-form-modal" title="Add Establishment or Destination" max-width="max-w-2xl">
+    <x-dashboard.modal id="user-form-modal" title="Add Establishment or Destination" max-width="max-w-2xl" confirm-outside-close>
         <form
             id="user-form"
             method="POST"
             action="{{ route('lgu.users.store') }}"
             data-default-action="{{ route('lgu.users.store') }}"
-            data-destination-action="{{ route('lgu.directory.destinations.store') }}"
             data-default-method="POST"
             class="flex flex-col gap-5"
         >
@@ -284,6 +286,7 @@
                         <label for="establishment-category" class="mb-1 block text-xs font-semibold text-sand-700">Category <span class="text-danger" aria-hidden="true">*</span></label>
                         <select id="establishment-category" name="category" required class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
                             <option value="">Select a category...</option>
+                            <option value="destinations" hidden>Tourist Destinations</option>
                             @foreach ($categories as $category)
                                 <option value="{{ $category['slug'] }}">{{ $category['label'] }}</option>
                             @endforeach
@@ -332,22 +335,22 @@
             </fieldset>
 
             <fieldset class="flex flex-col gap-4 border-t border-sand-200 pt-4">
-                <legend class="mb-3 text-xs font-semibold tracking-wide text-sand-500 uppercase">Contact <span data-type-only="establishment">&amp; Account</span></legend>
+                <legend class="mb-3 text-xs font-semibold tracking-wide text-sand-500 uppercase">Contact &amp; Account</legend>
                 <div class="grid gap-4 sm:grid-cols-2">
                     <div>
-                        <label for="establishment-owner" class="mb-1 block text-xs font-semibold text-sand-700">Owner / Manager Name <span data-required-mark class="text-danger" aria-hidden="true">*</span></label>
-                        <input id="establishment-owner" name="ownerName" type="text" data-required-for="establishment" required maxlength="255" placeholder="e.g. Juan Dela Cruz" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                        <label for="establishment-owner" class="mb-1 block text-xs font-semibold text-sand-700">Owner / Manager Name <span class="text-danger" aria-hidden="true">*</span></label>
+                        <input id="establishment-owner" name="ownerName" type="text" required maxlength="255" placeholder="e.g. Juan Dela Cruz" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
                     </div>
                     <div>
-                        <label for="establishment-phone" class="mb-1 block text-xs font-semibold text-sand-700">Contact Number <span data-required-mark class="text-danger" aria-hidden="true">*</span></label>
-                        <input id="establishment-phone" name="contactPhone" type="tel" data-required-for="establishment" required maxlength="50" placeholder="e.g. 0917 123 4567" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                        <label for="establishment-phone" class="mb-1 block text-xs font-semibold text-sand-700">Contact Number <span class="text-danger" aria-hidden="true">*</span></label>
+                        <input id="establishment-phone" name="contactPhone" type="tel" required maxlength="50" placeholder="e.g. 0917 123 4567" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
                     </div>
                 </div>
                 <div class="grid gap-4 sm:grid-cols-2">
                     <div>
-                        <label for="establishment-email" class="mb-1 block text-xs font-semibold text-sand-700">Email <span data-required-mark class="text-danger" aria-hidden="true">*</span></label>
-                        <input id="establishment-email" name="email" type="email" data-required-for="establishment" required maxlength="255" placeholder="e.g. frontdesk@example.com" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
-                        <p data-text-establishment="Used to sign in to the establishment's iTOUR account." data-text-destination="Public contact email. A destination has no login account." class="mt-1 text-xs text-sand-500">Used to sign in to the establishment's iTOUR account.</p>
+                        <label for="establishment-email" class="mb-1 block text-xs font-semibold text-sand-700">Email <span class="text-danger" aria-hidden="true">*</span></label>
+                        <input id="establishment-email" name="email" type="email" required maxlength="255" placeholder="e.g. frontdesk@example.com" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm">
+                        <p data-text-establishment="Used to sign in to the establishment's iTOUR account." data-text-destination="Used to sign in to the destination's iTOUR account." class="mt-1 text-xs text-sand-500">Used to sign in to the establishment's iTOUR account.</p>
                     </div>
                     <div>
                         <label for="establishment-website" class="mb-1 block text-xs font-semibold text-sand-700">Website / Facebook Page</label>

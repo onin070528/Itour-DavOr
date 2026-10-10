@@ -62,11 +62,12 @@ class UsersController extends LguController
      */
     public function store(Request $objRequest, UserAccountProvisioner $objProvisioner): RedirectResponse
     {
-        $arrData = $this->validatedEstablishmentFields($objRequest, Rule::unique('tbl_users', 'usr_email'));
+        $blnDestination = $objRequest->input('entryType') === 'destination';
+        $arrData = $this->validatedEstablishmentFields($objRequest, Rule::unique('tbl_users', 'usr_email'), $blnDestination);
         $objLgu = $objRequest->user();
 
         try {
-            $arrCreated = DB::transaction(function () use ($arrData, $objLgu, $objProvisioner): array {
+            $arrCreated = DB::transaction(function () use ($arrData, $objLgu, $objProvisioner, $blnDestination): array {
                 // Municipality always comes from the LGU's own account, never
                 // from the request — an LGU can only register establishments
                 // inside its own jurisdiction.
@@ -75,10 +76,12 @@ class UsersController extends LguController
                     'lst_slug' => $this->uniqueDestinationSlug($arrData['listing']['lst_name']),
                     'lst_municipality' => $objLgu->usr_organization_subtitle,
                     'mun_id' => $objLgu->mun_id,
-                    // Not public yet — the LGU reviews and submits it to
-                    // PTO (App\Services\ListingPublishWorkflow) before it
-                    // goes live, same as any other establishment.
-                    'lst_status' => 'DRAFT',
+                    // An establishment is not public yet — the LGU reviews and
+                    // submits it to PTO (App\Services\ListingPublishWorkflow)
+                    // before it goes live. A destination uses its own
+                    // Active/Inactive status and is live right away.
+                    'lst_status' => $blnDestination ? 'Active' : 'DRAFT',
+                    ...($blnDestination ? ['lst_contact_office' => TourismCatalog::tourismOfficeName($objLgu->usr_organization_subtitle)] : []),
                 ]);
 
                 return $objProvisioner->createWithPassphrase([
@@ -106,7 +109,7 @@ class UsersController extends LguController
         return back()->with('accountCreated', [
             'userId' => $objUser->usr_id,
             'name' => $objUser->usr_name,
-            'role' => UserRole::Establishment->title(),
+            'role' => $blnDestination ? 'Destination' : UserRole::Establishment->title(),
             'municipality' => $objLgu->usr_organization_subtitle,
             'passphrase' => $arrCreated['passphrase'],
             'emailSent' => $blnEmailSent,
@@ -119,8 +122,9 @@ class UsersController extends LguController
 
         // Role, mun_id, lst_id, and status are never
         // accepted from this endpoint.
-        $arrData = $this->validatedEstablishmentFields($objRequest, Rule::unique('tbl_users', 'usr_email')->ignore($user));
         $objListing = $user->establishment;
+        $blnDestination = $objListing?->lst_category === 'destinations';
+        $arrData = $this->validatedEstablishmentFields($objRequest, Rule::unique('tbl_users', 'usr_email')->ignore($user), $blnDestination);
         $arrBefore = $objListing?->getOriginal();
 
         try {
@@ -145,7 +149,7 @@ class UsersController extends LguController
             OperationLogger::updated($objRequest->user(), 'establishment', $objListing->lst_id, $objListing->mun_id, $objListing->lst_id, OperationLogger::diff($arrBefore, $objListing));
         }
 
-        return back()->with('toast', 'Establishment information saved.');
+        return back()->with('toast', $blnDestination ? 'Destination information saved.' : 'Establishment information saved.');
     }
 
     /**
@@ -202,11 +206,12 @@ class UsersController extends LguController
      *     account: array{usr_name: string, usr_email: string}
      * }
      */
-    private function validatedEstablishmentFields(Request $objRequest, Unique $objUniqueEmail): array
+    private function validatedEstablishmentFields(Request $objRequest, Unique $objUniqueEmail, bool $blnDestination = false): array
     {
         $arrData = $objRequest->validate([
             'name' => ['required', 'string', 'max:255'],
-            'category' => ['required', 'string', Rule::in(array_column($this->establishmentCategories(), 'slug'))],
+            // A destination's category is fixed, never taken from the form.
+            'category' => $blnDestination ? ['nullable'] : ['required', 'string', Rule::in(array_column($this->establishmentCategories(), 'slug'))],
             'barangay' => ['required', 'string', Rule::in(TourismCatalog::barangaysFor($objRequest->user()->usr_organization_subtitle))],
             'ownerName' => ['required', 'string', 'max:255'],
             'contactPhone' => ['required', 'string', 'max:50'],
@@ -219,7 +224,7 @@ class UsersController extends LguController
         return [
             'listing' => [
                 'lst_name' => $arrData['name'],
-                'lst_category' => $arrData['category'],
+                'lst_category' => $blnDestination ? 'destinations' : $arrData['category'],
                 'lst_barangay' => $arrData['barangay'],
                 'lst_owner_name' => $arrData['ownerName'],
                 'lst_contact_phone' => $arrData['contactPhone'],

@@ -19,12 +19,10 @@ document.addEventListener('DOMContentLoaded', function ()
 
 /**
  * LGU Accounts modal: "Establishment" or "Destination". Both use the same
- * form; choosing Destination renames the "Establishment" wording, swaps the
- * category for the fixed "Tourist Destinations", relaxes the owner/phone/
- * email requirements (no login account is created) and posts to the Tourism
- * Directory's destination route instead of the account route.
- * The chooser is only offered when adding; editing is always an
- * establishment account.
+ * form and the same account process; choosing Destination renames the
+ * "Establishment" wording and swaps the category for the fixed "Tourist
+ * Destinations". Both post to the account route (the server reads
+ * `entryType`). The chooser is only offered when adding.
  */
 function initEntryTypeToggle()
 {
@@ -41,7 +39,7 @@ function initEntryTypeToggle()
     var objHint = objChooser.querySelector('[data-entry-type-hint]');
     var arrHints = {
         establishment: 'Creates the establishment and its login account. It is listed under Tourism Directory → Establishments.',
-        destination: 'Adds a tourist destination (no login account is created). It is listed under Tourism Directory → Destinations.'
+        destination: 'Creates the destination and its login account. It is listed under Tourism Directory → Destinations.'
     };
 
     var applyType = function (strType)
@@ -68,20 +66,10 @@ function initEntryTypeToggle()
             objField.placeholder = objField.getAttribute('data-placeholder-' + strType);
         });
 
-        objForm.querySelectorAll('[data-required-for]').forEach(function (objField)
-        {
-            objField.required = objField.dataset.requiredFor === strType;
-        });
-        objForm.querySelectorAll('[data-required-mark]').forEach(function (objMark)
-        {
-            objMark.hidden = blnIsDestination;
-        });
         objForm.querySelectorAll('[data-entry-type-legend]').forEach(function (objLabel)
         {
             objLabel.textContent = blnIsDestination ? 'Destination' : 'Establishment';
         });
-
-        objForm.action = blnIsDestination ? objForm.dataset.destinationAction : objForm.dataset.defaultAction;
 
         if (objHint)
         {

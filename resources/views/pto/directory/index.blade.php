@@ -179,10 +179,19 @@
                                     <td class="px-4 py-3 text-sand-700">{{ $listing->lst_contact_phone }}</td>
                                     <td class="px-4 py-3"><x-dashboard.status-badge :tone="$statusTone($listing->lst_status)">{{ $listing->lst_status }}</x-dashboard.status-badge></td>
                                     <td class="px-4 py-3">
-                                        @if ($isQrEnabled)
-                                            <button type="button" data-modal-open="qr-view-{{ $listing->lst_id }}" class="rounded-sm border border-sand-300 px-2.5 py-1 text-xs font-semibold text-sand-800 hover:border-primary-300">
-                                                <i class="ti ti-qrcode" aria-hidden="true"></i> View
-                                            </button>
+                                        @if ($isQrEnabled || $listing->isFeedbackQrEnabled())
+                                            <div class="flex flex-wrap gap-1">
+                                                @if ($isQrEnabled)
+                                                    <button type="button" data-modal-open="qr-view-{{ $listing->lst_id }}" class="rounded-sm border border-sand-300 px-2.5 py-1 text-xs font-semibold text-sand-800 hover:border-primary-300">
+                                                        <i class="ti ti-qrcode" aria-hidden="true"></i> Arrival
+                                                    </button>
+                                                @endif
+                                                @if ($listing->isFeedbackQrEnabled())
+                                                    <button type="button" data-modal-open="feedback-qr-view-{{ $listing->lst_id }}" class="rounded-sm border border-sand-300 px-2.5 py-1 text-xs font-semibold text-sand-800 hover:border-primary-300">
+                                                        <i class="ti ti-message-2" aria-hidden="true"></i> Feedback
+                                                    </button>
+                                                @endif
+                                            </div>
                                         @else
                                             <span class="text-xs text-sand-400">No QR</span>
                                         @endif
@@ -310,6 +319,23 @@
                         </x-dashboard.modal>
                     @endif
 
+                    @if ($listing->isFeedbackQrEnabled())
+                        <x-dashboard.modal id="feedback-qr-view-{{ $listing->lst_id }}" title="{{ $listing->lst_name }} Feedback QR Code">
+                            <div data-qr-mount class="mx-auto flex h-56 w-56 items-center justify-center rounded-md border border-sand-200 bg-sand-0 p-3 [&>svg]:h-full [&>svg]:w-full">
+                                {!! \SimpleSoftwareIO\QrCode\Facades\QrCode::format('svg')->size(220)->margin(1)->generate(route('feedback.form', ['listing' => $listing->lst_uuid])) !!}
+                            </div>
+                            <p class="mt-3 text-center text-xs text-sand-500">Visitors scan this after their experience to give feedback on {{ $listing->lst_name }}.</p>
+
+                            <x-slot:footer>
+                                <button type="button" data-qr-print class="rounded-sm border border-sand-300 bg-sand-0 px-4 py-2.5 text-sm font-semibold text-sand-800 hover:border-primary-300">
+                                    <i class="ti ti-printer" aria-hidden="true"></i> Print
+                                </button>
+                                <button type="button" data-qr-download data-qr-filename="{{ $listing->lst_slug }}-feedback-qr.svg" class="rounded-sm bg-primary-700 px-4 py-2.5 text-sm font-semibold text-sand-0 hover:bg-primary-900">
+                                    <i class="ti ti-download" aria-hidden="true"></i> Download
+                                </button>
+                            </x-slot:footer>
+                        </x-dashboard.modal>
+                    @endif
                     @if ($listing->isQrEnabled())
                         <x-dashboard.modal id="qr-view-{{ $listing->lst_id }}" title="{{ $listing->lst_name }} QR Code">
                             <div data-qr-mount class="mx-auto flex h-56 w-56 items-center justify-center rounded-md border border-sand-200 bg-sand-0 p-3 [&>svg]:h-full [&>svg]:w-full">

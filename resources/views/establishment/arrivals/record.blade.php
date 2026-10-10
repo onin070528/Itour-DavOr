@@ -70,8 +70,17 @@
                         </div>
                         <div>
                             <label for="lead-visitor-name" class="mb-1 block text-xs font-semibold text-sand-700">Lead Visitor Name <span class="font-normal text-sand-500">(optional)</span></label>
-                            <input id="lead-visitor-name" type="text" x-model="leadVisitorName" placeholder="e.g. Juan Dela Cruz" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none">
+                            <input id="lead-visitor-name" type="text" x-model="leadVisitorName" placeholder="e.g. Juan Dela Cruz" maxlength="255" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none">
                         </div>
+                        <div>
+                            <label for="visitor-contact" class="mb-1 block text-xs font-semibold text-sand-700">Contact Number <span class="font-normal text-sand-500">(optional)</span></label>
+                            <input id="visitor-contact" type="text" x-model="visitorContact" placeholder="e.g. 0917 123 4567" maxlength="255" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none">
+                        </div>
+                    </div>
+
+                    <div class="mt-4">
+                        <label for="arrival-remarks" class="mb-1 block text-xs font-semibold text-sand-700">Remarks <span class="font-normal text-sand-500">(optional)</span></label>
+                        <textarea id="arrival-remarks" x-model="remarks" rows="2" maxlength="1000" placeholder="Anything worth noting about this group" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none"></textarea>
                     </div>
                 </div>
 
@@ -140,7 +149,7 @@
                         </div>
 
                         @if ($group['key'] === 'local')
-                            <div class="mt-4 border-t border-dashed border-sand-200 pt-4" x-show="localTotal > 0" x-cloak>
+                            <div class="mt-4 border-t border-dashed border-sand-200 pt-4">
                                 <label for="local-origin-scope" class="mb-1 block text-xs font-semibold text-sand-700">Where are they from? <span class="font-normal text-sand-500">(optional)</span></label>
                                 <select id="local-origin-scope" x-model="localOriginScope" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none">
                                     <option value="">Prefer not to say</option>
@@ -148,13 +157,13 @@
                                     <option value="outside_province">Outside Davao Oriental</option>
                                 </select>
 
-                                <div class="mt-3" x-show="localOriginScope === 'outside_province'" x-cloak>
-                                    <label for="local-origin-place" class="mb-1 block text-xs font-semibold text-sand-700">Home Province</label>
-                                    <input id="local-origin-place" type="text" list="province-options" x-model="localOriginPlace" placeholder="e.g. Davao del Sur" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none">
+                                <div class="mt-3">
+                                    <label for="local-origin-place" class="mb-1 block text-xs font-semibold text-sand-700">Home Province <span class="font-normal text-sand-500">(when outside Davao Oriental)</span></label>
+                                    <input id="local-origin-place" type="text" list="province-options" x-model="localOriginPlace" :disabled="localOriginScope !== 'outside_province'" placeholder="e.g. Davao del Sur" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none">
                                 </div>
                             </div>
                         @else
-                            <div class="mt-4 border-t border-dashed border-sand-200 pt-4" x-show="foreignTotal > 0" x-cloak>
+                            <div class="mt-4 border-t border-dashed border-sand-200 pt-4">
                                 <label for="foreign-country" class="mb-1 block text-xs font-semibold text-sand-700">Home Country <span class="font-normal text-sand-500">(optional)</span></label>
                                 <input id="foreign-country" type="text" list="country-options" x-model="foreignCountry" placeholder="e.g. Japan" class="w-full rounded-sm border border-sand-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none">
                             </div>

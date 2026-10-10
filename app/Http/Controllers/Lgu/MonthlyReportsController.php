@@ -20,6 +20,7 @@ use App\Http\Controllers\Concerns\TracksReportHistory;
 use App\Models\Listing;
 use App\Models\MonthlyArrivalReport;
 use App\Models\MunicipalReport;
+use App\Support\Notifier;
 use App\Support\OperationLogger;
 use App\Support\ReportWorkflowSteps;
 use Carbon\CarbonImmutable;
@@ -47,9 +48,11 @@ class MonthlyReportsController extends LguController
 
         $objEstablishments = Listing::query()
             ->visibleTo($objUser)
-            ->where('lst_category', '!=', 'destinations')
+            ->with('categoryRecord')
             ->orderBy('lst_name')
-            ->get();
+            ->get()
+            ->filter(fn (Listing $objListing) => $objListing->requiresArrivalRecords())
+            ->values();
 
         $objReportsByListing = MonthlyArrivalReport::query()
             ->visibleTo($objUser)
@@ -105,7 +108,7 @@ class MonthlyReportsController extends LguController
     public function showManualEntry(Request $objRequest, Listing $listing): View
     {
         $this->authorizeOwnMunicipality($objRequest, $listing);
-        abort_if($listing->lst_category === 'destinations', 404);
+        abort_unless($listing->requiresArrivalRecords(), 404);
 
         $dtmMonth = $this->resolvePeriod($objRequest);
 
@@ -120,7 +123,7 @@ class MonthlyReportsController extends LguController
     public function storeManualEntry(Request $objRequest, Listing $listing): RedirectResponse
     {
         $this->authorizeOwnMunicipality($objRequest, $listing);
-        abort_if($listing->lst_category === 'destinations', 404);
+        abort_unless($listing->requiresArrivalRecords(), 404);
 
         $arrData = $objRequest->validate([
             'period_month' => ['required', 'date_format:Y-m'],
@@ -320,6 +323,17 @@ class MonthlyReportsController extends LguController
             OperationLogger::diff($arrBefore, $monthlyArrivalReport),
         );
 
+        $monthlyArrivalReport->loadMissing('listing');
+        if ($monthlyArrivalReport->listing) {
+            Notifier::toEstablishment(
+                $monthlyArrivalReport->listing,
+                'monthly-report-verified',
+                "Your {$monthlyArrivalReport->mar_period_month->format('F Y')} monthly report was verified by your LGU and is being sent to the PTO.",
+                route('establishment.arrivals.monthly'),
+                'ti-circle-check',
+            );
+        }
+
         return back()->with('toast', 'Report verified.');
     }
 
@@ -426,6 +440,13 @@ class MonthlyReportsController extends LguController
         } else {
             OperationLogger::consolidated($objUser, 'municipal_report', $objMunicipalReport->mrp_id, $objUser->mun_id, $arrNewValues);
         }
+
+        Notifier::toPto(
+            'municipal-report-submitted',
+            "{$objMunicipalReport->mrp_municipality} submitted its {$dtmMonth->format('F Y')} tourism report for review.",
+            route('pto.municipalReports.show', $objMunicipalReport),
+            'ti-report-analytics',
+        );
 
         return redirect()->route('lgu.monthlyReports.index', ['period' => $dtmMonth->format('Y-m')])
             ->with('toast', "{$dtmMonth->format('F Y')} report consolidated and submitted to PTO.");

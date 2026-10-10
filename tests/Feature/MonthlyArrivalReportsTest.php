@@ -146,7 +146,7 @@ test('LGU consolidate only counts Verified reports and computes the total automa
     $listingA = makeEstablishmentListing('Manay', 'MAN', 'ABC Resort');
     $municipality = $listingA->municipalityRecord;
     $listingB = DB::table('tbl_listings')->insertGetId([
-        'lst_slug' => 'xyz-hotel-'.Str::random(6), 'lst_name' => 'XYZ Hotel', 'lst_category' => 'accommodation',
+        'lst_slug' => 'xyz-hotel-'.Str::random(6), 'lst_name' => 'XYZ Hotel', 'lst_category' => 'accommodation', 'cat_id' => qrEnabledCategoryFixture()->cat_id,
         'lst_municipality' => $municipality->mun_name, 'mun_id' => $municipality->mun_id,
         'lst_barangay' => 'Poblacion', 'lst_status' => 'PUBLISHED', 'lst_created_at' => now(), 'lst_updated_at' => now(),
     ]);
@@ -243,7 +243,7 @@ test('LGU Tourism Reports page shows the workflow steps, KPI cards, and sorts No
     $verified = makeEstablishmentListing('Boston', 'BOS2', 'ABC Resort');
     $municipality = $verified->municipalityRecord;
     $notSubmitted = Listing::query()->create([
-        'lst_slug' => 'xyz-hotel-'.Str::random(6), 'lst_name' => 'XYZ Hotel', 'lst_category' => 'accommodation',
+        'lst_slug' => 'xyz-hotel-'.Str::random(6), 'lst_name' => 'XYZ Hotel', 'lst_category' => 'accommodation', 'cat_id' => qrEnabledCategoryFixture()->cat_id,
         'lst_municipality' => $municipality->mun_name, 'mun_id' => $municipality->mun_id,
         'lst_barangay' => 'Poblacion', 'lst_status' => 'PUBLISHED',
     ]);

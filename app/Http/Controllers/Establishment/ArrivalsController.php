@@ -16,7 +16,10 @@ use App\Enums\ArrivalSource;
 use App\Enums\MonthlyReportStatus;
 use App\Enums\ReportSubmissionSource;
 use App\Models\Arrival;
+use App\Models\Listing;
 use App\Models\MonthlyArrivalReport;
+use App\Support\MonthlyReportReminder;
+use App\Support\Notifier;
 use App\Support\OperationLogger;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
@@ -35,6 +38,8 @@ class ArrivalsController extends EstablishmentController
      */
     public function record(Request $objRequest): View
     {
+        $this->ensureArrivalRecordsRequired($objRequest);
+
         return $this->renderEstablishment($objRequest, 'establishment.arrivals.record', 'arrivals.record', 'Record Arrival', [
             'provinces' => config('ph_provinces'),
             'countries' => config('countries'),
@@ -52,9 +57,13 @@ class ArrivalsController extends EstablishmentController
      */
     public function store(Request $objRequest): JsonResponse
     {
+        $this->ensureArrivalRecordsRequired($objRequest);
+
         $arrData = Validator::make($objRequest->all(), [
             'date' => ['required', 'date'],
             'visitorName' => ['nullable', 'string', 'max:255'],
+            'visitorContact' => ['nullable', 'string', 'max:255'],
+            'remarks' => ['nullable', 'string', 'max:1000'],
             'visitType' => ['required', Rule::in(['Daytour', 'Overnight'])],
             'male' => ['nullable', 'integer', 'min:0'],
             'female' => ['nullable', 'integer', 'min:0'],
@@ -100,6 +109,8 @@ class ArrivalsController extends EstablishmentController
                 'arr_source' => ArrivalSource::Staff,
                 'arr_date' => $arrData['date'],
                 'arr_visitor_name' => $arrData['visitorName'] ?? null,
+                'arr_visitor_contact' => $arrData['visitorContact'] ?? null,
+                'arr_remarks' => $arrData['remarks'] ?? null,
                 'arr_visit_type' => $arrData['visitType'],
                 'arr_party_male' => $objCompanions['male'],
                 'arr_party_female' => $objCompanions['female'],
@@ -132,8 +143,7 @@ class ArrivalsController extends EstablishmentController
      */
     public function index(Request $objRequest): View
     {
-        abort_if($objRequest->user()->lst_id === null, 403, 'Your account is not linked to an establishment yet.');
-        $objListing = $objRequest->user()->establishment()->firstOrFail();
+        $objListing = $this->ensureArrivalRecordsRequired($objRequest);
 
         $objArrivals = $objListing->arrivals()
             ->orderByDesc('arr_date')
@@ -143,9 +153,25 @@ class ArrivalsController extends EstablishmentController
                 'id' => 'GR-'.$objArrival->arr_id,
                 'date' => $objArrival->arr_date->toDateString(),
                 'visitorName' => $objArrival->arr_visitor_name,
+                'visitType' => $objArrival->arr_visit_type ?? '—',
+                'guests' => $objArrival->arr_party_size ?: 1,
+                'male' => (int) $objArrival->arr_party_male,
+                'female' => (int) $objArrival->arr_party_female,
+                'origin' => $this->describeOrigin($objArrival),
+                'source' => $objArrival->arr_source?->label() ?? '—',
+                'contact' => $objArrival->arr_visitor_contact,
+                'adults' => (int) $objArrival->arr_party_adults,
+                'children' => (int) $objArrival->arr_party_children,
+                'seniors' => (int) $objArrival->arr_party_seniors,
+                'local' => (int) $objArrival->arr_party_local,
+                'foreign' => (int) $objArrival->arr_party_foreign,
+                'localScope' => $objArrival->arr_local_origin_scope?->value,
+                'localPlace' => $objArrival->arr_local_origin_place,
+                'foreignCountry' => $objArrival->arr_foreign_country,
                 'gender' => $objArrival->arr_gender,
                 'classification' => $objArrival->arr_classification,
                 'remarks' => $objArrival->arr_remarks,
+                'recordedAt' => $objArrival->arr_created_at?->format('M j, Y g:i A'),
                 'status' => $objArrival->arr_status,
             ]);
 
@@ -155,16 +181,35 @@ class ArrivalsController extends EstablishmentController
     }
 
     /**
+     * Summarises where the party came from, e.g. "Local 2 (Davao City) · Foreign 1 (Japan)".
+     */
+    private function describeOrigin(Arrival $objArrival): string
+    {
+        $arrParts = [];
+
+        if ($objArrival->arr_party_local > 0) {
+            $strPlace = $objArrival->arr_local_origin_place ?? $objArrival->arr_local_origin_scope?->value;
+            $arrParts[] = 'Local '.$objArrival->arr_party_local.($strPlace ? ' ('.$strPlace.')' : '');
+        }
+
+        if ($objArrival->arr_party_foreign > 0) {
+            $arrParts[] = 'Foreign '.$objArrival->arr_party_foreign
+                .($objArrival->arr_foreign_country ? ' ('.$objArrival->arr_foreign_country.')' : '');
+        }
+
+        return $arrParts ? implode(' · ', $arrParts) : ($objArrival->arr_classification ?? '—');
+    }
+
+    /**
      * Monthly Reports: this establishment's digital monthly submission
-     * history, plus a "Submit [Month]" control for any of the last 12
+     * history, plus a "Submit [Month]" control for any of the last 12 completed
      * months that doesn't have a report yet. Digital submission never asks
      * for new data entry here — it sums whatever Arrival rows already exist
      * for the chosen month from the Record Arrival wizard.
      */
     public function monthlyReports(Request $objRequest): View
     {
-        abort_if($objRequest->user()->lst_id === null, 403, 'Your account is not linked to an establishment yet.');
-        $objListing = $objRequest->user()->establishment()->firstOrFail();
+        $objListing = $this->ensureArrivalRecordsRequired($objRequest);
 
         $objReports = $objListing->monthlyArrivalReports()
             ->with('verifier')
@@ -173,7 +218,7 @@ class ArrivalsController extends EstablishmentController
 
         $strSubmittedMonths = $objReports->pluck('mar_period_month')->map->toDateString();
 
-        $objMonthOptions = collect(range(0, 11))
+        $objMonthOptions = collect(range(1, 12))
             ->map(fn (int $intIndex) => CarbonImmutable::now()->subMonthsNoOverflow($intIndex)->startOfMonth())
             ->reject(fn (CarbonImmutable $dtmMonth) => $strSubmittedMonths->contains($dtmMonth->toDateString()))
             ->values();
@@ -181,6 +226,7 @@ class ArrivalsController extends EstablishmentController
         return $this->renderEstablishment($objRequest, 'establishment.arrivals.monthly', 'arrivals.monthly', 'Monthly Reports', [
             'reports' => $objReports,
             'monthOptions' => $objMonthOptions,
+            'reminder' => MonthlyReportReminder::forListing($objListing),
         ]);
     }
 
@@ -193,8 +239,7 @@ class ArrivalsController extends EstablishmentController
      */
     public function submitMonthlyReport(Request $objRequest): RedirectResponse
     {
-        abort_if($objRequest->user()->lst_id === null, 403, 'Your account is not linked to an establishment yet.');
-        $objListing = $objRequest->user()->establishment()->firstOrFail();
+        $objListing = $this->ensureArrivalRecordsRequired($objRequest);
 
         $arrData = $objRequest->validate([
             'period_month' => ['required', 'date_format:Y-m'],
@@ -264,6 +309,28 @@ class ArrivalsController extends EstablishmentController
             ],
         );
 
+        Notifier::toLgu(
+            $objListing->mun_id,
+            'monthly-report-submitted',
+            "{$objListing->lst_name} submitted its {$dtmMonth->format('F Y')} monthly report for your review.",
+            route('lgu.monthlyReports.show', $objReport),
+            'ti-report',
+        );
+
         return back()->with('toast', "{$dtmMonth->format('F Y')} report submitted for LGU review.");
+    }
+
+    /**
+     * Arrival recording and monthly reports only exist for establishments
+     * whose category requires them (Listing::requiresArrivalRecords()); any
+     * other establishment is refused here, and its menu hides these pages.
+     */
+    private function ensureArrivalRecordsRequired(Request $objRequest): Listing
+    {
+        abort_if($objRequest->user()->lst_id === null, 403, 'Your account is not linked to an establishment yet.');
+        $objListing = $objRequest->user()->establishment()->with('categoryRecord')->firstOrFail();
+        abort_unless($objListing->requiresArrivalRecords(), 403, 'Your establishment type does not need arrival records.');
+
+        return $objListing;
     }
 }

@@ -310,8 +310,37 @@ class Listing extends Model
     {
         return $this->lst_uuid !== null
             && $this->isPubliclyVisible()
-            && ! $this->isTourGuide()
-            && (bool) $this->categoryRecord?->cat_is_qr_enabled;
+            && $this->requiresArrivalRecords();
+    }
+
+    /**
+     * Whether this listing is expected to record tourist arrivals (arrival
+     * QR, Record Arrival, monthly reports and their reminders). Destinations
+     * always do; an establishment does only when its category (set at LGU
+     * registration) has arrival recording switched on by the PTO. A Tour
+     * Guide never does. Independent of publish status.
+     */
+    public function requiresArrivalRecords(): bool
+    {
+        if ($this->isTourGuide()) {
+            return false;
+        }
+
+        return $this->lst_category === 'destinations'
+            || (bool) $this->categoryRecord?->cat_is_qr_enabled;
+    }
+
+    /**
+     * Whether this listing has its own feedback QR / formal feedback form —
+     * any publicly visible destination or establishment except a Tour Guide.
+     * Independent of the check-in QR's per-category switch, since feedback is
+     * given after the visit.
+     */
+    public function isFeedbackQrEnabled(): bool
+    {
+        return $this->lst_uuid !== null
+            && $this->isPubliclyVisible()
+            && ! $this->isTourGuide();
     }
 
     /**

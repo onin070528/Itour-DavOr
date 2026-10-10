@@ -8,6 +8,7 @@
 @php
     $trendLabels = ['week' => 'This Week', 'month' => 'This Month', 'year' => 'This Year'];
     $totalClassified = $classificationBreakdown->sum();
+    $blnRecordsArrivals = $user->establishment?->requiresArrivalRecords() ?? false;
 @endphp
 
 <x-layouts.dashboard :user="$user" :nav-sections="$navSections" :page-title="$pageTitle" account-heading="System" :settings-href="route('establishment.settings')">
@@ -16,10 +17,12 @@
         description="How your establishment is performing on iTOUR."
     >
         <x-slot:actions>
+            @if ($blnRecordsArrivals)
             <a href="{{ route('establishment.arrivals.record') }}" class="inline-flex items-center gap-2 rounded-sm bg-primary-700 px-4 py-2.5 text-sm font-semibold text-sand-0 hover:bg-primary-900">
                 <i class="ti ti-send" aria-hidden="true"></i>
                 Record Tourist Arrival
             </a>
+            @endif
         </x-slot:actions>
     </x-dashboard.page-header>
 
@@ -141,13 +144,13 @@
     <div class="mt-6 rounded-md border border-sand-200 bg-sand-0 p-5">
         <h2 class="font-display text-base font-bold text-sand-900">Quick Actions</h2>
         <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-            @foreach ([
-                ['icon' => 'ti-send', 'label' => 'Record Tourist Arrival', 'href' => route('establishment.arrivals.record')],
-                ['icon' => 'ti-list-details', 'label' => 'View Arrival Records', 'href' => route('establishment.arrivals.index')],
+            @foreach (array_filter([
+                $blnRecordsArrivals ? ['icon' => 'ti-send', 'label' => 'Record Tourist Arrival', 'href' => route('establishment.arrivals.record')] : null,
+                $blnRecordsArrivals ? ['icon' => 'ti-list-details', 'label' => 'View Arrival Records', 'href' => route('establishment.arrivals.index')] : null,
                 ['icon' => 'ti-building-store', 'label' => 'View My Establishment', 'href' => route('establishment.profile')],
                 ['icon' => 'ti-message-2', 'label' => 'View Feedback', 'href' => route('establishment.feedback.index')],
-                ['icon' => 'ti-calendar-event', 'label' => 'Monthly Reports', 'href' => route('establishment.arrivals.monthly')],
-            ] as $action)
+                $blnRecordsArrivals ? ['icon' => 'ti-calendar-event', 'label' => 'Monthly Reports', 'href' => route('establishment.arrivals.monthly')] : null,
+            ]) as $action)
                 <a href="{{ $action['href'] }}" class="flex items-center gap-2.5 rounded-md border border-sand-200 px-3.5 py-3 text-sm font-semibold text-sand-800 transition-colors hover:border-primary-300 hover:text-primary-700">
                     <i class="ti {{ $action['icon'] }} text-primary-700" aria-hidden="true"></i>
                     {{ $action['label'] }}

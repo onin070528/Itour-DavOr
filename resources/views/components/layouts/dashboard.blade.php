@@ -233,10 +233,43 @@
                 </div>
 
                 <div class="flex shrink-0 items-center gap-4">
-                    <button type="button" class="relative text-sand-600" aria-label="Notifications">
-                        <i class="ti ti-bell text-lg" aria-hidden="true"></i>
-                        <span class="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-accent-500"></span>
-                    </button>
+                    @php
+                        $objBellNotifications = $user->notifications()->latest()->limit(8)->get();
+                        $intUnreadCount = $user->unreadNotifications()->count();
+                    @endphp
+                    <div class="relative">
+                        <button type="button" data-dropdown-toggle class="relative text-sand-600" aria-label="Notifications{{ $intUnreadCount ? ' ('.$intUnreadCount.' unread)' : '' }}">
+                            <i class="ti ti-bell text-lg" aria-hidden="true"></i>
+                            @if ($intUnreadCount > 0)
+                                <span class="absolute -top-1.5 -right-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold text-sand-0">{{ $intUnreadCount > 9 ? '9+' : $intUnreadCount }}</span>
+                            @endif
+                        </button>
+
+                        <div data-dropdown-menu class="absolute right-0 z-20 mt-2 hidden w-80 max-w-[calc(100vw-2rem)] rounded-md border border-sand-200 bg-sand-0 shadow-md">
+                            <div class="flex items-center justify-between border-b border-sand-100 px-3.5 py-2.5">
+                                <p class="text-sm font-semibold text-sand-900">Notifications</p>
+                                @if ($intUnreadCount > 0)
+                                    <form method="POST" action="{{ route('notifications.readAll') }}">
+                                        @csrf
+                                        <button type="submit" class="text-xs font-semibold text-primary-700 hover:underline">Mark all as read</button>
+                                    </form>
+                                @endif
+                            </div>
+                            <div class="max-h-80 overflow-y-auto">
+                                @forelse ($objBellNotifications as $objBellNotification)
+                                    <a href="{{ route('notifications.open', $objBellNotification->id) }}" @class(['flex items-start gap-2.5 border-b border-sand-100 px-3.5 py-2.5 text-left hover:bg-sand-50', 'bg-primary-50' => $objBellNotification->read_at === null])>
+                                        <i class="ti {{ $objBellNotification->data['icon'] ?? 'ti-bell' }} mt-0.5 text-base text-primary-700" aria-hidden="true"></i>
+                                        <span class="min-w-0">
+                                            <span class="block text-sm text-sand-800">{{ $objBellNotification->data['message'] ?? 'You have a new notification.' }}</span>
+                                            <span class="block text-xs text-sand-500">{{ $objBellNotification->created_at->diffForHumans() }}</span>
+                                        </span>
+                                    </a>
+                                @empty
+                                    <p class="px-3.5 py-6 text-center text-sm text-sand-500">You're all caught up.</p>
+                                @endforelse
+                            </div>
+                        </div>
+                    </div>
 
                     <div class="relative">
                         <button type="button" data-dropdown-toggle class="flex cursor-pointer items-center gap-2.5 rounded-sm">
@@ -278,6 +311,8 @@
                 {{ $slot }}
             </main>
         </div>
+
+        <x-establishment.monthly-report-reminder :user="$user" />
 
         {{-- Shared confirmation dialog for archive / enable / disable actions.
              Triggered via [data-confirm-trigger] — see resources/js/dashboard.js. --}}

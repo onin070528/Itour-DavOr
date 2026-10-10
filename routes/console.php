@@ -20,3 +20,7 @@ Artisan::command('inspire', function () {
 // retention — daily is frequent enough for a monthly-scale retention
 // window (config('establishment_images.archive_retention_months')).
 Schedule::command('establishment-images:purge')->daily();
+
+// Establishments are reminded 3 days before, on, and after the 15th when
+// last month's report has not been sent to their LGU yet.
+Schedule::command('reports:send-reminders')->dailyAt('08:00');

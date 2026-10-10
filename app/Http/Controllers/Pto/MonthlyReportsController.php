@@ -44,9 +44,11 @@ class MonthlyReportsController extends PtoController
 
         $objEstablishments = Listing::query()
             ->where('mun_id', $objMunicipality?->mun_id)
-            ->where('lst_category', '!=', 'destinations')
+            ->with('categoryRecord')
             ->orderBy('lst_name')
-            ->get();
+            ->get()
+            ->filter(fn (Listing $objListing) => $objListing->requiresArrivalRecords())
+            ->values();
 
         $objReportsByListing = MonthlyArrivalReport::query()
             ->where('mun_id', $objMunicipality?->mun_id)

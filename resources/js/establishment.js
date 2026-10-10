@@ -21,22 +21,30 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function initQrActions() {
-    document.getElementById('qr-print')?.addEventListener('click', () => window.print());
+    // The QR page shows two cards (check-in and feedback); each card's own
+    // buttons act on that card only.
+    document.querySelectorAll('[data-qr-card]').forEach((card) => {
+        card.querySelector('[data-qr-card-print]')?.addEventListener('click', () => {
+            card.classList.add('qr-print-target');
+            window.print();
+            card.classList.remove('qr-print-target');
+        });
 
-    document.getElementById('qr-download')?.addEventListener('click', (e) => {
-        const svg = document.getElementById('establishment-qr-svg')?.querySelector('svg');
-        if (!svg) return;
+        card.querySelector('[data-qr-card-download]')?.addEventListener('click', (e) => {
+            const svg = card.querySelector('svg');
+            if (!svg) return;
 
-        const source = new XMLSerializer().serializeToString(svg);
-        const blob = new Blob([source], { type: 'image/svg+xml' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = e.currentTarget.dataset.qrFilename || 'qr-code.svg';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(url);
+            const source = new XMLSerializer().serializeToString(svg);
+            const blob = new Blob([source], { type: 'image/svg+xml' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = e.currentTarget.dataset.qrFilename || 'qr-code.svg';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        });
     });
 }
 
@@ -60,6 +68,8 @@ function arrivalForm(actionUrl, defaultDate) {
         actionUrl,
         date: defaultDate,
         leadVisitorName: '',
+        visitorContact: '',
+        remarks: '',
         visitType: 'Daytour',
         localOriginScope: '',
         localOriginPlace: '',
@@ -127,6 +137,8 @@ function arrivalForm(actionUrl, defaultDate) {
                     body: JSON.stringify({
                         date: this.date,
                         visitorName: this.leadVisitorName,
+                        visitorContact: this.visitorContact,
+                        remarks: this.remarks,
                         visitType: this.visitType,
                         localOriginScope: this.localTotal > 0 ? this.localOriginScope : null,
                         localOriginPlace: this.localTotal > 0 && this.localOriginScope === 'outside_province' ? this.localOriginPlace : null,
@@ -142,6 +154,8 @@ function arrivalForm(actionUrl, defaultDate) {
                 window.dispatchEvent(new CustomEvent('itour:toast', { detail: { message: 'Arrival recorded.', tone: 'success' } }));
 
                 this.leadVisitorName = '';
+                this.visitorContact = '';
+                this.remarks = '';
                 this.visitType = 'Daytour';
                 this.localOriginScope = '';
                 this.localOriginPlace = '';

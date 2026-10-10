@@ -57,7 +57,6 @@ class CheckinController extends Controller
             'countries' => config('countries'),
             'checkinAction' => route('checkin.store', $establishment),
             'refusalMessage' => null,
-            'feedbackUrl' => $objListing->isPubliclyVisible() ? route('listings.show', $objListing).'#feedback' : null,
         ]);
     }
 
@@ -87,6 +86,8 @@ class CheckinController extends Controller
             'website' => ['prohibited'],
             'visitorName' => ['required', 'string', 'max:255'],
             'visitorContact' => ['required', 'string', 'max:255'],
+            'visitType' => ['nullable', Rule::in(['Daytour', 'Overnight'])],
+            'remarks' => ['nullable', 'string', 'max:1000'],
             'male' => ['nullable', 'integer', 'min:0'],
             'female' => ['nullable', 'integer', 'min:0'],
             'adults' => ['nullable', 'integer', 'min:0'],
@@ -127,6 +128,8 @@ class CheckinController extends Controller
                 'arr_date' => now()->toDateString(),
                 'arr_visitor_name' => $arrData['visitorName'],
                 'arr_visitor_contact' => $arrData['visitorContact'],
+                'arr_visit_type' => $arrData['visitType'] ?? 'Daytour',
+                'arr_remarks' => $arrData['remarks'] ?? null,
                 'arr_party_male' => $objCompanions['male'],
                 'arr_party_female' => $objCompanions['female'],
                 'arr_party_adults' => $objCompanions['adults'],

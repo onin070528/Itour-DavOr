@@ -35,7 +35,7 @@ class DashboardNavigation
         $arrSections = match (true) {
             $objUser->isPto() => self::_ptoSections($strActive, $intImageApprovalCount),
             $objUser->isLgu() => self::_lguSections($strActive, $intImageApprovalCount),
-            $objUser->isEstablishment() => self::_establishmentSections($strActive),
+            $objUser->isEstablishment() => self::_establishmentSections($strActive, $objUser),
             default => [],
         };
 
@@ -123,12 +123,16 @@ class DashboardNavigation
     /**
      * @return array<string, array<int, array<string, mixed>>>
      */
-    private static function _establishmentSections(string $strActive): array
+    private static function _establishmentSections(string $strActive, User $objUser): array
     {
         $item = self::_itemBuilder($strActive);
         $group = self::_groupBuilder($strActive);
 
-        return [
+        // Arrival recording and monthly reports only apply to establishment
+        // types whose category requires them (Listing::requiresArrivalRecords()).
+        $blnRecordsArrivals = $objUser->establishment?->requiresArrivalRecords() ?? false;
+
+        $arrSections = [
             'Main' => [
                 $item('dashboard', 'ti-layout-dashboard', 'Dashboard', 'establishment.dashboard'),
             ],
@@ -142,7 +146,7 @@ class DashboardNavigation
                     $item('arrivals.record', 'ti-send', 'Record Arrival', 'establishment.arrivals.record'),
                     $item('arrivals.index', 'ti-list-details', 'Arrival Records', 'establishment.arrivals.index'),
                 ]),
-                $item('establishment.qr', 'ti-qrcode', 'QR Code', 'establishment.qr'),
+                $item('establishment.qr', 'ti-qrcode', 'QR Codes', 'establishment.qr'),
             ],
             'Reports' => [
                 $item('arrivals.monthly', 'ti-calendar-event', 'Monthly Report', 'establishment.arrivals.monthly'),
@@ -157,6 +161,27 @@ class DashboardNavigation
                 $item('activityLog', 'ti-shield-check', 'Activity Log', 'establishment.activityLog'),
             ],
         ];
+
+        // A destination's details are managed by its LGU, so its maintainer
+        // account has a Photos page instead of a profile.
+        if ($objUser->establishment?->lst_category === 'destinations') {
+            $arrSections['Work'] = array_values(array_map(
+                fn (array $arrEntry) => $arrEntry['key'] === 'establishment.profile'
+                    ? $item('establishment.photos', 'ti-photo', 'Photos', 'establishment.photos')
+                    : $arrEntry,
+                $arrSections['Work'],
+            ));
+        }
+
+        if (! $blnRecordsArrivals) {
+            unset($arrSections['Reports']);
+            $arrSections['Work'] = array_values(array_filter(
+                $arrSections['Work'],
+                fn (array $arrEntry) => ! in_array($arrEntry['key'], ['arrivals'], true),
+            ));
+        }
+
+        return $arrSections;
     }
 
     /**

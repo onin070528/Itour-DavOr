@@ -11,6 +11,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreFeedbackRequest extends FormRequest
 {
@@ -28,6 +29,13 @@ class StoreFeedbackRequest extends FormRequest
             'name' => ['nullable', 'string', 'max:60'],
             'rating' => ['required', 'integer', 'between:1,5'],
             'comment' => ['required', 'string', 'min:5', 'max:1000'],
+            'email' => ['nullable', 'email', 'max:120'],
+            'visit_date' => ['nullable', 'date', 'before_or_equal:today'],
+            'visit_purpose' => ['nullable', Rule::in(['Leisure', 'Business', 'Family / Friends', 'Event', 'Other'])],
+            'visitor_origin' => ['nullable', Rule::in(['Local', 'Foreign'])],
+            'aspects' => ['nullable', 'array'],
+            'aspects.*' => ['nullable', 'integer', 'between:1,5'],
+            'would_recommend' => ['nullable', 'in:0,1'],
         ];
     }
 

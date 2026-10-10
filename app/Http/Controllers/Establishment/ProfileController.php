@@ -48,6 +48,23 @@ class ProfileController extends EstablishmentController
     }
 
     /**
+     * Photos page for a destination's account, which has no details form
+     * (its LGU manages those) — only the photo manager. Photos go to the LGU
+     * for approval exactly like an establishment's.
+     */
+    public function photos(Request $objRequest): View
+    {
+        $objListing = $this->ownListing($objRequest);
+        abort_unless($objListing->lst_category === 'destinations', 404);
+
+        return $this->renderEstablishment($objRequest, 'establishment.photos', 'establishment.photos', 'Photos', [
+            'listing' => $objListing,
+            'images' => $objListing->establishmentImages,
+            'blnIsReadOnly' => $objListing->lst_status === 'Archived',
+        ]);
+    }
+
+    /**
      * "Save draft" — saves the details form without validating required
      * fields and never changes status. Always available in DRAFT/UNPUBLISHED.
      */
@@ -226,7 +243,8 @@ class ProfileController extends EstablishmentController
 
         return $this->renderEstablishment($objRequest, 'establishment.qr', 'establishment.qr', 'QR Code', [
             'establishmentName' => $objListing->lst_name,
-            'checkinUrl' => route('lgu.establishmentQr', ['establishment' => $objListing->lst_uuid]),
+            'checkinUrl' => $objListing->requiresArrivalRecords() ? route('lgu.establishmentQr', ['establishment' => $objListing->lst_uuid]) : null,
+            'feedbackUrl' => $objListing->isFeedbackQrEnabled() ? route('feedback.form', ['listing' => $objListing->lst_uuid]) : null,
         ]);
     }
 

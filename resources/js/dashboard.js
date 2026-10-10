@@ -379,7 +379,24 @@ function initModals() {
 
     document.querySelectorAll('[data-modal-backdrop]').forEach((backdrop) => {
         backdrop.addEventListener('click', (e) => {
-            if (e.target === backdrop) closeModal(backdrop.closest('[data-modal]'));
+            if (e.target !== backdrop) return;
+
+            const modal = backdrop.closest('[data-modal]');
+            // A form modal marked data-confirm-outside-close asks first, so a
+            // stray click outside it doesn't throw away what was typed.
+            if (modal?.hasAttribute('data-confirm-outside-close')) {
+                askYesNo({
+                    title: 'Are you sure?',
+                    message: 'Do you want to close this form? Anything you have entered will be lost.',
+                    yesLabel: 'Yes',
+                    noLabel: 'No',
+                    onYes: () => closeModal(modal),
+                });
+
+                return;
+            }
+
+            closeModal(modal);
         });
     });
 
@@ -388,6 +405,34 @@ function initModals() {
         const open = Array.from(document.querySelectorAll('[data-modal]:not(.hidden)')).pop();
         if (open) closeModal(open);
     });
+}
+
+/**
+ * Opens the shared `#confirm-modal` as a plain Yes / No question and runs
+ * `onYes` if the user picks Yes. Picking No (or the X / outside click) just
+ * closes the question.
+ */
+function askYesNo({ title, message, yesLabel = 'Yes', noLabel = 'No', onYes }) {
+    const modal = document.getElementById('confirm-modal');
+    if (!modal) return;
+
+    modal.querySelector('[data-confirm-title]').textContent = title;
+    modal.querySelector('[data-confirm-message]').textContent = message;
+
+    const noButton = modal.querySelector('[data-modal-close]');
+    if (noButton) noButton.textContent = noLabel;
+
+    const yesButton = modal.querySelector('[data-confirm-button]');
+    yesButton.textContent = yesLabel;
+    yesButton.classList.add('bg-danger');
+    yesButton.classList.remove('bg-primary-700');
+    yesButton.onclick = () => {
+        closeModal(modal);
+        onYes();
+    };
+
+    modal.classList.remove('hidden');
+    document.body.classList.add('overflow-hidden');
 }
 
 function closeModal(modal) {
@@ -547,6 +592,9 @@ function initConfirmActions() {
     document.addEventListener('click', (e) => {
         const trigger = e.target.closest('[data-confirm-trigger]');
         if (!trigger) return;
+
+        const cancelButton = modal.querySelector('[data-modal-close]');
+        if (cancelButton) cancelButton.textContent = 'Cancel';
 
         titleEl.textContent = trigger.dataset.confirmTitle ?? 'Are you sure?';
         messageEl.textContent = trigger.dataset.confirmMessage ?? 'This action cannot be undone.';

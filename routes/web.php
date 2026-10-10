@@ -33,6 +33,7 @@ use App\Http\Controllers\Lgu\MonthlyReportsController as LguMonthlyReportsContro
 use App\Http\Controllers\Lgu\SettingsController as LguSettingsController;
 use App\Http\Controllers\Lgu\UsersController as LguUsersController;
 use App\Http\Controllers\ListingDetailController;
+use App\Http\Controllers\NotificationsController;
 use App\Http\Controllers\PrivacyController;
 use App\Http\Controllers\Pto\AnnouncementsController as PtoAnnouncementsController;
 use App\Http\Controllers\Pto\AuditLogsController as PtoAuditLogsController;
@@ -68,6 +69,11 @@ Route::get('/establishment-images/{image}/{variant}', [EstablishmentImageFileCon
 Route::get('/checkin/{establishment}', [CheckinController::class, 'show'])->name('lgu.establishmentQr');
 Route::post('/checkin/{establishment}', [CheckinController::class, 'store'])->middleware('throttle:qr-checkin')->name('checkin.store');
 
+// Separate from the check-in QR: each destination/establishment also has its
+// own feedback QR, scanned after the visit, opening a formal feedback form.
+Route::get('/feedback/{listing}', [PublicFeedbackController::class, 'show'])->name('feedback.form');
+Route::post('/feedback/{listing}', [PublicFeedbackController::class, 'submit'])->middleware('throttle:5,1')->name('feedback.submit');
+
 Route::middleware('guest')->group(function () {
     Route::get('/login', [SessionController::class, 'create'])->name('login');
     Route::post('/login', [SessionController::class, 'store'])->middleware('throttle:login')->name('login.store');
@@ -76,6 +82,11 @@ Route::middleware('guest')->group(function () {
     Route::post('/forgot-password', [PasswordResetLinkController::class, 'store'])->middleware('throttle:6,1')->name('password.email');
     Route::get('/reset-password/{token}', [NewPasswordController::class, 'create'])->name('password.reset');
     Route::post('/reset-password', [NewPasswordController::class, 'store'])->middleware('throttle:6,1')->name('password.store');
+});
+
+Route::middleware('auth')->prefix('notifications')->name('notifications.')->group(function () {
+    Route::get('/{notificationId}/open', [NotificationsController::class, 'open'])->name('open');
+    Route::post('/read-all', [NotificationsController::class, 'readAll'])->name('readAll');
 });
 
 Route::post('/logout', [SessionController::class, 'destroy'])
@@ -233,6 +244,7 @@ Route::middleware(['auth', 'role:establishment'])->prefix('establishment')->name
     Route::put('/profile', [EstablishmentProfileController::class, 'update'])->name('profile.update');
     Route::patch('/profile/submit', [EstablishmentProfileController::class, 'submit'])->name('profile.submit');
     Route::get('/qr-code', [EstablishmentProfileController::class, 'qr'])->name('qr');
+    Route::get('/photos', [EstablishmentProfileController::class, 'photos'])->name('photos');
 
     Route::prefix('arrivals')->name('arrivals.')->group(function () {
         Route::get('/record', [EstablishmentArrivalsController::class, 'record'])->name('record');

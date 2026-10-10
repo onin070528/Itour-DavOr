@@ -921,10 +921,7 @@ function initEstablishmentQrForm() {
 
     const localOriginScope = document.getElementById('qr-local-origin-scope');
     const localOriginPlace = document.getElementById('qr-local-origin-place');
-    const localOriginPlaceWrap = document.getElementById('qr-local-origin-place-wrap');
-    const localOriginWrap = document.getElementById('qr-local-origin-wrap');
     const foreignCountry = document.getElementById('qr-foreign-country');
-    const foreignCountryWrap = document.getElementById('qr-foreign-country-wrap');
 
     function updateTotal() {
         const sums = computeMatrixSums();
@@ -933,10 +930,8 @@ function initEstablishmentQrForm() {
         foreignValue.textContent = String(sums.foreign);
         localValue.textContent = String(sums.local);
 
-        localOriginWrap?.classList.toggle('hidden', sums.local <= 0);
-        foreignCountryWrap?.classList.toggle('hidden', sums.foreign <= 0);
-        if (localOriginPlaceWrap) {
-            localOriginPlaceWrap.classList.toggle('hidden', localOriginScope?.value !== 'outside_province');
+        if (localOriginPlace) {
+            localOriginPlace.disabled = localOriginScope?.value !== 'outside_province';
         }
     }
 
@@ -976,6 +971,8 @@ function initEstablishmentQrForm() {
                 visitorName: form.elements.namedItem('visitorName')?.value,
                 visitorContact: form.elements.namedItem('visitorContact')?.value,
                 website: form.elements.namedItem('website')?.value,
+                visitType: form.querySelector('input[name="visitType"]:checked')?.value ?? 'Daytour',
+                remarks: form.elements.namedItem('remarks')?.value || null,
                 localOriginScope: sums.local > 0 ? (localOriginScope?.value || null) : null,
                 localOriginPlace: sums.local > 0 && localOriginScope?.value === 'outside_province' ? (localOriginPlace?.value || null) : null,
                 foreignCountry: sums.foreign > 0 ? (foreignCountry?.value || null) : null,
