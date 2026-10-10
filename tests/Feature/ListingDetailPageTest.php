@@ -138,7 +138,7 @@ test('a destination without a map location explains that nearby services cannot 
     $destinations = Category::query()->firstOrCreate(['cat_name' => 'Tourist Destinations'], ['cat_sort_order' => 0, 'cat_is_active' => true]);
     $listing = listingDetailFixture(['lst_category' => 'destinations', 'cat_id' => $destinations->cat_id, 'lst_status' => 'Active', 'lst_lat' => null, 'lst_lng' => null]);
 
-    $this->get(route('listings.show', $listing))->assertOk()->assertSee("map location hasn't been set yet", false)->assertDontSee('Find Nearby');
+    $this->get(route('listings.show', $listing))->assertOk()->assertSee("map location hasn't been set yet", false)->assertDontSee(route('listings.nearby', $listing), false);
     $this->get(route('listings.nearby', $listing))->assertOk()->assertSee("map location hasn't been set yet", false);
 });
 

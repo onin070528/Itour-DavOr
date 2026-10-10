@@ -30,6 +30,8 @@ class DatabaseSeeder extends Seeder
             MunicipalReportSeeder::class,
             RbacScopeBackfillSeeder::class,
             RbacDemoAccountSeeder::class,
+            SentimentLexiconSeeder::class,
+            FeedbackIssueLexiconSeeder::class,
         ]);
 
         // WithoutModelEvents above also mutes Listing's creating hook that

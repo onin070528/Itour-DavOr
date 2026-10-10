@@ -28,7 +28,11 @@
                         (local/foreign), and companion headcounts, submitted when you scan an establishment's
                         check-in QR code.
                     </li>
-                    <li><strong>Reviews and feedback</strong> you choose to submit about destinations or establishments.</li>
+                    <li>
+                        <strong>Tourist feedback</strong> you choose to submit about a destination or establishment — your
+                        feedback text, and optionally your name and visit date, together with the time you gave consent.
+                        No account, contact details, or location are collected with it.
+                    </li>
                     <li><strong>Staff accounts</strong> — name, email, and role, for PTO, LGU, and establishment users who log in to manage listings.</li>
                 </ul>
                 <p class="mt-3">
@@ -46,6 +50,13 @@
                     province and its municipalities — visitor volume, origin, and satisfaction trends that
                     inform tourism planning. Staff account data exists only so authorized users can manage
                     listings, reports, and photos.
+                </p>
+                <p class="mt-3">
+                    <strong>How feedback is analyzed.</strong> Feedback is read in English. If you write in another
+                    language (for example Bisaya or Tagalog), its text is first sent to an external translation service
+                    to be translated into English. The English text is then scored with a fixed tourism word list — not
+                    AI — to measure positive, neutral, or negative experiences and recurring concerns for tourism
+                    analysis. Your original words are kept as you wrote them, and the results are never shown publicly.
                 </p>
             </section>
 
@@ -65,6 +76,7 @@
                 <ul class="mt-2 list-disc space-y-1.5 pl-5">
                     <li><strong>Mapbox</strong> — powers the maps; receives your IP address and the map area you view.</li>
                     <li><strong>Google Maps</strong> — opens only when you choose Get Directions, with the destination's location. iTOUR does not send your location; Google Maps may ask for it itself.</li>
+                    <li><strong>OpenAI (translation service)</strong> — receives only the text of feedback that is not in English, so it can be translated into English for tourism analysis. Your name, visit date, and IP address are not sent with it. Please don't include personal details in your feedback.</li>
                     <li><strong>Our hosting provider</strong> — stores the application and its database, and sees standard web traffic logs (IP address, pages requested) like any hosted web application.</li>
                 </ul>
             </section>

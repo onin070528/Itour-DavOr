@@ -11,15 +11,14 @@
             ['label' => 'Home', 'href' => url('/')],
             ['label' => 'Explore', 'href' => route('explore')],
             ['label' => 'Directory', 'href' => route('explore')],
-            ['label' => 'Nearby', 'href' => url('/').'#near-you'],
-            ['label' => 'Reviews', 'href' => url('/').'#reviews'],
+            ['label' => 'Nearby', 'href' => route('nearby')],
             ['label' => 'About', 'href' => url('/').'#about'],
         ],
         'For Partners' => [
             ['label' => 'Establishment sign in', 'href' => route('login')],
             ['label' => 'LGU tourism office', 'href' => route('login')],
             ['label' => 'Provincial Tourism Office', 'href' => route('login')],
-            ['label' => 'Submit tourist feedback', 'href' => url('/').'#reviews'],
+            ['label' => 'Submit tourist feedback', 'href' => route('feedback.create')],
         ],
     ];
 @endphp

@@ -1,5 +1,6 @@
 import { registerSW } from 'virtual:pwa-register';
-import { initFindNearMe } from './find_near_me';
+import { initFindNearMe, requestCurrentPosition, requestNearbyPlaces } from './find_near_me';
+import { initTouristFeedbackForm } from './tourist_feedback_form';
 
 // Registers the service worker configured in vite.config.js (VitePWA) —
 // offline caching for the public Hotlines page only (see its runtimeCaching
@@ -19,70 +20,9 @@ document.addEventListener('DOMContentLoaded', () => {
     initExperiencesExploreAll();
     initChatbot();
     initEstablishmentQrForm();
-    initNavScrollSpy();
     initHeroCarousel();
+    initTouristFeedbackForm();
 });
-
-/**
- * Highlights "Home"/"Nearby"/"Reviews" in the topbar as the corresponding
- * same-page section scrolls into view — the landing page's only nav items
- * without their own route ("Explore"/"Hotlines" keep their server-rendered,
- * route-matched active state untouched; this never runs on pages that lack
- * the #near-you/#reviews sections, i.e. everywhere but the landing page).
- */
-function initNavScrollSpy() {
-    const spyLabels = ['Home', 'Nearby', 'Reviews'];
-    const navLinks = Array.from(document.querySelectorAll('[data-nav-link]'))
-        .filter((link) => spyLabels.includes(link.dataset.navLink));
-
-    if (!navLinks.length) return;
-
-    const sections = ['Nearby', 'Reviews']
-        .map((label) => ({ label, el: document.getElementById({ Nearby: 'near-you', Reviews: 'reviews' }[label]) }))
-        .filter((s) => s.el);
-
-    if (!sections.length) return;
-
-    function paint(activeLabel) {
-        navLinks.forEach((link) => {
-            const active = link.dataset.navLink === activeLabel;
-
-            if (link.dataset.navVariant === 'underline') {
-                link.classList.toggle('border-accent-500', active);
-                link.classList.toggle('text-primary-700', active);
-                link.classList.toggle('font-semibold', active);
-                link.classList.toggle('border-transparent', !active);
-                link.classList.toggle('text-sand-900', !active);
-            } else {
-                link.classList.toggle('bg-sand-100', active);
-                link.classList.toggle('text-primary-700', active);
-                link.classList.toggle('font-semibold', active);
-            }
-        });
-    }
-
-    const observer = new IntersectionObserver((entries) => {
-        const visible = entries
-            .filter((entry) => entry.isIntersecting)
-            .map((entry) => sections.find((s) => s.el === entry.target)?.label)
-            .filter(Boolean);
-
-        if (visible.length) {
-            // Lowest section currently in view wins when two overlap.
-            paint(visible[visible.length - 1]);
-            return;
-        }
-
-        // Nothing observed is intersecting: above the first section means
-        // Home is still the active "section"; below it (past the last
-        // section's bottom) leaves About as the closest match, since
-        // there's nothing further down the page to hand off to.
-        const aboveEverything = sections[0].el.getBoundingClientRect().top > 0;
-        paint(aboveEverything ? 'Home' : 'About');
-    }, { rootMargin: '-100px 0px -55% 0px', threshold: 0 });
-
-    sections.forEach((s) => observer.observe(s.el));
-}
 
 /**
  * Landing page hero background carousel: cross-fades between
@@ -621,131 +561,551 @@ function initListingDetailMap() {
 }
 
 /**
- * Landing page "Find Places Near You" section (resources/views/components/
- * near-you-section.blade.php): a Mapbox map of the province's public places
- * that also plots Find Near Me results. Which places are nearest, and how
- * far they are, comes only from the server (Find Near Me ->
- * NearbySearchService); this map calculates nothing. The visitor's
- * approximate position (rounded, display only) arrives in the
- * "find-near-me:results" event from resources/js/find_near_me.js.
+ * The public Nearby page (resources/views/nearby.blade.php): a Mapbox map and
+ * a list of the province's public places. Which places are nearest, and how
+ * far they are, comes only from the server (POST /find-near-me ->
+ * NearbySearchService, reached through requestNearbyPlaces()); this page
+ * calculates no distance. Without a chosen location it shows every public
+ * place, filtered by category for display only. The chosen location (device
+ * position or a searched place) lives in this function's memory only — it is
+ * never stored — and "Clear location" drops it. Mapbox order is [lng, lat].
  */
 function initNearbyMap() {
+    const page = document.getElementById('nearby-page');
     const container = document.getElementById('nearby-map');
     const dataEl = document.getElementById('nearby-map-data');
-    const statusText = document.getElementById('nearby-map-status-text');
 
-    if (!container || !dataEl) {
-        return;
-    }
-
-    const token = container.dataset.mapboxToken;
-    if (!window.mapboxgl || !token) {
-        if (statusText) statusText.textContent = "Map can't be displayed right now";
-        console.error('[nearby-map] mapbox-gl failed to load, or no public Mapbox token was configured.');
-        return;
-    }
-
-    if (!mapboxgl.supported()) {
-        if (statusText) statusText.textContent = "Map can't be displayed in this browser";
-        console.error('[nearby-map] mapboxgl.supported() returned false — no WebGL in this browser.');
+    if (!page || !container || !dataEl) {
         return;
     }
 
     const places = JSON.parse(dataEl.textContent);
-    const centerLat = Number(container.dataset.mapboxCenterLat);
-    const centerLng = Number(container.dataset.mapboxCenterLng);
+    const placesBySlug = new Map(places.map((place) => [place.slug, place]));
+    const endpoint = page.dataset.endpoint;
+    const mapboxToken = container.dataset.mapboxToken;
 
-    mapboxgl.accessToken = token;
+    const searchForm = document.getElementById('nearby-search-form');
+    const searchInput = document.getElementById('nearby-search');
+    const searchSubmit = document.getElementById('nearby-search-submit');
+    const useLocationButton = document.getElementById('nearby-use-location');
+    const useLocationLabel = document.getElementById('nearby-use-location-label');
+    const clearButton = document.getElementById('nearby-clear-location');
+    const radiusSelect = document.getElementById('nearby-radius');
+    const statusEl = document.getElementById('nearby-status');
+    const noticeEl = document.getElementById('nearby-notice');
+    const listEl = document.getElementById('nearby-list');
+    const distanceNote = document.getElementById('nearby-distance-note');
+    const categoryButtons = Array.from(page.querySelectorAll('[data-nearby-category]'));
+    const viewButtons = Array.from(page.querySelectorAll('[data-nearby-view]'));
+    const panels = Array.from(page.querySelectorAll('[data-nearby-panel]'));
 
-    let map;
-    try {
-        map = new mapboxgl.Map({
-            container,
-            style: MAP_STYLES.satellite,
-            center: [centerLng, centerLat],
-            zoom: 8.4,
-        });
-        map.addControl(new MapStyleToggleControl(), 'top-left');
-    } catch (error) {
-        if (statusText) statusText.textContent = "Map can't be displayed right now";
-        console.error('[nearby-map] mapboxgl.Map() threw:', error);
-        return;
+    const state = {
+        origin: null, // { lat, lng, label } — in memory only
+        category: '',
+        results: [],
+        total: 0,
+        page: 1,
+        lastPage: 1,
+        error: null,
+        isLoading: false,
+        selected: null,
+        requestId: 0,
+    };
+
+    const attr = (value) => escapeHtml(value).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    const isDesktop = () => window.matchMedia('(min-width: 1024px)').matches;
+
+    // ---- Map -------------------------------------------------------------
+
+    let map = null;
+    const markers = new Map();
+    let originMarker = null;
+
+    if (window.mapboxgl && mapboxToken && mapboxgl.supported()) {
+        try {
+            mapboxgl.accessToken = mapboxToken;
+            map = new mapboxgl.Map({
+                container,
+                style: MAP_STYLES.satellite,
+                center: [Number(container.dataset.mapboxCenterLng), Number(container.dataset.mapboxCenterLat)],
+                zoom: 8.4,
+            });
+            map.addControl(new MapStyleToggleControl(), 'top-left');
+            map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+            watchMapLoadFailure(map, container, '[nearby-map]');
+            map.on('load', () => map.resize());
+        } catch (error) {
+            console.error('[nearby-map] mapboxgl.Map() threw:', error);
+            map = null;
+            showMapFallback(container);
+        }
+    } else {
+        console.error('[nearby-map] mapbox-gl unavailable, no public Mapbox token, or no WebGL.');
+        showMapFallback(container);
     }
 
-    map.on('error', (event) => {
-        console.error('[nearby-map] map error:', event?.error ?? event);
-    });
+    // ---- What is shown ---------------------------------------------------
 
-    map.on('load', () => {
-        map.resize();
-    });
+    /**
+     * The list items for the current state: the server's nearest results
+     * (enriched with the page's public fields) once a location is chosen,
+     * otherwise every public place in the chosen category.
+     */
+    function currentItems() {
+        if (state.origin) {
+            return state.results.map((result) => {
+                const base = placesBySlug.get(result.slug);
 
-    map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+                return {
+                    slug: result.slug,
+                    name: result.name,
+                    kind: result.type,
+                    categoryLabel: result.subtype || result.category,
+                    address: [result.barangay, result.municipality].filter(Boolean).join(', '),
+                    lat: result.latitude,
+                    lng: result.longitude,
+                    hours: base?.hours ?? null,
+                    href: result.url,
+                    directionsUrl: base?.directionsUrl ?? null,
+                    distanceLabel: result.distanceLabel,
+                };
+            });
+        }
 
-    // Mapbox/GeoJSON order is [longitude, latitude].
-    places.forEach((place) => {
-        new mapboxgl.Marker({ color: '#125d5a' })
-            .setLngLat([place.lng, place.lat])
-            .setPopup(new mapboxgl.Popup({ offset: 24 }).setHTML(`
-                <p class="font-semibold text-sand-900">${escapeHtml(place.name)}</p>
-                <p class="text-xs text-sand-600">${escapeHtml(place.categoryLabel)} · ${escapeHtml(place.barangay)}, ${escapeHtml(place.municipality)}</p>
-            `))
-            .addTo(map);
-    });
-
-    let resultMarkers = [];
-
-    function clearResultMarkers() {
-        resultMarkers.forEach((marker) => marker.remove());
-        resultMarkers = [];
+        return places
+            .filter((place) => state.category === '' || place.category === state.category)
+            .sort((first, second) => first.name.localeCompare(second.name))
+            .map((place) => ({
+                slug: place.slug,
+                name: place.name,
+                kind: place.kind,
+                categoryLabel: place.categoryLabel,
+                address: [place.barangay, place.municipality].filter(Boolean).join(', '),
+                lat: place.lat,
+                lng: place.lng,
+                hours: place.hours,
+                href: place.href,
+                directionsUrl: place.directionsUrl,
+                distanceLabel: null,
+            }));
     }
 
-    // Summary comment: Find Near Me results — the server's places, plus the
-    // visitor's approximate position, which stays in this browser.
-    document.addEventListener('find-near-me:results', (event) => {
-        const { places: nearbyPlaces, origin } = event.detail;
+    function render() {
+        const items = state.error ? [] : currentItems();
 
-        clearResultMarkers();
-        resultMarkers.push(addPlaceMarker(
-            map,
-            { name: 'You are here (approximate)', lat: origin.lat, lng: origin.lng },
-            MAP_MARKER_COLORS.reference,
-            '<p class="font-semibold text-sand-900">You are here (approximate)</p>',
-            { scale: 1.1, label: 'Your approximate location' },
-        ));
+        renderList(items);
+        renderMarkers(items);
+        renderStatus(items);
 
-        nearbyPlaces.forEach((place) => {
-            resultMarkers.push(addPlaceMarker(
+        clearButton.hidden = !state.origin;
+        distanceNote.hidden = !state.origin || items.length === 0;
+    }
+
+    function renderList(items) {
+        if (state.isLoading && state.results.length === 0) {
+            listEl.innerHTML = Array.from({ length: 4 }, () => `
+                <li class="animate-pulse rounded-md border border-sand-200 bg-sand-0 p-4" aria-hidden="true">
+                    <div class="h-4 w-2/3 rounded-sm bg-sand-200"></div>
+                    <div class="mt-2 h-3 w-1/3 rounded-sm bg-sand-100"></div>
+                    <div class="mt-4 h-3 w-5/6 rounded-sm bg-sand-100"></div>
+                    <div class="mt-4 flex gap-2"><div class="h-8 w-24 rounded-sm bg-sand-200"></div><div class="h-8 w-24 rounded-sm bg-sand-100"></div></div>
+                </li>
+            `).join('');
+            listEl.setAttribute('aria-busy', 'true');
+            return;
+        }
+
+        listEl.removeAttribute('aria-busy');
+
+        if (state.error) {
+            listEl.innerHTML = `
+                <li class="rounded-md border border-sand-200 bg-sand-0 p-6 text-center">
+                    <i class="ti ti-cloud-off text-3xl text-sand-400" aria-hidden="true"></i>
+                    <p class="mt-2 text-sm font-semibold text-sand-900">${escapeHtml(state.error)}</p>
+                    <button type="button" data-nearby-retry class="mt-3 inline-flex items-center rounded-sm border border-sand-300 bg-sand-0 px-3 py-1.5 text-xs font-semibold text-sand-800 hover:border-primary-300">Try again</button>
+                </li>
+            `;
+            return;
+        }
+
+        if (items.length === 0) {
+            const hasWiderRadius = Boolean(state.origin && radiusSelect.options[radiusSelect.selectedIndex + 1]);
+
+            listEl.innerHTML = `
+                <li class="rounded-md border border-sand-200 bg-sand-0 p-6 text-center">
+                    <i class="ti ti-map-search text-3xl text-sand-400" aria-hidden="true"></i>
+                    <p class="mt-2 text-sm font-semibold text-sand-900">${state.origin ? 'No places found near this location' : 'No places found in this category'}</p>
+                    <p class="mt-1 text-xs text-sand-600">Try ${state.origin ? 'a wider distance, ' : ''}another category, or browse the full directory.</p>
+                    <div class="mt-3 flex flex-wrap justify-center gap-2">
+                        ${hasWiderRadius ? '<button type="button" data-nearby-wider class="inline-flex items-center rounded-sm border border-sand-300 bg-sand-0 px-3 py-1.5 text-xs font-semibold text-sand-800 hover:border-primary-300">Search a wider area</button>' : ''}
+                        <a href="${attr(page.dataset.directoryUrl ?? '/explore')}" class="inline-flex items-center rounded-sm border border-sand-300 bg-sand-0 px-3 py-1.5 text-xs font-semibold text-sand-800 hover:border-primary-300">Browse the full directory</a>
+                    </div>
+                </li>
+            `;
+            return;
+        }
+
+        listEl.innerHTML = items.map((item) => `
+            <li data-map-item="${attr(item.slug)}" data-nearby-card class="cursor-pointer rounded-md border border-sand-200 bg-sand-0 p-4 shadow-sm transition-colors hover:border-primary-300">
+                <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                        <h2 class="font-display text-sm font-bold text-sand-900">${escapeHtml(item.name)}</h2>
+                        <p class="mt-0.5 text-xs font-semibold text-primary-700">${escapeHtml(item.categoryLabel)}</p>
+                    </div>
+                    ${item.distanceLabel ? `<p class="shrink-0 rounded-sm bg-sand-100 px-2 py-1 text-xs font-semibold text-sand-700">${escapeHtml(item.distanceLabel)}</p>` : ''}
+                </div>
+                ${item.address ? `<p class="mt-2 flex items-start gap-1.5 text-xs text-sand-600"><i class="ti ti-map-pin mt-0.5 shrink-0" aria-hidden="true"></i>${escapeHtml(item.address)}</p>` : ''}
+                ${item.hours ? `<p class="mt-1 flex items-start gap-1.5 text-xs text-sand-600"><i class="ti ti-clock mt-0.5 shrink-0" aria-hidden="true"></i>${escapeHtml(item.hours)}</p>` : ''}
+                <div class="mt-3 flex flex-wrap gap-2">
+                    ${placesBySlug.has(item.slug)
+                        ? `<button type="button" data-listing-details="${attr(item.slug)}" class="inline-flex items-center gap-1 rounded-sm bg-primary-700 px-3 py-1.5 text-xs font-semibold text-sand-0 hover:bg-primary-900">View Details</button>`
+                        : `<a href="${attr(item.href)}" class="inline-flex items-center gap-1 rounded-sm bg-primary-700 px-3 py-1.5 text-xs font-semibold text-sand-0 hover:bg-primary-900">View Details</a>`}
+                    ${item.directionsUrl ? `<a href="${attr(item.directionsUrl)}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 rounded-sm border border-sand-300 bg-sand-0 px-3 py-1.5 text-xs font-semibold text-sand-800 hover:border-primary-300"><i class="ti ti-directions" aria-hidden="true"></i>Directions</a>` : ''}
+                </div>
+            </li>
+        `).join('') + (state.origin && state.page < state.lastPage
+            ? `<li class="text-center"><button type="button" data-nearby-more class="inline-flex items-center rounded-sm border border-sand-300 bg-sand-0 px-4 py-2 text-sm font-semibold text-sand-800 hover:border-primary-300 disabled:opacity-70">Show more places</button></li>`
+            : '');
+
+        paintSelection();
+    }
+
+    function renderStatus(items) {
+        if (state.isLoading) {
+            statusEl.textContent = state.origin ? 'Looking for places near this location…' : 'Loading places…';
+            return;
+        }
+
+        if (state.error) {
+            statusEl.textContent = '';
+            return;
+        }
+
+        if (!state.origin) {
+            statusEl.textContent = `Showing ${items.length} ${items.length === 1 ? 'place' : 'places'} across Davao Oriental. Search a location or use yours to see the closest.`;
+            return;
+        }
+
+        if (items.length === 0) {
+            statusEl.textContent = '';
+            return;
+        }
+
+        const shown = items.length < state.total
+            ? `Showing the nearest ${items.length} of ${state.total}`
+            : `${state.total} ${state.total === 1 ? 'place' : 'places'}`;
+        statusEl.textContent = `${shown} within ${radiusSelect.value} km of ${state.origin.label}, nearest first.`;
+    }
+
+    function renderMarkers(items) {
+        if (!map) {
+            return;
+        }
+
+        markers.forEach((marker) => marker.remove());
+        markers.clear();
+        originMarker?.remove();
+        originMarker = null;
+
+        items.forEach((item) => {
+            const marker = addPlaceMarker(
                 map,
-                { name: place.name, lat: place.latitude, lng: place.longitude },
-                MAP_MARKER_COLORS[place.type] ?? MAP_MARKER_COLORS.establishment,
+                item,
+                MAP_MARKER_COLORS[item.kind] ?? MAP_MARKER_COLORS.establishment,
                 `
-                    <p class="font-semibold text-sand-900">${escapeHtml(place.name)}</p>
-                    <p class="text-xs text-sand-600">${escapeHtml(place.subtype || place.category)} · ${escapeHtml(place.distanceLabel)}</p>
-                    <a href="${escapeHtml(place.url)}" class="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary-700 hover:text-primary-900">View Details<i class="ti ti-arrow-right"></i></a>
+                    <p class="font-semibold text-sand-900">${escapeHtml(item.name)}</p>
+                    <p class="text-xs text-sand-600">${escapeHtml(item.categoryLabel)}${item.distanceLabel ? ` · ${escapeHtml(item.distanceLabel)}` : ''}</p>
                 `,
-                { label: `${place.name} — ${place.distanceLabel}` },
-            ));
+                { label: `${item.name} — ${item.categoryLabel}${item.distanceLabel ? `, ${item.distanceLabel}` : ''}` },
+            );
+            marker.getElement().addEventListener('click', () => selectPlace(item.slug, { fromMap: true }));
+            markers.set(item.slug, marker);
         });
 
-        const bounds = new mapboxgl.LngLatBounds([origin.lng, origin.lat], [origin.lng, origin.lat]);
-        nearbyPlaces.forEach((place) => bounds.extend([place.longitude, place.latitude]));
-        map.fitBounds(bounds, { padding: 50, maxZoom: 14, duration: 0 });
+        if (state.origin) {
+            originMarker = addPlaceMarker(
+                map,
+                { name: state.origin.label, lat: state.origin.lat, lng: state.origin.lng },
+                MAP_MARKER_COLORS.reference,
+                `<p class="font-semibold text-sand-900">${escapeHtml(state.origin.label)}</p>`,
+                { scale: 1.1, label: `Search location: ${state.origin.label}` },
+            );
+        }
 
-        if (statusText) {
-            statusText.textContent = nearbyPlaces.length > 0
-                ? `Showing ${nearbyPlaces.length} ${nearbyPlaces.length === 1 ? 'place' : 'places'} near you`
-                : 'No places found within that distance';
+        const bounds = new mapboxgl.LngLatBounds();
+        let hasPoints = false;
+
+        if (state.origin) {
+            bounds.extend([state.origin.lng, state.origin.lat]);
+            hasPoints = true;
+        }
+
+        items.forEach((item) => {
+            bounds.extend([item.lng, item.lat]);
+            hasPoints = true;
+        });
+
+        if (hasPoints) {
+            map.fitBounds(bounds, { padding: 50, maxZoom: state.origin ? 14 : 12, duration: 0 });
+        }
+    }
+
+    // ---- Selection: marker <-> card --------------------------------------
+
+    function paintSelection() {
+        listEl.querySelectorAll('[data-nearby-card]').forEach((card) => {
+            const isSelected = card.dataset.mapItem === state.selected;
+
+            card.classList.toggle('bg-primary-100', isSelected);
+            card.classList.toggle('border-primary-700', isSelected);
+            card.classList.toggle('ring-1', isSelected);
+            card.classList.toggle('ring-primary-700', isSelected);
+        });
+    }
+
+    /**
+     * Highlights the card of a place. From the map it scrolls the card into
+     * view; from the list it moves the map to the marker and opens its popup.
+     */
+    function selectPlace(slug, { fromMap = false } = {}) {
+        state.selected = slug;
+        paintSelection();
+
+        const card = Array.from(listEl.querySelectorAll('[data-nearby-card]')).find((element) => element.dataset.mapItem === slug);
+
+        if (fromMap) {
+            card?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            return;
+        }
+
+        const marker = markers.get(slug);
+
+        if (!map || !marker) {
+            return;
+        }
+
+        if (!isDesktop()) {
+            setView('map');
+        }
+
+        map.easeTo({ center: marker.getLngLat(), zoom: Math.max(map.getZoom(), 14) });
+
+        if (!marker.getPopup().isOpen()) {
+            marker.togglePopup();
+        }
+    }
+
+    function setView(view) {
+        viewButtons.forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.nearbyView === view)));
+        panels.forEach((panel) => panel.classList.toggle('hidden', panel.dataset.nearbyPanel !== view));
+
+        if (view === 'map') {
+            map?.resize();
+        }
+    }
+
+    // ---- Location and server search --------------------------------------
+
+    function showNotice(message) {
+        noticeEl.textContent = message ?? '';
+        noticeEl.hidden = !message;
+    }
+
+    function setBusy(isBusy, label = 'Use my location') {
+        useLocationButton.disabled = isBusy;
+        searchSubmit.disabled = isBusy;
+        useLocationLabel.textContent = label;
+    }
+
+    /**
+     * Sets the search location and asks the server for its nearest places.
+     */
+    function chooseLocation(lat, lng, label) {
+        state.origin = { lat, lng, label };
+        showNotice('');
+        fetchResults(1);
+    }
+
+    async function fetchResults(pageNumber) {
+        const requestId = ++state.requestId;
+        const isAppend = pageNumber > 1;
+
+        state.isLoading = !isAppend;
+        state.error = null;
+
+        if (!isAppend) {
+            state.results = [];
+        }
+
+        render();
+
+        try {
+            const data = await requestNearbyPlaces(endpoint, {
+                latitude: state.origin.lat,
+                longitude: state.origin.lng,
+                radius: Number(radiusSelect.value),
+                category: state.category || null,
+                page: pageNumber,
+            });
+
+            if (requestId !== state.requestId) return;
+
+            state.results = isAppend ? [...state.results, ...data.results] : data.results;
+            state.total = data.total;
+            state.page = data.page;
+            state.lastPage = data.lastPage;
+        } catch (error) {
+            if (requestId !== state.requestId) return;
+
+            state.error = error.message;
+        }
+
+        state.isLoading = false;
+        render();
+    }
+
+    async function useDeviceLocation() {
+        showNotice('');
+        setBusy(true, 'Locating…');
+
+        try {
+            const { latitude, longitude } = await requestCurrentPosition();
+
+            // Rounded for display only, like the Find Near Me panel; the server rounds the search itself.
+            chooseLocation(Number(latitude.toFixed(4)), Number(longitude.toFixed(4)), 'your location');
+        } catch (error) {
+            showNotice(error.message);
+        }
+
+        setBusy(false);
+    }
+
+    /**
+     * Looks a typed place up through the Mapbox Geocoding API, limited to
+     * Davao Oriental. Only the typed text goes to Mapbox — never a visitor
+     * position.
+     */
+    async function searchPlace(query) {
+        if (!mapboxToken) {
+            showNotice("Place search isn't available right now. You can still use your location or pick a category.");
+            return;
+        }
+
+        showNotice('');
+        setBusy(true, 'Use my location');
+
+        try {
+            const params = new URLSearchParams({
+                q: query,
+                bbox: page.dataset.geocodeBounds,
+                country: 'ph',
+                limit: '1',
+                access_token: mapboxToken,
+            });
+            const response = await fetch(`https://api.mapbox.com/search/geocode/v6/forward?${params}`);
+
+            if (!response.ok) {
+                throw new Error('geocoding failed');
+            }
+
+            const feature = (await response.json()).features?.[0];
+
+            if (!feature) {
+                showNotice(`We couldn't find "${query}" in Davao Oriental. Try a town, barangay, or landmark name.`);
+            } else {
+                const [lng, lat] = feature.geometry.coordinates;
+
+                chooseLocation(lat, lng, feature.properties?.name ?? query);
+            }
+        } catch (error) {
+            console.error('[nearby-map] place search failed:', error);
+            showNotice("Place search isn't available right now. Please try again, or use your location.");
+        }
+
+        setBusy(false);
+    }
+
+    // ---- Wiring ----------------------------------------------------------
+
+    searchForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+
+        const query = searchInput.value.trim();
+
+        if (query === '') {
+            showNotice('Type a town, barangay, or landmark to search.');
+            return;
+        }
+
+        searchPlace(query);
+    });
+
+    useLocationButton.addEventListener('click', useDeviceLocation);
+
+    clearButton.addEventListener('click', () => {
+        state.requestId++;
+        state.origin = null;
+        state.results = [];
+        state.error = null;
+        state.isLoading = false;
+        state.selected = null;
+        searchInput.value = '';
+        showNotice('');
+        render();
+    });
+
+    categoryButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+            state.category = button.dataset.nearbyCategory;
+            categoryButtons.forEach((other) => other.setAttribute('aria-pressed', String(other === button)));
+            state.selected = null;
+
+            if (state.origin) {
+                fetchResults(1);
+            } else {
+                render();
+            }
+        });
+    });
+
+    radiusSelect.addEventListener('change', () => {
+        if (state.origin) {
+            fetchResults(1);
         }
     });
 
-    document.addEventListener('find-near-me:cleared', () => {
-        clearResultMarkers();
+    viewButtons.forEach((button) => button.addEventListener('click', () => setView(button.dataset.nearbyView)));
 
-        if (statusText) {
-            statusText.textContent = 'Showing destinations & establishments across Davao Oriental';
+    listEl.addEventListener('click', (event) => {
+        if (event.target.closest('[data-nearby-retry]')) {
+            fetchResults(1);
+            return;
+        }
+
+        if (event.target.closest('[data-nearby-wider]')) {
+            radiusSelect.selectedIndex += 1;
+            fetchResults(1);
+            return;
+        }
+
+        const moreButton = event.target.closest('[data-nearby-more]');
+
+        if (moreButton) {
+            moreButton.disabled = true;
+            fetchResults(state.page + 1);
+            return;
+        }
+
+        // Buttons and links inside a card do their own thing; the rest of the card selects its place.
+        const card = event.target.closest('[data-nearby-card]');
+
+        if (card && !event.target.closest('a, button')) {
+            selectPlace(card.dataset.mapItem);
         }
     });
+
+    setView('map');
+    render();
 }
 
 /**

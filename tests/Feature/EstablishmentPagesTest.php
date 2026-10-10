@@ -127,6 +127,13 @@ test('feedback and arrival records are limited to the account\'s own establishme
         'lst_id' => $badjaoListing->lst_id,
     ]);
 
+    // Real tourist feedback rows (Objective 4) — one per establishment.
+    foreach ([[$botanikaListing, 'Beautiful sunrise from the room'], [$badjaoListing, 'Lami kaayo ang kinilaw']] as [$objListing, $strText]) {
+        $objListing->feedbacks()->make(['fbk_original_text' => $strText])
+            ->forceFill(['fbk_consent_at' => now(), 'fbk_content_hash' => hash('sha256', $strText)])
+            ->save();
+    }
+
     // Botanika user should see their own feedback and arrivals
     $feedback = test()->actingAs($botanikaUser)->get(route('establishment.feedback.index'));
     $feedback->assertOk();

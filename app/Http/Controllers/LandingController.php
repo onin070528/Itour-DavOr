@@ -4,7 +4,7 @@
  * iTOUR — Davao Oriental Tourism Information System
  *
  * Purpose: Renders the public landing page — featured destinations,
- * establishments, municipalities, visitor reviews, and the nearby-places map.
+ * establishments, and municipalities — and the Nearby page.
  * Programmer/s: iTOUR Development Team
  * Copyright (c) 2026 iTOUR Development Team. All rights reserved.
  */
@@ -12,8 +12,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\Announcement;
+use App\Models\Category;
 use App\Support\DirectionsLink;
 use App\Support\TourismCatalog;
+use Illuminate\Support\Collection;
 use Illuminate\View\View;
 
 class LandingController extends Controller
@@ -52,84 +54,85 @@ class LandingController extends Controller
         return view('landing', [
             'signatureExperiences' => $arrSignatureExperiences,
             'moreExperiences' => $objActiveListings->whereNotIn('id', $arrSignatureIds)->values()->all(),
-            // "Get directions" links are built here (destination coordinates only, App\Support\DirectionsLink).
-            // Public modal fields only (Objective 3, Phase 7): no workflow status,
-            // visibility flag, or stored file name reaches the page's JSON.
-            'listingDetails' => $objActiveListings
-                ->map(fn (array $arrListing) => [
-                    ...array_intersect_key($arrListing, array_flip(self::MODAL_FIELDS)),
-                    'categoryLabel' => TourismCatalog::categoryLabel($arrListing['category']),
-                    'directionsUrl' => DirectionsLink::toDestination($arrListing['lat'], $arrListing['lng']),
-                ])
-                ->keyBy('id')
-                ->all(),
+            'listingDetails' => $this->_listingDetails($objActiveListings),
             'featuredEstablishments' => TourismCatalog::featuredEstablishments(4),
             'municipalities' => TourismCatalog::municipalities(),
-            'reviews' => $this->reviews(),
-            'nearbyPlaces' => $this->nearbyPlaces(),
             'announcements' => Announcement::query()->currentlyVisible()->limit(5)->get(),
         ]);
     }
 
     /**
-     * Active listings that have coordinates, in the shape the "Find Places
-     * Near You" Mapbox map on the landing page plots markers from.
-     *
-     * @return array<int, array{name: string, category: string, municipality: string, barangay: string, lat: float, lng: float}>
+     * Display the public Nearby page: a map and list of the province's public
+     * places, narrowed by the server's Find Near Me search once the visitor
+     * picks a location. The page only carries public fields — the same ones
+     * the landing page's "View Details" modal already used.
      */
-    private function nearbyPlaces(): array
+    public function nearby(): View
     {
-        return collect(TourismCatalog::listings())
-            ->where('isPubliclyVisible', true)
-            ->filter(fn ($arrListing) => $arrListing['lat'] !== null && $arrListing['lng'] !== null)
-            ->map(fn ($arrListing) => [
-                'name' => $arrListing['name'],
-                'category' => $arrListing['category'],
+        $objActiveListings = collect(TourismCatalog::listings())->where('isPubliclyVisible', true);
+
+        return view('nearby', [
+            'nearbyPlaces' => $this->nearbyPlaces($objActiveListings),
+            'listingDetails' => $this->_listingDetails($objActiveListings),
+            'categories' => Category::query()->active()->get()
+                ->map(fn (Category $objCategory) => [
+                    'slug' => $objCategory->legacySlug(),
+                    'label' => $objCategory->isDestinationCategory() ? 'Destinations' : $objCategory->cat_name,
+                    'icon' => TourismCatalog::categoryIcon($objCategory->legacySlug()),
+                ])
+                ->all(),
+        ]);
+    }
+
+    /**
+     * The public modal fields of each listing, keyed by listing id.
+     * "Get directions" links are built here (destination coordinates only,
+     * App\Support\DirectionsLink). Public modal fields only (Objective 3,
+     * Phase 7): no workflow status, visibility flag, or stored file name
+     * reaches the page's JSON.
+     *
+     * @param  Collection<int, array<string, mixed>>  $objActiveListings
+     * @return array<string, array<string, mixed>>
+     */
+    private function _listingDetails(Collection $objActiveListings): array
+    {
+        return $objActiveListings
+            ->map(fn (array $arrListing) => [
+                ...array_intersect_key($arrListing, array_flip(self::MODAL_FIELDS)),
                 'categoryLabel' => TourismCatalog::categoryLabel($arrListing['category']),
-                'municipality' => $arrListing['municipality'],
-                'barangay' => $arrListing['barangay'],
-                'lat' => $arrListing['lat'],
-                'lng' => $arrListing['lng'],
-                'href' => $arrListing['href'],
+                'directionsUrl' => DirectionsLink::toDestination($arrListing['lat'], $arrListing['lng']),
             ])
-            ->values()
+            ->keyBy('id')
             ->all();
     }
 
     /**
-     * @return array<int, array{name: string, rating: int, subject: string, date: string, text: string}>
+     * Active listings that have coordinates, in the shape the Nearby page's
+     * Mapbox map and list are built from. `directionsUrl` is the server-built
+     * destination-only link; `hours` is the stored value or null.
+     *
+     * @param  Collection<int, array<string, mixed>>  $objActiveListings
+     * @return array<int, array<string, mixed>>
      */
-    private function reviews(): array
+    private function nearbyPlaces(Collection $objActiveListings): array
     {
-        return [
-            [
-                'name' => 'Rica M.',
-                'rating' => 5,
-                'subject' => 'Dahican Beach',
-                'date' => 'July 28, 2026',
-                'text' => 'Woke up early for the sunrise and had the whole shoreline to myself. The sand is so fine and the skimboard rentals right on the beach made it an easy first try.',
-            ],
-            [
-                'name' => 'Josel T.',
-                'rating' => 5,
-                'subject' => 'Aliwagwag Falls Eco-Park',
-                'date' => 'July 14, 2026',
-                'text' => "Genuinely one of the most beautiful falls I've hiked to in Mindanao. The canopy walk gives you a view of nearly every tier — bring water shoes, the stairs get slippery.",
-            ],
-            [
-                'name' => 'Grace A.',
-                'rating' => 4,
-                'subject' => 'Mount Hamiguitan Range Wildlife Sanctuary',
-                'date' => 'June 30, 2026',
-                'text' => 'The pygmy forest at the summit is unreal — centuries-old bonsai trees you can only find here. Trek is long, so book a guide through the tourism office in advance.',
-            ],
-            [
-                'name' => 'Marco D.',
-                'rating' => 5,
-                'subject' => 'Botanika Nature Resort',
-                'date' => 'June 9, 2026',
-                'text' => 'Stayed two nights and did not want to leave. Garden villas were quiet, staff arranged a Pujada Bay island hop for us, and the farm-to-table breakfast was a highlight.',
-            ],
-        ];
+        return $objActiveListings
+            ->filter(fn ($arrListing) => $arrListing['lat'] !== null && $arrListing['lng'] !== null)
+            ->map(fn ($arrListing) => [
+                'slug' => $arrListing['id'],
+                'name' => $arrListing['name'],
+                'kind' => $arrListing['category'] === 'destinations' ? 'destination' : 'establishment',
+                'category' => $arrListing['category'],
+                'categoryLabel' => $arrListing['destinationType'] ?: TourismCatalog::categoryLabel($arrListing['category']),
+                'municipality' => $arrListing['municipality'],
+                'barangay' => $arrListing['barangay'],
+                'lat' => (float) $arrListing['lat'],
+                'lng' => (float) $arrListing['lng'],
+                'hours' => $arrListing['hours'],
+                'href' => $arrListing['href'],
+                'directionsUrl' => DirectionsLink::toDestination($arrListing['lat'], $arrListing['lng']),
+            ])
+            ->values()
+            ->all();
     }
 }

@@ -5,7 +5,7 @@
     Programmer/s: iTOUR Development Team
     Copyright (c) 2026 iTOUR Development Team. All rights reserved.
 --}}
-@props(['title' => null, 'description' => null, 'canonical' => null])
+@props(['title' => null, 'description' => null, 'canonical' => null, 'robots' => null])
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
     <head>
@@ -17,6 +17,9 @@
         <meta name="description" content="{{ $description ?: 'iTOUR is the official tourism information platform of the Provincial Tourism Office of Davao Oriental — explore destinations, accommodations, restaurants, and tourism establishments across the province.' }}">
         @if ($canonical)
             <link rel="canonical" href="{{ $canonical }}">
+        @endif
+        @if ($robots)
+            <meta name="robots" content="{{ $robots }}">
         @endif
 
         @fonts

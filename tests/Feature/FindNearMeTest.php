@@ -167,24 +167,74 @@ test('the destination page and the landing modal use destination-only directions
     expect($arrModalListing['directionsUrl'])->not->toContain($objListing->lst_uuid)->not->toContain('Owner');
 });
 
-test('the landing page and Explore offer Find Near Me with the privacy notice and configured radii', function () {
+test('Explore offers Find Near Me with the privacy notice and configured radii', function () {
     test()->seed(CategorySeeder::class);
 
-    foreach ([route('home'), route('explore')] as $strUrl) {
-        $objResponse = $this->get($strUrl)->assertOk()
-            ->assertSee('data-find-near-me', false)
-            ->assertSee('data-endpoint="/find-near-me"', false)
-            ->assertSee('iTOUR uses your current location only to identify nearby tourism destinations and services. Your exact location is not permanently stored.')
-            ->assertSee('Allow Location')
-            ->assertSee('Not Now')
-            ->assertSee('<option value="10" selected>10 km</option>', false);
+    $objResponse = $this->get(route('explore'))->assertOk()
+        ->assertSee('data-find-near-me', false)
+        ->assertSee('data-endpoint="/find-near-me"', false)
+        ->assertSee('iTOUR uses your current location only to identify nearby tourism destinations and services. Your exact location is not permanently stored.')
+        ->assertSee('Allow Location')
+        ->assertSee('Not Now')
+        ->assertSee('<option value="10" selected>10 km</option>', false);
 
-        foreach (config('tourism_directory.nearby.radius_options_km') as $intRadius) {
-            $objResponse->assertSee('<option value="'.$intRadius.'"', false);
-        } // end foreach configured radius
-    } // end foreach page
+    foreach (config('tourism_directory.nearby.radius_options_km') as $intRadius) {
+        $objResponse->assertSee('<option value="'.$intRadius.'"', false);
+    } // end foreach configured radius
+});
 
-    $this->get(route('home'))->assertDontSee('find-near-you-button', false)->assertSee('id="nearby-map"', false);
+test('the Nearby page has the map, location search, category pills, configured radii, and the privacy notice', function () {
+    test()->seed(CategorySeeder::class);
+
+    $objResponse = $this->get(route('nearby'))->assertOk()
+        ->assertSee('Search a location, choose a category, and see the closest tourism services.')
+        ->assertSee('id="nearby-map"', false)
+        ->assertSee('Use my location')
+        ->assertSee('data-nearby-category=""', false)
+        ->assertSee('data-nearby-category="accommodation"', false)
+        ->assertSee('data-endpoint="/find-near-me"', false)
+        ->assertSee('Your exact location is not permanently stored.')
+        ->assertSee('<option value="10" selected>10 km</option>', false);
+
+    foreach (config('tourism_directory.nearby.radius_options_km') as $intRadius) {
+        $objResponse->assertSee('<option value="'.$intRadius.'"', false);
+    } // end foreach configured radius
+
+    // Summary comment: the map section moved off the landing page, which keeps its other sections.
+    $this->get(route('home'))->assertOk()->assertDontSee('id="nearby-map"', false)->assertSee('Signature experiences of Davao Oriental');
+});
+
+test('the topbar links to the Nearby page with the new labels', function () {
+    $objResponse = $this->get(route('home'))->assertOk()
+        ->assertSeeInOrder(['>Home<', '>Explore<', '>Find Nearby<', '>Emergency Hotlines<'], false)
+        ->assertSee('href="'.route('nearby').'"', false);
+
+    expect($objResponse->getContent())->not->toContain('#near-you');
+});
+
+test('the Nearby page exposes only public place fields, with server-built destination-only directions', function () {
+    test()->seed(CategorySeeder::class);
+    $objCategory = Category::query()->where('cat_name', 'Tourist Destinations')->firstOrFail();
+    $objListing = Listing::query()->create([
+        'lst_slug' => Str::slug('Nearby Falls '.Str::random(6)),
+        'lst_name' => 'Nearby Falls',
+        'lst_category' => 'destinations',
+        'cat_id' => $objCategory->cat_id,
+        'lst_municipality' => 'Cateel',
+        'lst_barangay' => 'Aliwagwag',
+        'lst_lat' => 7.7947,
+        'lst_lng' => 126.355,
+        'lst_status' => 'Active',
+        'lst_owner_name' => 'Owner Person',
+    ]);
+
+    $strHtml = $this->get(route('nearby'))->assertOk()->getContent();
+    preg_match('#<script type="application/json" id="nearby-map-data">(.*?)</script>#s', $strHtml, $arrMatch);
+    $arrPlace = collect(json_decode($arrMatch[1], true))->firstWhere('slug', $objListing->lst_slug);
+
+    expect($arrPlace['directionsUrl'])->toBe(DirectionsLink::toDestination(7.7947, 126.355));
+    expect(array_keys($arrPlace))->not->toContain('lst_uuid')->not->toContain('status')->not->toContain('email');
+    expect($strHtml)->not->toContain($objListing->lst_uuid);
 });
 
 test('the browser code keeps no location, calculates no distance, and calls no directions service', function () {

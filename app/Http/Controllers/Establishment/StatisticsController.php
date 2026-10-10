@@ -11,6 +11,7 @@
 
 namespace App\Http\Controllers\Establishment;
 
+use App\Services\FeedbackAnalyticsService;
 use App\Support\EstablishmentMockData;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -20,12 +21,12 @@ class StatisticsController extends EstablishmentController
     /**
      * Tourism Statistics: this establishment's own visitor trend and classification.
      */
-    public function index(Request $request): View
+    public function index(Request $request, FeedbackAnalyticsService $objAnalytics): View
     {
         $name = $request->user()->usr_organization_name;
 
         return $this->renderEstablishment($request, 'establishment.statistics', 'statistics', 'Tourism Statistics', [
-            'summary' => EstablishmentMockData::dashboardSummary($name),
+            'summary' => $objAnalytics->withFeedbackCards(EstablishmentMockData::dashboardSummary($name), $objAnalytics->scopedQuery($request->user())),
             'arrivalTrend' => EstablishmentMockData::arrivalTrend($name),
             'classificationBreakdown' => EstablishmentMockData::classificationBreakdown($name),
             'genderBreakdown' => collect(EstablishmentMockData::arrivals($name))->countBy('gender'),

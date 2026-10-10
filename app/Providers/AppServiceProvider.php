@@ -15,8 +15,11 @@ use App\Models\Municipality;
 use App\Models\User;
 use App\Policies\ImagePolicy;
 use App\Policies\MunicipalityPolicy;
+use App\Services\OpenAiTranslationService;
+use App\Services\TranslationService;
 use App\Support\SecurityLogger;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
@@ -32,7 +35,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Objective 4: the feedback pipeline depends on the provider-neutral
+        // TranslationService; this is the one place the provider is chosen.
+        $this->app->bind(TranslationService::class, OpenAiTranslationService::class);
     }
 
     /**
@@ -89,6 +94,22 @@ class AppServiceProvider extends ServiceProvider
         // keyed by IP only. The key never includes the submitted coordinates.
         RateLimiter::for('find-near-me', function (Request $objRequest) {
             return Limit::perMinute((int) config('tourism_directory.nearby.find_near_me_per_minute'))->by($objRequest->ip());
+        });
+
+        // Public tourist feedback (Objective 4) — no account, so keyed by IP.
+        // The hourly limit counts only completed submissions (the redirect
+        // to the thank-you page), so a tourist correcting a typo is never
+        // blocked; the per-minute limit caps every attempt. Both expire on
+        // their own — an IP is never blocked for good (shared Wi-Fi).
+        RateLimiter::for('tourist-feedback', function (Request $objRequest) {
+            $strThankYouUrl = route('feedback.thankYou');
+
+            return [
+                Limit::perHour((int) config('tourist_feedback.submissions_per_hour'))
+                    ->by('submitted|'.$objRequest->ip())
+                    ->after(fn ($objResponse) => $objResponse instanceof RedirectResponse && $objResponse->getTargetUrl() === $strThankYouUrl),
+                Limit::perMinute(20)->by('attempts|'.$objRequest->ip()),
+            ];
         });
 
         // Establishment photo uploads — per-user, not per-establishment, so

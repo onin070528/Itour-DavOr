@@ -40,6 +40,66 @@ const MESSAGES = {
 };
 
 /**
+ * One-time position request (no continuous tracking). Resolves with the
+ * visitor's coordinates, or rejects with an Error whose message is a plain,
+ * visitor-facing sentence. The coordinates are not kept anywhere.
+ */
+export function requestCurrentPosition() {
+    return new Promise((resolve, reject) => {
+        if (!window.isSecureContext) {
+            reject(new Error(MESSAGES.insecure));
+            return;
+        }
+
+        if (!('geolocation' in navigator)) {
+            reject(new Error(MESSAGES.unsupported));
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => resolve({ latitude: position.coords.latitude, longitude: position.coords.longitude }),
+            (error) => reject(new Error(geolocationMessage(error))),
+            GEOLOCATION_OPTIONS,
+        );
+    });
+}
+
+/**
+ * Sends a location to the iTOUR server only, in the POST JSON body, and
+ * resolves with the server's nearest public places. Rejects with an Error
+ * carrying a plain visitor-facing message.
+ *
+ * @param {string} endpoint The Find Near Me route.
+ * @param {{latitude: number, longitude: number, radius?: number, category?: ?string, page?: number}} payload
+ */
+export async function requestNearbyPlaces(endpoint, payload) {
+    let response;
+
+    try {
+        response = await fetch(endpoint, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+            },
+            body: JSON.stringify(payload),
+        });
+    } catch {
+        throw new Error(MESSAGES.offline);
+    }
+
+    const data = await response.json().catch(() => null);
+
+    if (response.ok && data) {
+        return data;
+    }
+
+    throw new Error(failureMessage(response.status, data));
+}
+
+/**
  * Every Find Near Me panel on the page.
  */
 export function initFindNearMe() {
@@ -81,77 +141,33 @@ function initPanel(root) {
     /**
      * One search: a fresh one-time position request, then one POST.
      */
-    function search() {
+    async function search() {
         if (isBusy) {
             return;
         }
 
         clearResults();
-
-        if (!window.isSecureContext) {
-            showStatus(MESSAGES.insecure, { showActions: true });
-            return;
-        }
-
-        if (!('geolocation' in navigator)) {
-            showStatus(MESSAGES.unsupported, { showActions: true });
-            return;
-        }
-
         setBusy(true);
         showStatus(MESSAGES.locating);
 
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                sendSearch(position.coords.latitude, position.coords.longitude);
-            },
-            (error) => {
-                setBusy(false);
-                showStatus(geolocationMessage(error), { showActions: true });
-            },
-            GEOLOCATION_OPTIONS,
-        );
-    }
-
-    /**
-     * Sends the position to the iTOUR server only, in the request body.
-     */
-    async function sendSearch(latitude, longitude) {
-        showStatus(MESSAGES.searching);
-
-        let response;
-
         try {
-            response = await fetch(endpoint, {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Accept: 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
-                },
-                body: JSON.stringify({
-                    latitude,
-                    longitude,
-                    radius: Number(radiusSelect.value),
-                    category: categorySelect?.value || null,
-                }),
+            const { latitude, longitude } = await requestCurrentPosition();
+
+            showStatus(MESSAGES.searching);
+
+            const data = await requestNearbyPlaces(endpoint, {
+                latitude,
+                longitude,
+                radius: Number(radiusSelect.value),
+                category: categorySelect?.value || null,
             });
-        } catch {
+
             setBusy(false);
-            showStatus(MESSAGES.offline, { showActions: true });
-            return;
-        }
-
-        const data = await response.json().catch(() => null);
-        setBusy(false);
-
-        if (response.ok && data) {
             renderResults(data, latitude, longitude);
-            return;
+        } catch (error) {
+            setBusy(false);
+            showStatus(error.message, { showActions: true });
         }
-
-        showStatus(failureMessage(response.status, data), { showActions: true });
     }
 
     function renderResults(data, latitude, longitude) {

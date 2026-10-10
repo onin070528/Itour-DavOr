@@ -85,7 +85,7 @@ The exact test totals of the final run are recorded in `docs/objective3_director
 2. **(0:40) Map view.** Switch to Map. Point out: destination (teal) and tourism service (orange) pins, the list under the map, "Show on map". Mention: Mapbox only displays; the data comes from PostgreSQL.
 3. **(1:05) Destination page.** Open Dahican Beach. Show visitor information, entrance fee, managing office, the location map, and Nearby Tourism Services grouped by category with distances. Mention: the distances are Haversine, calculated in PostgreSQL by one service, nearest first, at most 5 per category.
 4. **(1:40) Find Nearby.** Click Find Nearby; change the radius from 10 km to 25 km to show more places, then filter one category. To show the empty state, pick 1 km with a category that has nothing that close; point out the "search within" a wider radius option.
-5. **(2:05) Find Near Me.** On the landing page, open Find Near Me: read the privacy notice, Allow Location, show the nearest places and their pins. Mention: the location is sent once by POST, rounded to about 11 m, and never stored. (Requires HTTPS — use the cloudflared address.)
+5. **(2:05) Find Near Me.** Open the Nearby page (`/nearby`, topbar "Find Nearby"): read the privacy notice, Use my location (or search a place), show the nearest places and their pins. Mention: the location is sent once by POST, rounded to about 11 m, and never stored. (Requires HTTPS — use the cloudflared address.)
 6. **(2:35) Directions and workflow.** Click Get Directions: Google Maps opens with the destination only. Close with the workflow: an LGU submits, only the PTO publishes; a suspended destination goes back to Draft and must be reviewed again.
 
 ---

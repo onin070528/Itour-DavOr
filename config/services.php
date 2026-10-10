@@ -47,6 +47,15 @@ return [
         'token' => env('MAPBOX_SECRET_KEY'),
     ],
 
+    // Objective 4: used ONLY to translate tourist feedback into English
+    // (App\Services\OpenAiTranslationService). Sentiment, issue detection,
+    // and recommendations never call it.
+    'openai' => [
+        'api_key' => env('OPENAI_API_KEY'),
+        'base_url' => 'https://api.openai.com/v1',
+        'translation_model' => env('OPENAI_TRANSLATION_MODEL', 'gpt-4.1-mini'),
+    ],
+
     'turnstile' => [
         'site_key' => env('TURNSTILE_SITE_KEY'),
         'secret_key' => env('TURNSTILE_SECRET_KEY'),

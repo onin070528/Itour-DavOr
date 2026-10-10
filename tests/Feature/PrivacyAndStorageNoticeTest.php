@@ -32,10 +32,18 @@ test('the privacy notice page loads and covers every required section', function
         ->assertSee('Contact');
 });
 
-test('the privacy notice page does not claim an AI backend receives data', function () {
-    // No OpenAI/AI backend exists today (Ori's replies are a client-side
-    // placeholder) — the page must not claim otherwise.
-    test()->get(route('privacy'))->assertDontSee('OpenAI');
+test('the privacy notice discloses translation of non-English feedback and claims no other AI use', function () {
+    // Objective 4: OpenAI receives only non-English feedback text, for
+    // translation; scoring uses the fixed word list, not AI. Ori (the
+    // chatbot) is still a client-side placeholder and is not listed as a
+    // third party.
+    test()->get(route('privacy'))
+        ->assertSee('OpenAI (translation service)')
+        ->assertSee('external translation service')
+        ->assertSee('not in English')
+        ->assertSee('Your name, visit date, and IP address are not sent with it.')
+        ->assertSee('fixed tourism word list')
+        ->assertDontSee('<strong>Ori', false);
 });
 
 test('the public footer links to the privacy notice', function () {

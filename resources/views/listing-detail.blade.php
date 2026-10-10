@@ -83,6 +83,22 @@
             @endforeach
         </dl>
 
+        {{-- Share Your Experience (Objective 4): only while this listing
+             accepts new feedback (Listing::isAcceptingFeedback()) — never on
+             a staff preview of an unpublished record. Public slug only. --}}
+        @if ($listing->isAcceptingFeedback())
+            <section class="mt-8 flex flex-col gap-3 border-t border-sand-200 pt-6 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <h2 class="font-display text-lg font-bold text-sand-900">Been here?</h2>
+                    <p class="mt-1 text-sm text-sand-600">Share your experience to help improve tourism in Davao Oriental.</p>
+                </div>
+                <a href="{{ route('feedback.create', ['listing' => $listing->lst_slug]) }}" class="btn-primary shrink-0 justify-center">
+                    <i class="ti ti-message-2" aria-hidden="true"></i>
+                    Share Your Experience
+                </a>
+            </section>
+        @endif
+
         {{-- Visitor information (destinations): what to know before going. --}}
         @if ($isDestination && $listing->lst_visitor_information)
             <section class="mt-8 border-t border-sand-200 pt-6">

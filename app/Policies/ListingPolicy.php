@@ -177,4 +177,27 @@ class ListingPolicy
             && $objListing->lst_category !== 'destinations'
             && $objListing->lst_id === $objUser->lst_id;
     }
+
+    /**
+     * Who may view a listing's tourist feedback analytics (Objective 4):
+     * the PTO every listing; the LGU listings in its own municipality; an
+     * establishment only its own linked listing. Stricter than view(),
+     * which also lets an establishment read destinations in its
+     * municipality — that never extends to feedback. A missing mun_id or
+     * lst_id denies. Keep in step with Feedback::scopeVisibleTo(). An LGU
+     * denial (a cross-municipality attempt) is recorded by Gate::after
+     * (AppServiceProvider) through SecurityLogger::accessDenied().
+     */
+    public function viewFeedback(User $objUser, Listing $objListing): bool
+    {
+        $blnIsOwnMunicipality = $objUser->mun_id !== null && $objListing->mun_id === $objUser->mun_id;
+        $blnIsOwnListing = $objUser->lst_id !== null && $objListing->lst_id === $objUser->lst_id;
+
+        return match ($objUser->usr_role) {
+            UserRole::PtoAdministrator => true,
+            UserRole::Lgu => $blnIsOwnMunicipality,
+            UserRole::Establishment => $blnIsOwnListing,
+            default => false,
+        };
+    }
 }

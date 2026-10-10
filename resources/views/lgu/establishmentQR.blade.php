@@ -251,6 +251,18 @@
                     <p class="mt-1 text-sm text-sand-600">Thanks! Your visit to {{ $establishmentName }} has been logged.</p>
                     <p id="qr-success-summary" class="mt-3 rounded-sm bg-sand-50 px-3 py-1.5 text-sm font-semibold text-sand-800"></p>
 
+                    {{-- Objective 4: only when this establishment accepts public
+                         feedback; the link carries the public slug only. --}}
+                    @if ($feedbackUrl ?? null)
+                        <div class="mt-6 w-full border-t border-sand-100 pt-5">
+                            <p class="text-sm text-sand-600">Enjoying your visit? Tell us how it went — it helps improve tourism in Davao Oriental.</p>
+                            <a href="{{ $feedbackUrl }}" class="btn-primary mt-3 justify-center">
+                                <i class="ti ti-message-2" aria-hidden="true"></i>
+                                Share Your Experience
+                            </a>
+                        </div>
+                    @endif
+
                     <button type="button" id="qr-form-reset" class="mt-6 rounded-sm border border-sand-300 px-5 py-2.5 text-sm font-semibold text-sand-800 hover:border-primary-300">
                         Register Another Group
                     </button>

@@ -383,6 +383,16 @@ class Listing extends Model
         return $this->hasMany(MonthlyArrivalReport::class, 'lst_id', 'lst_id');
     }
 
+    /**
+     * Public tourist feedback submitted for this destination or
+     * establishment listing. Kept when the listing is later unpublished,
+     * archived, or suspended.
+     */
+    public function feedbacks(): HasMany
+    {
+        return $this->hasMany(Feedback::class, 'lst_id', 'lst_id');
+    }
+
     public function municipalityRecord(): BelongsTo
     {
         return $this->belongsTo(Municipality::class, 'mun_id', 'mun_id');
@@ -580,6 +590,35 @@ class Listing extends Model
             ->orWhere(fn (Builder $objEstablishment) => $objEstablishment
                 ->where('lst_category', '!=', 'destinations')
                 ->where('lst_status', 'PUBLISHED')));
+    }
+
+    /**
+     * Whether tourists may submit new public feedback for this listing
+     * (Objective 4): a publicly visible destination (Active) or tourism
+     * establishment (PUBLISHED), whatever its reporting method or QR
+     * state. Tour guides are excluded because their feedback would be
+     * about a named individual. Feedback already stored stays with the
+     * listing when it later stops being public.
+     */
+    public function isAcceptingFeedback(): bool
+    {
+        return $this->isPubliclyVisible() && ! $this->isTourGuide();
+    }
+
+    /**
+     * Query form of isAcceptingFeedback() — the same rule, for the public
+     * feedback selector and validation. Keep the two in step. A NULL
+     * lst_type is not a tour guide, so it is kept explicitly (SQL NOT IN
+     * would drop it).
+     */
+    public function scopeAcceptingFeedback(Builder $objQuery): Builder
+    {
+        $arrTourGuideTypes = [config('establishment_categories.tour_guide_type'), self::LEGACY_TOUR_GUIDE_TYPE];
+
+        return $objQuery->publiclyVisible()
+            ->where(fn (Builder $objType) => $objType
+                ->whereNull('lst_type')
+                ->orWhereNotIn('lst_type', $arrTourGuideTypes));
     }
 
     public function isDraft(): bool

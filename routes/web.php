@@ -52,6 +52,7 @@ use App\Http\Controllers\Pto\SettingsController as PtoSettingsController;
 use App\Http\Controllers\Pto\UsersController as PtoUsersController;
 use App\Http\Controllers\QrCodeController;
 use App\Http\Controllers\ReportVerificationController;
+use App\Http\Controllers\TouristFeedbackController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [LandingController::class, 'index'])->name('home');
@@ -59,6 +60,7 @@ Route::get('/', [LandingController::class, 'index'])->name('home');
 // and a destination's Find Nearby list — rate-limited per IP, generously.
 Route::middleware('throttle:public-directory')->group(function () {
     Route::get('/explore', [ExploreController::class, 'index'])->name('explore');
+    Route::get('/nearby', [LandingController::class, 'nearby'])->name('nearby');
     Route::get('/listings/{listing}', [ListingDetailController::class, 'show'])->name('listings.show');
     Route::get('/listings/{listing}/nearby', [ListingDetailController::class, 'nearby'])->name('listings.nearby');
 
@@ -69,6 +71,13 @@ Route::middleware('throttle:public-directory')->group(function () {
 Route::get('/hotlines', [HotlinesController::class, 'index'])->name('hotlines');
 Route::get('/verify-report', [ReportVerificationController::class, 'show'])->name('reports.verify');
 Route::get('/privacy', [PrivacyController::class, 'show'])->name('privacy');
+
+// Public tourist feedback (Objective 4): no account; Turnstile, CSRF,
+// honeypot, duplicate protection, and the 'tourist-feedback' rate limit.
+// A listing is preselected by its public slug (?listing={slug}).
+Route::get('/feedback', [TouristFeedbackController::class, 'create'])->middleware('throttle:public-directory')->name('feedback.create');
+Route::post('/feedback', [TouristFeedbackController::class, 'store'])->middleware('throttle:tourist-feedback')->name('feedback.store');
+Route::get('/feedback/thank-you', [TouristFeedbackController::class, 'thankYou'])->name('feedback.thankYou');
 
 // The only route that ever serves an establishment image file — public for
 // a Published image, authorized-only otherwise. See
@@ -160,6 +169,7 @@ Route::middleware(['auth', 'role:pto_administrator'])->prefix('pto')->name('pto.
     Route::prefix('feedback')->name('feedback.')->group(function () {
         Route::get('/', [PtoFeedbackController::class, 'index'])->name('index');
         Route::get('/analytics', [PtoFeedbackController::class, 'analytics'])->name('analytics');
+        Route::get('/listings/{listing}', [PtoFeedbackController::class, 'listing'])->name('listing');
     });
 
     Route::prefix('hotlines')->name('hotlines.')->group(function () {
@@ -264,6 +274,7 @@ Route::middleware(['auth', 'role:lgu', 'lgu.municipality'])->prefix('lgu')->name
     Route::prefix('feedback')->name('feedback.')->group(function () {
         Route::get('/', [LguFeedbackController::class, 'index'])->name('index');
         Route::get('/analytics', [LguFeedbackController::class, 'analytics'])->name('analytics');
+        Route::get('/listings/{listing}', [LguFeedbackController::class, 'listing'])->name('listing');
     });
 
     Route::get('/users', [LguUsersController::class, 'index'])->name('users');

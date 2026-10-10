@@ -39,6 +39,12 @@ class CheckinController extends Controller
      * record, a category or establishment with QR switched off, or an
      * establishment with no linked account all show a refusal message
      * instead.
+     *
+     * When the establishment also accepts public feedback
+     * (Listing::isAcceptingFeedback() — published, not a tour guide), the
+     * success step offers "Share Your Experience", linking to the public
+     * feedback form by the listing's public slug (never its id or this
+     * QR uuid). QR eligibility itself is unchanged.
      */
     public function show(string $establishment, ArrivalRecorder $arrivalRecorder): View
     {
@@ -61,6 +67,7 @@ class CheckinController extends Controller
             'municipalities' => $arrivalRecorder->getProvinceMunicipalityNames(),
             'checkinAction' => route('checkin.store', $establishment),
             'refusalMessage' => null,
+            'feedbackUrl' => $objListing->isAcceptingFeedback() ? route('feedback.create', ['listing' => $objListing->lst_slug]) : null,
         ]);
     }
 
